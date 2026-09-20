@@ -179,11 +179,40 @@ begin
                         where category_id = cat and profile_id = uid);
 end $fn$;
 
+-- Visibilidade decidida SÓ pelas colunas recebidas, sem reconsultar a tabela.
+-- É isso que permite usá-las na policy de SELECT da própria tabela: num
+-- INSERT ... RETURNING a linha nova ainda não está visível para uma função,
+-- então qualquer regra que fosse buscá-la de volta negaria a inserção.
+-- `autor` entra na regra porque a lista de membros só é gravada depois do
+-- INSERT: sem isso, uma categoria restrita ficaria invisível até para quem
+-- acabou de criá-la, e o RETURNING seria negado.
+drop function if exists public.category_visible(uuid, boolean);
+create or replace function public.category_visible(cid uuid, ev boolean, autor uuid)
+returns boolean language sql stable security definer set search_path = public as $fn$
+  select public.is_admin()
+      or coalesce(ev, false)
+      or autor = auth.uid()
+      or exists (select 1 from public.category_members m
+                  where m.category_id = cid and m.profile_id = auth.uid());
+$fn$;
+
+drop function if exists public.channel_visible(uuid, boolean, boolean, uuid);
+create or replace function public.channel_visible(cat uuid, inh boolean, ev boolean, cid uuid, autor uuid)
+returns boolean language sql stable security definer set search_path = public as $fn$
+  select public.is_admin()
+      or autor = auth.uid()
+      or (cat is not null and inh and public.can_see_category(cat))
+      or ((cat is null or not inh)
+          and (coalesce(ev, false)
+               or exists (select 1 from public.channel_members m
+                           where m.channel_id = cid and m.profile_id = auth.uid())));
+$fn$;
+
 -- Regra única de acesso a canal, usada por todas as policies.
 create or replace function public.can_read_channel(ch text)
 returns boolean language plpgsql stable security definer set search_path = public as $fn$
 declare
-  cid uuid; cat uuid; inh boolean; ev boolean; uid uuid := auth.uid();
+  cid uuid; cat uuid; inh boolean; ev boolean; aut uuid; uid uuid := auth.uid();
 begin
   if uid is null or ch is null then return false; end if;
   if ch = 'geral' then return true; end if;
@@ -201,14 +230,10 @@ begin
     exception when others then
       return false;
     end;
-    select category_id, inherit_access, everyone into cat, inh, ev
+    select category_id, inherit_access, everyone, created_by into cat, inh, ev, aut
       from public.channels where id = cid;
     if not found then return false; end if;
-    if cat is not null and inh then
-      return public.can_see_category(cat);
-    end if;
-    return ev or exists (select 1 from public.channel_members
-                          where channel_id = cid and profile_id = uid);
+    return public.channel_visible(cat, inh, ev, cid, aut);
   end if;
 
   return false;
@@ -457,14 +482,18 @@ create policy codes_write on public.invite_codes for all    to authenticated
   using (public.is_admin()) with check (public.is_admin());
 
 -- ---------- categorias ----------
+-- Estas quatro usam category_visible(id, everyone), que decide pelas colunas da
+-- linha. Usar can_see_category(id) aqui reconsultaria a própria tabela e
+-- quebraria o INSERT ... RETURNING de uma categoria nova.
 create policy cat_read   on public.categories for select to authenticated
-  using (public.can_see_category(id));
+  using (public.category_visible(id, everyone, created_by));
 create policy cat_insert on public.categories for insert to authenticated
   with check (public.is_staff());
 create policy cat_update on public.categories for update to authenticated
-  using (public.is_staff() and public.can_see_category(id)) with check (public.is_staff());
+  using (public.is_staff() and public.category_visible(id, everyone, created_by))
+  with check (public.is_staff());
 create policy cat_delete on public.categories for delete to authenticated
-  using (public.is_staff() and public.can_see_category(id));
+  using (public.is_staff() and public.category_visible(id, everyone, created_by));
 
 create policy catm_read  on public.category_members for select to authenticated
   using (public.can_see_category(category_id) or profile_id = auth.uid());
@@ -472,15 +501,16 @@ create policy catm_write on public.category_members for all to authenticated
   using (public.is_staff()) with check (public.is_staff());
 
 -- ---------- canais ----------
+-- Mesmo motivo: channel_visible() decide pelas colunas, sem voltar na tabela.
 create policy ch_read   on public.channels for select to authenticated
-  using (public.can_read_channel('chan:' || id::text));
+  using (public.channel_visible(category_id, inherit_access, everyone, id, created_by));
 create policy ch_insert on public.channels for insert to authenticated
   with check (public.is_staff());
 create policy ch_update on public.channels for update to authenticated
-  using (public.is_staff() and public.can_read_channel('chan:' || id::text))
+  using (public.is_staff() and public.channel_visible(category_id, inherit_access, everyone, id, created_by))
   with check (public.is_staff());
 create policy ch_delete on public.channels for delete to authenticated
-  using (public.is_staff() and public.can_read_channel('chan:' || id::text));
+  using (public.is_staff() and public.channel_visible(category_id, inherit_access, everyone, id, created_by));
 
 create policy chm_read  on public.channel_members for select to authenticated
   using (public.can_read_channel('chan:' || channel_id::text) or profile_id = auth.uid());
