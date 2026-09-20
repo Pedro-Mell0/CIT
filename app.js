@@ -24,7 +24,7 @@ $('#go').onclick = async () => {
   if (!/^[A-Za-z0-9_]{3,20}$/.test(name)) return err.textContent = 'Codinome: 3 a 20 caracteres (letras, números e _).';
   if (pass.length < 6) return err.textContent = 'Senha: mínimo de 6 caracteres.';
   $('#go').disabled = true;
-  const email = name.toLowerCase() + '@cit.paralela';
+  const email = name.toLowerCase() + '@cit-paralela.com';
   const { error } = signup
     ? await sb.auth.signUp({ email, password: pass, options: { data: { codename: name, code } } })
     : await sb.auth.signInWithPassword({ email, password: pass });
