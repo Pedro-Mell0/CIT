@@ -7,6 +7,7 @@ index.html   estrutura
 style.css    visual
 config.js    URL e chave anon do Supabase
 format.js    formatação de texto (negrito, tópicos, etc.)
+fx.js        ambientação: som, decodificação, relógio, chuva de caracteres
 app.js       acesso, barra de canais, mensagens e edição
 ops.js       dossiês de operação (painel lateral direito)
 manage.js    gerenciar usuários (ADMIN) e criar canais/categorias (COMANDO)
