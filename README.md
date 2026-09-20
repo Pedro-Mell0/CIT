@@ -58,7 +58,8 @@ Quatro colunas, todas **redimensionáveis** pelas alças entre elas e
 3. **Dossiê** — as informações principais da operação.
 4. **Transmissão** — o chat do canal.
 
-No `# geral` só existe a transmissão: ele é canal de conversa, não tem dossiê.
+No `# geral` só existe a transmissão, sempre aberta e ocupando a sala: ele é
+canal de conversa, não tem dossiê.
 Nos demais, relatos e dossiê **abrem sozinhos quando há operação** no canal e
 ficam recolhidos quando não há — mexer no botão da coluna faz a sua escolha
 passar a mandar, e criar uma operação devolve as duas ao automático.

@@ -571,7 +571,12 @@ function marcaDossies(v) {
  * no botão da coluna para a escolha dele passar a mandar.
  */
 function colVisivel(k) {
-  if (soChat() && (k === 'entries' || k === 'dossier')) return false;
+  if (soChat()) {
+    if (k === 'entries' || k === 'dossier') return false;
+    // no geral o chat é a sala inteira: recolhido em outro canal, ele não pode
+    // vir fechado aqui, senão o canal abre vazio
+    if (k === 'chat') return true;
+  }
   const p = colPref(k);
   if (p === '0') return false;
   if (p === '1') return true;

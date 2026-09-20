@@ -549,3 +549,6 @@ mark{background:#45e3ff33;color:var(--cyan);padding:0 .1rem}
 .modal-foot .form-note{margin-right:auto}
 #members{letter-spacing:.06em;font-size:.72rem}
 @media(max-width:760px){#members{font-size:0;padding:.4rem .55rem}#members::before{content:"\2687";font-size:.9rem}}
+/* no geral não faz sentido recolher a única coluna que existe */
+:root.view-chat-only .col-tg[data-col="chat"],
+:root.view-chat-only #chat .col-x{display:none!important}
