@@ -257,12 +257,14 @@
   }
 
   // ========================================================= chuva de caracteres
+  // Só roda na tela de acesso: atrás do chat ela disputa atenção com o texto.
   function chuva() {
     const cv = q('#rain');
-    if (!cv) return;
-    if (calmo()) { cv.remove(); return; }
+    if (!cv) return null;
+    if (calmo()) { cv.remove(); return null; }
     const ctx = cv.getContext('2d');
-    if (!ctx) { cv.remove(); return; }
+    if (!ctx) { cv.remove(); return null; }
+    let ativa = true;
 
     const GLIFOS = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789#$%&@/\\<>=+';
     const corpo = 15;
@@ -282,7 +284,7 @@
     let ultimo = 0;
     const quadro = t => {
       requestAnimationFrame(quadro);
-      if (document.hidden || t - ultimo < 55) return;   // ~18 fps, poupa bateria
+      if (!ativa || document.hidden || t - ultimo < 55) return;   // ~18 fps, poupa bateria
       ultimo = t;
       ctx.fillStyle = 'rgba(4,2,12,.11)';               // rastro que some
       ctx.fillRect(0, 0, w, h);
@@ -295,6 +297,14 @@
       }
     };
     requestAnimationFrame(quadro);
+
+    return {
+      visivel(v) {
+        ativa = !!v;
+        cv.classList.toggle('hide', !v);
+        if (v) medir();          // redesenha limpo ao voltar para o acesso
+      },
+    };
   }
 
   // ========================================================= cursor de bloco
@@ -320,7 +330,8 @@
     }
   }
 
-  hud(); chuva(); cursor(); botoes();
+  hud(); cursor(); botoes();
+  const rain = chuva();
 
-  window.FX = { decodifica, bootLine, som: SFX };
+  window.FX = { decodifica, bootLine, som: SFX, rain };
 })();

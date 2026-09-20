@@ -145,6 +145,7 @@ async function start() {
   await loadTree();
 
   $('#auth').classList.add('hide'); $('#app').classList.remove('hide');
+  window.FX?.rain?.visivel(false);   // a chuva fica só na tela de acesso
   $('#me-name').textContent = me.codename;
   $('#me-role').textContent = { admin: 'ADMIN', command: 'COMANDO', agent: 'AGENTE' }[me.role] || 'AGENTE';
   $('#me-role').className = 'role-' + me.role;

@@ -91,8 +91,12 @@ do PDF. Os dois botões no rodapé da barra lateral ligam e desligam **♪ som**
   ao chegar transmissão, tom grave na falha, e um chiado de fundo em laço.
   Gerado na hora com Web Audio: nenhum arquivo, nenhuma requisição. O navegador
   só libera o áudio depois do primeiro clique ou tecla na página.
-- **Chuva de caracteres** — atrás de todo o conteúdo, a ~18 fps, pausada quando
-  a aba perde o foco.
+- **Chuva de caracteres** — só na tela de acesso, a ~18 fps, pausada quando a
+  aba perde o foco e desligada ao entrar (atrás do chat ela disputava atenção
+  com o texto).
+- **Grade de dados** — atrás do chat, uma grade que desliza devagar com um pulso
+  de luz subindo por ela de tempos em tempos. Feita só com CSS: sem canvas, sem
+  timer, sem custo de bateria.
 - **Texto que se decodifica** — nomes de canal e títulos de operação entram
   embaralhados e se resolvem letra a letra.
 - **Linha de boot** — ao abrir um canal, uma linha de terminal digita o enlace
