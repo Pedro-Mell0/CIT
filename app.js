@@ -593,13 +593,15 @@ function layout() {
   });
   const vis = colOrder.filter(colVisivel);
   const flexKey = vis.includes('entries') ? 'entries' : vis[0];
+  requestAnimationFrame(reajustaLarguras);
 
   colOrder.forEach((k, i) => {
     const n = $(COLS[k].el);
     if (!n) return;
     n.style.order = i * 2;
     if (k === flexKey) { n.style.flex = '1'; n.style.width = 'auto'; }
-    else { n.style.flex = 'none'; n.style.width = COLS[k].css ? `var(${COLS[k].css})` : ''; }
+    // 0 1 auto (e não 'none'): sob aperto elas cedem em vez de estourar a fila
+    else { n.style.flex = '0 1 auto'; n.style.width = COLS[k].css ? `var(${COLS[k].css})` : ''; }
   });
 
   const grips = [...document.querySelectorAll('#room-body .grip.inner')];
@@ -614,12 +616,56 @@ function layout() {
   });
 }
 
+/**
+ * Quanto uma coluna pode crescer agora. O teto não é fixo: depende do que as
+ * outras colunas visíveis já ocupam. Sem isso, a coluna continuava "crescendo"
+ * no papel depois que a elástica encolhia a zero, a fila estourava a largura da
+ * sala e a alça descolava do cursor — que é a sensação de travar.
+ */
+const FOLGA_ELASTICA = 220;   // respiro mínimo da coluna que absorve a sobra
+
+function maxCol(k) {
+  const c = COLS[k];
+  if (!c?.css) return 0;
+  if (k === 'side') return Math.max(c.min, Math.min(c.max, innerWidth - 480));
+
+  const body = $('#room-body');
+  const cs = getComputedStyle(body);
+  const gap = parseFloat(cs.gap) || 0;
+  const vis = colOrder.filter(colVisivel);
+  const alcas = Math.max(0, vis.length - 1);
+  const itens = vis.length + alcas;
+
+  let livre = body.getBoundingClientRect().width
+    - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0)
+    - Math.max(0, itens - 1) * gap
+    - alcas * 8;
+
+  const elastica = vis.includes('entries') ? 'entries' : vis[0];
+  vis.forEach(o => {
+    if (o === k) return;
+    livre -= (o === elastica || !COLS[o].css)
+      ? FOLGA_ELASTICA
+      : $(COLS[o].el).getBoundingClientRect().width;
+  });
+  return Math.max(c.min, Math.min(c.max, livre));
+}
+
 function larguraCol(k, px) {
   const c = COLS[k];
   if (!c?.css) return;
-  const w = Math.round(Math.min(Math.max(px, c.min), Math.min(c.max, innerWidth - 260)));
+  const w = Math.round(Math.min(Math.max(px, c.min), maxCol(k)));
   document.documentElement.style.setProperty(c.css, w + 'px');
   try { localStorage.setItem('cit.w.' + k, String(w)); } catch {}
+}
+
+/** Reaplica as larguras dentro do teto atual (janela menor, coluna recolhida). */
+function reajustaLarguras() {
+  Object.keys(COLS).forEach(k => {
+    if (!COLS[k].css) return;
+    const atual = parseFloat(getComputedStyle(document.documentElement).getPropertyValue(COLS[k].css));
+    if (atual) larguraCol(k, atual);
+  });
 }
 
 function abreCol(k, on) {
@@ -728,6 +774,7 @@ function ordenaCols(mover, alvo, antes) {
   addEventListener('touchmove', move, { passive: true });
   addEventListener('mouseup', up);
   addEventListener('touchend', up);
+  addEventListener('resize', reajustaLarguras);
 })();
 
 // ---------- abrir canal ----------
