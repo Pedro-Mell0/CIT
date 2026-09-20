@@ -441,7 +441,11 @@ async function send() {
   if (!body) return;
   ta.value = ''; grow();
   const { error } = await sb.from('messages').insert({ channel: chan, body, author_id: me.id });
-  if (error) { ta.value = body; grow(); toast('Falha ao enviar — tente de novo.', true); }
+  if (error) {
+    console.error('envio:', error);
+    ta.value = body; grow();
+    toast('Falha ao enviar: ' + error.message, true);
+  }
 }
 
 function grow() {

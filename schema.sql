@@ -103,6 +103,23 @@ create table if not exists public.messages (
   body       text not null,
   created_at timestamptz not null default now()
 );
+-- O schema anterior só conhecia 'geral' e 'agent:<uuid>'. Se ele deixou um CHECK
+-- limitando os valores de `channel`, o formato novo 'chan:<uuid>' seria rejeitado
+-- na hora de enviar mensagem num canal criado pelo comando.
+do $do$
+declare c record;
+begin
+  for c in
+    select con.conname as name
+      from pg_constraint con
+     where con.conrelid = 'public.messages'::regclass
+       and con.contype = 'c'
+       and pg_get_constraintdef(con.oid) ilike '%channel%'
+  loop
+    execute format('alter table public.messages drop constraint %I', c.name);
+  end loop;
+end $do$;
+
 alter table public.messages add column if not exists edited_at timestamptz;
 alter table public.messages add column if not exists edited_by uuid references public.profiles(id) on delete set null;
 create index if not exists messages_channel_idx on public.messages (channel, created_at);
