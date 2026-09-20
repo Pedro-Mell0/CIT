@@ -169,8 +169,11 @@ function listen() {
       const m = p.new || p.old;
       if (!m) return;
       if (p.eventType === 'INSERT') {
-        if (m.channel === chan) addMsg(m);
-        else document.querySelector(`[data-ch="${CSS.escape(m.channel)}"]`)?.classList.add('new');
+        if (m.channel === chan) { addMsg(m); if (m.author_id !== me.id) window.FX?.som.recebida(); }
+        else {
+          document.querySelector(`[data-ch="${CSS.escape(m.channel)}"]`)?.classList.add('new');
+          window.FX?.som.recebida();
+        }
       } else if (p.eventType === 'UPDATE' && m.channel === chan) {
         const old = msgEls.get(String(m.id));
         if (old) { const n = buildMsg(m); old.replaceWith(n); msgEls.set(String(m.id), n); }
@@ -287,7 +290,7 @@ let loadToken = 0;
 async function openChannel(key, jumpTo) {
   chan = key;
   const info = chanInfo(key);
-  $('#ch-title').textContent = info.label;
+  window.FX?.decodifica($('#ch-title'), info.label, 380);
   $('#ch-hint').textContent = info.hint;
   drawChannels();
 
@@ -302,6 +305,7 @@ async function openChannel(key, jumpTo) {
   if (manageView) return window.MANAGE?.open?.();
 
   document.querySelector(`[data-ch="${CSS.escape(key)}"]`)?.classList.remove('new');
+  window.FX?.bootLine(info.label);
 
   const token = ++loadToken;
   const box = $('#msgs');
@@ -440,9 +444,12 @@ async function send() {
   const body = ta.value.trim();
   if (!body) return;
   ta.value = ''; grow();
+  $('#caret-hint')?.classList.remove('hide');
+  window.FX?.som.envio();
   const { error } = await sb.from('messages').insert({ channel: chan, body, author_id: me.id });
   if (error) {
     console.error('envio:', error);
+    window.FX?.som.falha();
     ta.value = body; grow();
     toast('Falha ao enviar: ' + error.message, true);
   }

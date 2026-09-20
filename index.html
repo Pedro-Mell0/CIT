@@ -16,6 +16,8 @@
   <circle class="eye" cx="22" cy="30" r="3.5" fill="currentColor"/><circle class="eye" cx="42" cy="30" r="3.5" fill="currentColor"/>
   <path d="M28 40h8l-4 8z" fill="currentColor"/></symbol></svg>
 
+<canvas id="rain" aria-hidden="true"></canvas>
+
 <main id="auth">
   <section class="card">
     <svg class="logo"><use href="#owl"/></svg>
@@ -36,10 +38,18 @@
   <aside id="side">
     <div class="me"><svg class="logo sm"><use href="#owl"/></svg>
       <div><b id="me-name"></b><span id="me-role"></span></div></div>
+    <div id="hud" aria-hidden="true">
+      <div id="hud-clock"></div>
+      <div id="hud-stat"></div>
+    </div>
     <nav id="chans"></nav>
     <div class="side-foot">
       <button id="new-ch" class="ghost hide">+ Canal / categoria</button>
-      <button id="out" class="ghost">Encerrar sessão</button>
+      <div class="fx-row">
+        <button id="fx-sfx" class="ghost" title="Som" aria-label="Som">♪</button>
+        <button id="fx-crt" class="ghost" title="Ruído de vídeo" aria-label="Ruído de vídeo">▩</button>
+        <button id="out" class="ghost">Encerrar sessão</button>
+      </div>
     </div>
   </aside>
 
@@ -59,15 +69,17 @@
 
     <div id="room-body">
       <div id="chat">
+        <div id="boot-line" class="hide" aria-hidden="true"></div>
         <div id="msgs" aria-live="polite"></div>
         <div class="composer">
           <div id="msg-grip" role="separator" aria-label="Redimensionar caixa de texto"
                title="Arraste para redimensionar · duplo clique volta ao automático"></div>
           <div class="fmt-hint">
-            <b>**negrito**</b> · <i>'itálico'</i> · <u>__sublinhado__</u> · <s>~~riscado~~</s> · <code>`código`</code> · <span class="k">- tópico</span> · <span class="k">&gt; citação</span> · <span class="k">||spoiler||</span>
+            <b>**negrito**</b> · <i>'itálico'</i> · <u>__sublinhado__</u> · <s>~~riscado~~</s> · <code>`código`</code> · <span class="k">- tópico</span> · <span class="k">&gt; citação</span> · <span class="k">||spoiler||</span> · <span class="k">[[censurado]]</span>
           </div>
           <div class="composer-row">
-            <textarea id="msg" placeholder="Transmitir mensagem..." rows="1" maxlength="4000" autocomplete="off"></textarea>
+            <textarea id="msg" rows="1" maxlength="4000" autocomplete="off" aria-label="Mensagem"></textarea>
+            <span id="caret-hint" aria-hidden="true"><span class="blk">&#9608;</span> Transmitir mensagem...</span>
             <button id="send" class="primary">Enviar</button>
           </div>
         </div>
@@ -113,6 +125,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
 <script src="format.js"></script>
+<script src="fx.js"></script>
 <script src="app.js"></script>
 <script src="ops.js"></script>
 <script src="manage.js"></script>

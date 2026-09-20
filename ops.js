@@ -15,6 +15,7 @@
   }));
   const KEYS = BLOCKS.flatMap(b => b.items.map(([k]) => k)).filter(k => k !== 'status');
   const statusOf = row => (row?.status === 'encerrada' ? 'encerrada' : 'ativa');
+  const stamp = st => el('div', 'op-stamp ' + st, st.toUpperCase());
   const dot = st => el('span', 'op-dot ' + st);
   const LONG = new Set(['f_report', 'f_suspects', 'f_agents', 'f_witnesses', 'f_victims']);
 
@@ -98,12 +99,13 @@
 
     // bloco 1 — título, com a luz de status ao lado
     const st = statusOf(op);
+    body.append(stamp(st));
     const row = el('div', 'op-head-row');
     const led = dot(st);
     led.title = st === 'ativa' ? 'operação ativa' : 'operação encerrada';
     const h = el('h2', 'op-title');
-    h.dataset.text = op.title;
-    h.textContent = op.title;
+    if (window.FX) window.FX.decodifica(h, op.title, 460, true);
+    else { h.textContent = op.title; h.dataset.text = op.title; }
     row.append(led, h);
     body.append(row);
 
@@ -223,6 +225,9 @@
     root.append(head);
 
     const st = statusOf(op);
+    const marca = stamp(st);
+    marca.classList.add('p-stamp');
+    root.append(marca);
     const row = el('div', 'op-head-row');
     row.append(dot(st));
     const h = el('h2', 'op-title');

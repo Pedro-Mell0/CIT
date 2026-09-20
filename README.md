@@ -76,15 +76,30 @@ devolver a sessão junto; para garantir a saída, use *Encerrar sessão*.
 - **Tamanho da caixa**: arraste a alça logo acima dela. A altura escolhida fica
   guardada; duplo clique na alça devolve o crescimento automático.
 
-## Ruído de CRT
+## Ambientação
 
-De 9 em 9 a 30 segundos a tela dá uma "vacilada" de sinal, com uma faixa de
-imagem rasgada atravessando o vídeo, além de uma varredura lenta e contínua.
-É uma camada sobreposta que não captura clique nem altera o layout, some na
-impressão do PDF, e respeita `prefers-reduced-motion` do sistema.
+Tudo abaixo respeita `prefers-reduced-motion` do sistema e some na impressão
+do PDF. Os dois botões no rodapé da barra lateral ligam e desligam **♪ som** e
+**▩ ruído de vídeo**; a escolha fica guardada naquele navegador.
 
-Para desligar, no console do navegador (F12): `CRT.toggle()`. A escolha fica
-guardada naquele navegador.
+- **Ruído de CRT** — de 9 em 9 a 30 segundos a tela dá uma "vacilada" de sinal,
+  com uma faixa de imagem rasgada atravessando o vídeo, além de uma varredura
+  lenta e contínua. É uma camada sobreposta que não captura clique.
+- **Som** — estalo de tecla ao enviar, bipe duplo ao chegar transmissão, tom
+  grave na falha, e um chiado de fundo em laço. Gerado na hora com Web Audio:
+  nenhum arquivo, nenhuma requisição. O navegador só libera o áudio depois do
+  primeiro clique ou tecla na página.
+- **Chuva de caracteres** — atrás de todo o conteúdo, a ~18 fps, pausada quando
+  a aba perde o foco.
+- **Texto que se decodifica** — nomes de canal e títulos de operação entram
+  embaralhados e se resolvem letra a letra.
+- **Linha de boot** — ao abrir um canal, uma linha de terminal digita o enlace
+  sendo estabelecido e some sozinha.
+- **Relógio e status** — hora com os dois-pontos piscando e indicadores de
+  enlace, ruído e cifra na barra lateral.
+- **Cursor de bloco** — piscando na caixa de mensagem quando ela está vazia.
+- **Marca d'água** — carimbo diagonal ATIVA/ENCERRADA atrás do dossiê, também
+  no PDF.
 
 ### Formatação
 
@@ -105,6 +120,7 @@ Vale em mensagens e em todos os campos dos dossiês.
 | `# Título`       | título            |
 | `---`            | linha divisória   |
 | `\|\|texto\|\|`  | spoiler (revela no clique) |
+| `[[texto]]`      | tarja de censura (revela no clique) |
 | `https://…`      | link              |
 
 ## Operações (dossiês)

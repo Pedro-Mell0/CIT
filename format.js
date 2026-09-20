@@ -27,6 +27,7 @@
   // g:   grupo com o conteúdo a formatar
   const RULES = [
     { re: /`([^`\n]+)`/,                                              tag: 'code', raw: true },
+    { re: /\[\[([\s\S]+?)\]\]/,                                       tag: 'span', cls: 'redact' },
     { re: /\|\|([\s\S]+?)\|\|/,                                       tag: 'span', cls: 'spoiler' },
     { re: /\*\*\*([\s\S]+?)\*\*\*/,                                   tag: 'strong', wrap: 'em' },
     { re: /\*\*([\s\S]+?)\*\*/,                                       tag: 'strong' },
@@ -73,7 +74,7 @@
         } else {
           inline(content, node);
         }
-        if (r.cls === 'spoiler') {
+        if (r.cls === 'spoiler' || r.cls === 'redact') {
           node.title = 'clique para revelar';
           node.onclick = () => node.classList.toggle('open');
         }
@@ -183,6 +184,7 @@
       .replace(/^\s*>\s?/gm, '')
       .replace(/^\s*#{1,3}\s+/gm, '')
       .replace(/\|\|([\s\S]+?)\|\|/g, '$1')
+      .replace(/\[\[([\s\S]+?)\]\]/g, '$1')
       .replace(/\*\*\*|\*\*|__|~~|[`*_]/g, '')
       .replace(/\s+/g, ' ')
       .trim();
