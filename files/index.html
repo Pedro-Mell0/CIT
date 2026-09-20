@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>CIT · Paralela</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦉</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute"><symbol id="owl" viewBox="0 0 64 64">
+  <path d="M8 6l12 8h24l12-8v26c0 16-10 26-24 26S8 48 8 32z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/>
+  <circle cx="22" cy="30" r="8" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="42" cy="30" r="8" fill="none" stroke="currentColor" stroke-width="2.5"/>
+  <circle class="eye" cx="22" cy="30" r="3.5" fill="currentColor"/><circle class="eye" cx="42" cy="30" r="3.5" fill="currentColor"/>
+  <path d="M28 40h8l-4 8z" fill="currentColor"/></symbol></svg>
+
+<main id="auth">
+  <section class="card">
+    <svg class="logo"><use href="#owl"/></svg>
+    <h1>CIT</h1>
+    <p class="sub">Departamento de Polícia Paralela</p>
+    <pre id="boot"></pre>
+    <div class="tabs"><button id="t-in" class="on">Entrar</button><button id="t-up">Cadastrar agente</button></div>
+    <input id="u" placeholder="codinome" autocomplete="username" maxlength="20" spellcheck="false">
+    <input id="p" type="password" placeholder="senha" autocomplete="current-password">
+    <input id="c" placeholder="código de acesso" class="hide" spellcheck="false">
+    <button id="go" class="primary">Entrar</button>
+    <p id="err" role="alert"></p>
+    <small>Use apenas seu codinome. Nunca informe seu nome real ou de personagem.</small>
+  </section>
+</main>
+
+<div id="app" class="hide">
+  <aside id="side">
+    <div class="me"><svg class="logo sm"><use href="#owl"/></svg>
+      <div><b id="me-name"></b><span id="me-role"></span></div></div>
+    <nav id="chans"></nav>
+    <button id="out" class="ghost">Encerrar sessão</button>
+  </aside>
+  <section id="room">
+    <header><button id="menu" class="ghost" aria-label="Canais">☰</button><h2 id="ch-title"></h2><span id="ch-hint"></span></header>
+    <div id="msgs" aria-live="polite"></div>
+    <div class="composer"><input id="msg" placeholder="Transmitir mensagem..." autocomplete="off" maxlength="2000"><button id="send" class="primary">Enviar</button></div>
+  </section>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
