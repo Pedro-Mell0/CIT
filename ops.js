@@ -1,5 +1,5 @@
 /* ===========================================================================
-   ops.js — dossiês de operação (painel lateral direito, redimensionável).
+   ops.js — dossiês de operação: coluna do dossiê e coluna dos relatos.
    =========================================================================== */
 (() => {
   const BLOCKS = [
@@ -20,50 +20,15 @@
   const LONG = new Set(['f_report', 'f_suspects', 'f_agents', 'f_witnesses', 'f_victims']);
 
   let curChan = null, ops = [], sel = null, entries = [];
-  let userSet = null;   // null = automático (abre quando há dossiê); true/false = escolha do usuário
-
-  const panel = () => $('#ops');
-
-  function setOpen(v) {
-    const on = !!v && !!curChan && curChan !== 'manage';
-    panel().classList.toggle('hide', !on);
-    $('#ops-grip').classList.toggle('hide', !on);
-    $('#ops-toggle').classList.toggle('on', on);
-  }
-  const applyOpen = () => setOpen(userSet === null ? ops.length > 0 : userSet);
-
-  // ---------- redimensionar ----------
-  const savedW = +localStorage.getItem('cit.opsw') || 380;
-  document.documentElement.style.setProperty('--ops-w', savedW + 'px');
-  (() => {
-    const grip = $('#ops-grip');
-    let dragging = false;
-    const move = e => {
-      if (!dragging) return;
-      const x = (e.touches ? e.touches[0].clientX : e.clientX);
-      const w = Math.min(Math.max(window.innerWidth - x, 260), Math.min(900, window.innerWidth - 320));
-      document.documentElement.style.setProperty('--ops-w', w + 'px');
-      localStorage.setItem('cit.opsw', String(Math.round(w)));
-    };
-    const up = () => { dragging = false; document.body.classList.remove('dragging'); };
-    const down = e => { dragging = true; document.body.classList.add('dragging'); e.preventDefault(); };
-    grip.addEventListener('mousedown', down);
-    grip.addEventListener('touchstart', down, { passive: false });
-    addEventListener('mousemove', move);
-    addEventListener('touchmove', move, { passive: true });
-    addEventListener('mouseup', up);
-    addEventListener('touchend', up);
-  })();
 
   // ---------- dados ----------
   async function load() {
-    if (!curChan || curChan === 'manage') { ops = []; sel = null; entries = []; setOpen(false); return draw(); }
+    if (!curChan || curChan === 'manage') { ops = []; sel = null; entries = []; return draw(); }
     const { data } = await sb.from('operations').select('*').eq('channel', curChan).order('created_at', { ascending: false });
     ops = data || [];
     if (sel && !ops.find(o => o.id === sel)) sel = null;
     sel = sel || ops[0]?.id || null;
     await loadEntries();
-    applyOpen();
     draw();
   }
 
@@ -94,6 +59,7 @@
       b.onclick = create;
       e.append(b);
       body.append(e);
+      drawEntries(null);
       return;
     }
 
@@ -137,13 +103,33 @@
     // blocos 2 a 4 — todos os rótulos aparecem, mesmo em branco
     BLOCKS.forEach(b => body.append(blockView(b, op, false)));
 
-    // relatos
-    if (entries.length) {
-      const sep = el('div', 'op-sep');
-      sep.append(el('span', null, 'RELATOS'));
-      body.append(sep);
+    drawEntries(op);
+  }
+
+  /** Coluna dos relatos: do mais antigo no topo ao mais novo embaixo,
+      para que rolar para cima seja voltar no tempo. */
+  function drawEntries(op) {
+    const box = $('#ent-body');
+    box.innerHTML = '';
+    $('#ent-count').textContent = entries.length
+      ? entries.length + (entries.length === 1 ? ' relato' : ' relatos') : '';
+
+    if (!op) {
+      box.append(el('p', 'empty', '> nenhuma operação aberta neste canal.'));
+      return;
     }
-    entries.forEach((en, i) => body.append(entryView(en, i + 1)));
+    if (!entries.length) {
+      const e = el('div', 'ops-empty');
+      e.append(el('p', null, '> sem relatos em ' + op.title + '.'));
+      const b = el('button', 'primary sm', '+ ADICIONAR RELATO');
+      b.onclick = () => entryForm(null);
+      e.append(b);
+      box.append(e);
+      return;
+    }
+    box.append(el('div', 'ent-top', '↑ relatos mais antigos'));
+    entries.forEach((en, i) => box.append(entryView(en, i + 1)));
+    box.scrollTop = box.scrollHeight;     // abre no mais recente
   }
 
   function blockView(b, row, onlyFilled) {
@@ -195,7 +181,7 @@
         if (!confirm('Excluir este relato?')) return;
         const { error } = await sb.from('operation_entries').delete().eq('id', en.id);
         if (error) return toast('Não foi possível excluir: ' + error.message, true);
-        loadEntries().then(draw);
+        loadEntries().then(() => draw());
       };
       head.append(ed, rm);
     }
@@ -327,7 +313,7 @@
       if (error) return toast('Falha ao salvar: ' + error.message, true);
       m.close();
       sel = id;
-      userSet = true;
+      abreCol('dossier', true);
       load();
     };
   }
@@ -357,37 +343,33 @@
       save.disabled = false;
       if (error) return toast('Falha ao salvar: ' + error.message, true);
       m.close();
-      loadEntries().then(draw);
+      loadEntries().then(() => draw());
     };
   }
 
   // ---------- ligações ----------
   $('#op-new').onclick = () => { if (curChan && curChan !== 'manage') create(); };
-  $('#ops-toggle').onclick = () => { userSet = panel().classList.contains('hide'); setOpen(userSet); };
-  $('#ops-close').onclick = () => { userSet = false; setOpen(false); };
 
   window.OPS = {
     setChannel(key) {
       curChan = key;
       sel = null;
-      userSet = null;
-      setOpen(false);
       load();
     },
     realtime(table, p) {
       const row = p.new || p.old;
       if (!row) return;
       if (table === 'operations') { if (row.channel === curChan) load(); }
-      else if (row.operation_id === sel) loadEntries().then(draw);
+      else if (row.operation_id === sel) loadEntries().then(() => draw());
     },
     async focus(opId) {
       sel = opId;
-      userSet = true;
+      abreCol('dossier', true);
       await load();
       sel = opId;
       await loadEntries();
       draw();
-      panel().scrollTop = 0;
+      $('#ops-body').scrollTop = 0;
     },
     has: () => ops.length,
   };

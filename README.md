@@ -33,7 +33,10 @@ Digitados uma única vez, no cadastro. Definem o cargo da conta.
 |--------------|---------|----------------------------------------------------------------------|
 | `AGENTE`     | AGENTE  | ler/escrever nos canais liberados, criar e editar dossiês e relatos  |
 | `COMANDOCIT` | COMANDO | tudo do agente + criar categorias e canais, editar mensagens alheias, remover agentes |
-| `ADMIN!@#`   | ADMIN   | tudo do comando + criar/excluir contas, dar e tirar privilégios, redefinir senhas |
+| `ADMIN!@#`   | ADMIN   | tudo do comando + criar/excluir contas, dar e tirar privilégios, trocar codinomes, redefinir senhas |
+
+O cargo **não aparece no chat**: nada indica quais codinomes são de comando ou
+admin. Só o painel ⚙ mostra isso, e só para o ADMIN.
 
 Trocar um código:
 
@@ -44,6 +47,20 @@ update invite_codes set code = 'NOVO' where role = 'command';
 A primeira conta ADMIN precisa ser criada pelo cadastro normal, usando `ADMIN!@#`.
 Depois disso o ADMIN cria as demais contas pelo painel, sem distribuir códigos.
 
+## Layout
+
+Quatro colunas, todas **redimensionáveis** pelas alças entre elas e
+**colapsáveis** pelo ✕ do cabeçalho ou pelos botões ▤ ▦ ▣ no topo da sala:
+
+1. **Canais** — barra lateral com os canais e as configurações.
+2. **Relatos** — a coluna larga, onde as apurações se acumulam. Do mais antigo
+   no topo ao mais novo embaixo: rolar para cima é voltar no tempo.
+3. **Dossiê** — as informações principais da operação.
+4. **Transmissão** — o chat do canal.
+
+Larguras e colapsos ficam guardados naquele navegador. Abaixo de 900px de
+largura as colunas empilham na vertical.
+
 ## Canais
 
 - `# geral` — todos os agentes.
@@ -53,6 +70,12 @@ Depois disso o ADMIN cria as demais contas pelo painel, sem distribuir códigos.
   categoria (herdando o acesso dela) ou avulso, com acesso próprio.
 
 Quem cria entra automaticamente na lista de acesso. O ADMIN enxerga tudo.
+
+**Reordenar**: quem tem COMANDO arrasta os itens da barra lateral — dá para pôr
+uma categoria acima do `# geral`, mandar os canais individuais para baixo, mover
+um canal para dentro de uma categoria (soltando sobre o nome dela) ou reordenar
+os canais dentro dela. A ordem é a mesma para todo mundo. Como usa arrastar e
+soltar do navegador, funciona no computador, não no toque.
 
 Para **editar ou excluir**: o ✎ no topo do canal, e o ✎ ao lado do nome da
 categoria na barra lateral. Excluir um canal apaga junto as mensagens e os
@@ -168,6 +191,10 @@ aquele usuário acessa** — o RLS garante que nada fora disso aparece. Clicar e
 resultado abre o canal e salta até a mensagem ou dossiê.
 
 ## Manutenção
+
+**Trocar o codinome de um agente** é do ADMIN, pelo ✎ nome no painel ⚙. Como o
+login é derivado do codinome, o e-mail interno muda junto: o agente passa a
+entrar com o nome novo e a mesma senha.
 
 Promover alguém pelo SQL, se preciso:
 

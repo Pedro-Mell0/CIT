@@ -91,6 +91,14 @@ create table if not exists public.channel_members (
   primary key (channel_id, profile_id)
 );
 
+-- ---------- ordem da barra lateral ----------
+-- Vale para todos: quem tem COMANDO arrasta e reorganiza para o grupo inteiro.
+-- `key` é 'geral', 'individuais', 'cat:<uuid>' ou 'chan:<uuid>'.
+create table if not exists public.sidebar_order (
+  key      text primary key,
+  position int not null default 0
+);
+
 -- ---------- mensagens ----------
 -- `channel` é uma chave de texto:
 --   'geral'          canal público
@@ -419,6 +427,45 @@ begin
   return uid;
 end $fn$;
 
+-- ADMIN troca o codinome de um agente. Como o login é derivado do codinome,
+-- o e-mail interno e a identidade mudam junto: a partir daí o agente entra
+-- com o nome novo e a senha antiga.
+create or replace function public.set_codename(target uuid, new_name text)
+returns void language plpgsql security definer
+set search_path = public, auth as $fn$
+declare mail text;
+begin
+  if not public.is_admin() then
+    raise exception 'Apenas o ADMIN pode alterar codinomes.';
+  end if;
+  if new_name !~ '^[A-Za-z0-9_]{3,20}$' then
+    raise exception 'Codinome: 3 a 20 caracteres (letras, números e _).';
+  end if;
+  if exists (select 1 from public.profiles where codename = new_name and id <> target) then
+    raise exception 'Já existe um agente com esse codinome.';
+  end if;
+
+  mail := lower(new_name) || '.cit.paralela@gmail.com';
+  if exists (select 1 from auth.users where email = mail and id <> target) then
+    raise exception 'Já existe uma conta com esse codinome.';
+  end if;
+
+  update public.profiles set codename = new_name where id = target;
+
+  update auth.users
+     set email = mail,
+         raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb)
+                              || jsonb_build_object('codename', new_name),
+         updated_at = now()
+   where id = target;
+
+  update auth.identities
+     set identity_data = coalesce(identity_data, '{}'::jsonb)
+                         || jsonb_build_object('email', mail),
+         updated_at = now()
+   where user_id = target and provider = 'email';
+end $fn$;
+
 -- ADMIN redefine a senha de qualquer conta.
 create or replace function public.admin_set_password(target uuid, p_password text)
 returns void language plpgsql security definer
@@ -470,6 +517,7 @@ $fn$;
 -- ============================================================================
 -- 5. RLS
 -- ============================================================================
+alter table public.sidebar_order     enable row level security;
 alter table public.profiles          enable row level security;
 alter table public.invite_codes      enable row level security;
 alter table public.categories        enable row level security;
@@ -489,7 +537,7 @@ begin
      where schemaname = 'public'
        and tablename in ('profiles','invite_codes','categories','category_members',
                          'channels','channel_members','messages','operations',
-                         'operation_entries')
+                         'operation_entries','sidebar_order')
   loop
     execute format('drop policy if exists %I on public.%I', p.policyname, p.tablename);
   end loop;
@@ -504,6 +552,11 @@ create policy profiles_update on public.profiles for update to authenticated
 create policy codes_read  on public.invite_codes for select to authenticated using (public.is_admin());
 create policy codes_write on public.invite_codes for all    to authenticated
   using (public.is_admin()) with check (public.is_admin());
+
+-- ---------- ordem da barra ----------
+create policy ord_read  on public.sidebar_order for select to authenticated using (true);
+create policy ord_write on public.sidebar_order for all    to authenticated
+  using (public.is_staff()) with check (public.is_staff());
 
 -- ---------- categorias ----------
 -- Estas quatro usam category_visible(id, everyone), que decide pelas colunas da
@@ -587,7 +640,7 @@ declare t text;
 begin
   foreach t in array array['profiles','messages','categories','channels',
                            'category_members','channel_members',
-                           'operations','operation_entries']
+                           'operations','operation_entries','sidebar_order']
   loop
     begin
       execute format('alter publication supabase_realtime add table public.%I', t);
@@ -604,3 +657,4 @@ alter table public.categories        replica identity full;
 alter table public.messages          replica identity full;
 alter table public.operations        replica identity full;
 alter table public.operation_entries replica identity full;
+alter table public.sidebar_order     replica identity full;

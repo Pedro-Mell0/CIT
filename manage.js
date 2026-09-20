@@ -56,6 +56,7 @@
       }
       if (p.role === 'admin') acts.append(btn('▼ tirar ADMIN', () => setRole(p, 'command')));
     }
+    acts.append(btn('✎ nome', () => renomear(p)));
     acts.append(btn('⚿ senha', () => resetPass(p)));
     if (!self) acts.append(btn('✕ excluir', () => removeUser(p), 'danger'));
     row.append(acts);
@@ -84,6 +85,32 @@
     delete people[p.id];
     open(); drawChannels();
     toast(`Conta de ${p.codename} removida.`);
+  }
+
+  function renomear(p) {
+    const m = modal('ALTERAR CODINOME · ' + p.codename);
+    m.body.append(el('p', 'form-note',
+      'O login é derivado do codinome: depois da troca, o agente entra com o nome novo e a mesma senha.'));
+    const nome = field(m.body, 'Novo codinome', p.codename, { ph: '3 a 20 caracteres (letras, números e _)' });
+    const save = el('button', 'primary', 'Salvar');
+    const cancel = el('button', 'ghost', 'Cancelar');
+    cancel.onclick = m.close;
+    m.foot.append(cancel, save);
+    nome.focus();
+    nome.select();
+    save.onclick = async () => {
+      const novo = nome.value.trim();
+      if (novo === p.codename) return m.close();
+      save.disabled = true;
+      const { error } = await sb.rpc('set_codename', { target: p.id, new_name: novo });
+      save.disabled = false;
+      if (error) return toast(error.message, true);
+      m.close();
+      const antigo = p.codename;
+      await loadPeople();
+      open(); drawChannels();
+      toast(`${antigo} agora é ${novo}.`);
+    };
   }
 
   function resetPass(p) {

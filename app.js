@@ -28,6 +28,7 @@ const chans  = {};        // id -> canal
 const catMem = {};        // categoria -> Set(perfil)
 const chanMem = {};       // canal     -> Set(perfil)
 const msgEls = new Map(); // id da mensagem -> elemento
+const order  = {};        // chave da barra lateral -> posição
 
 const isStaff = () => me && (me.role === 'command' || me.role === 'admin');
 const isAdmin = () => me && me.role === 'admin';
@@ -122,13 +123,15 @@ async function loadPeople() {
 }
 
 async function loadTree() {
-  const [c, ch, cm, chm] = await Promise.all([
+  const [c, ch, cm, chm, ord] = await Promise.all([
     sb.from('categories').select('*').order('position').order('name'),
     sb.from('channels').select('*').order('position').order('name'),
     sb.from('category_members').select('*'),
     sb.from('channel_members').select('*'),
+    sb.from('sidebar_order').select('*'),
   ]);
-  [cats, chans, catMem, chanMem].forEach(o => Object.keys(o).forEach(k => delete o[k]));
+  [cats, chans, catMem, chanMem, order].forEach(o => Object.keys(o).forEach(k => delete o[k]));
+  (ord.data || []).forEach(x => order[x.key] = x.position);
   (c.data || []).forEach(x => cats[x.id] = x);
   (ch.data || []).forEach(x => chans[x.id] = x);
   (cm.data || []).forEach(x => (catMem[x.category_id] ||= new Set()).add(x.profile_id));
@@ -197,6 +200,7 @@ function listen() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'channels' }, reload)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'category_members' }, reload)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'channel_members' }, reload)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'sidebar_order' }, reload)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'operations' }, p => window.OPS?.realtime?.('operations', p))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'operation_entries' }, p => window.OPS?.realtime?.('operation_entries', p))
     .subscribe();
@@ -222,29 +226,18 @@ function chanInfo(key) {
   return { label: c.name, icon: '#', hint: (c.topic ? c.topic + ' · ' : '') + 'acesso: ' + who, ch: c };
 }
 
-function navBtn(nav, key, label, icon, cls) {
+function navBtn(parent, key, label, icon, cls) {
   const b = el('button', cls);
   b.dataset.ch = key;
   b.append(el('span', 'ic', icon), el('span', 'nm', label));
   b.classList.toggle('on', key === chan);
-  b.onclick = () => { openChannel(key); $('#side').classList.remove('open'); };
-  nav.append(b);
+  b.onclick = () => { openChannel(key); if (innerWidth <= 760) $('#side').classList.remove('open'); };
+  parent.append(b);
   return b;
 }
 
-function drawChannels() {
-  const nav = $('#chans'); nav.innerHTML = '';
-  navBtn(nav, 'geral', 'geral', '#');
-
-  if (me.role === 'agent') {
-    navBtn(nav, 'agent:' + me.id, 'canal do comando', '🔒');
-  } else {
-    const agents = Object.values(people).filter(p => p.role === 'agent')
-      .sort((a, b) => a.codename.localeCompare(b.codename));
-    if (agents.length) nav.append(el('h3', null, 'Canais individuais'));
-    agents.forEach(a => navBtn(nav, 'agent:' + a.id, a.codename, '🔒'));
-  }
-
+/** Itens de primeiro nível, já na ordem salva. */
+function topItems() {
   const byCat = {}, loose = [];
   Object.values(chans)
     .sort((a, b) => (a.position - b.position) || a.name.localeCompare(b.name))
@@ -253,9 +246,42 @@ function drawChannels() {
       else loose.push(c);
     });
 
-  Object.values(cats)
-    .sort((a, b) => (a.position - b.position) || a.name.localeCompare(b.name))
-    .forEach(cat => {
+  const items = [
+    { key: 'geral', kind: 'geral', def: 0 },
+    { key: 'individuais', kind: 'group', def: 1 },
+    ...Object.values(cats).map(c => ({ key: 'cat:' + c.id, kind: 'cat', cat: c, def: 10 + (c.position || 0) })),
+    ...loose.map(c => ({ key: 'chan:' + c.id, kind: 'chan', ch: c, def: 100 + (c.position || 0) })),
+  ];
+  items.sort((a, b) => (order[a.key] ?? a.def) - (order[b.key] ?? b.def));
+  return { items, byCat };
+}
+
+function drawChannels() {
+  const nav = $('#chans');
+  nav.innerHTML = '';
+  const { items, byCat } = topItems();
+
+  items.forEach(it => {
+    const box = el('div', 'nav-item');
+    box.dataset.key = it.key;
+    nav.append(box);
+
+    if (it.kind === 'geral') {
+      navBtn(box, 'geral', 'geral', '#');
+
+    } else if (it.kind === 'group') {
+      if (me.role === 'agent') {
+        navBtn(box, 'agent:' + me.id, 'canal do comando', '🔒');
+      } else {
+        const agents = Object.values(people).filter(p => p.role === 'agent')
+          .sort((a, b) => a.codename.localeCompare(b.codename));
+        if (!agents.length) { box.remove(); return; }
+        box.append(el('h3', null, 'Canais individuais'));
+        agents.forEach(a => navBtn(box, 'agent:' + a.id, a.codename, '🔒'));
+      }
+
+    } else if (it.kind === 'cat') {
+      const cat = it.cat;
       const head = el('h3', 'cat');
       const tw = el('button', 'cat-tw');
       tw.append(el('span', 'arw', collapsed.has(cat.id) ? '▸' : '▾'), el('span', null, cat.name));
@@ -270,20 +296,211 @@ function drawChannels() {
         ed.onclick = e => { e.stopPropagation(); window.MANAGE?.categoryForm?.(cat); };
         head.append(ed);
       }
-      nav.append(head);
-      if (!collapsed.has(cat.id)) (byCat[cat.id] || []).forEach(c => navBtn(nav, 'chan:' + c.id, c.name, '#', 'sub'));
-    });
+      box.append(head);
+      box.dataset.catId = cat.id;
+      if (!collapsed.has(cat.id)) {
+        (byCat[cat.id] || []).forEach(c => armaCanal(navBtn(box, 'chan:' + c.id, c.name, '#', 'sub'), c));
+      }
 
-  if (loose.length) {
-    nav.append(el('h3', null, 'Canais'));
-    loose.forEach(c => navBtn(nav, 'chan:' + c.id, c.name, '#'));
-  }
+    } else {
+      armaCanal(navBtn(box, 'chan:' + it.ch.id, it.ch.name, '#'), it.ch);
+    }
+
+    armaTopo(box);
+  });
 
   if (isAdmin()) {
-    nav.append(el('h3', null, 'Administração'));
-    navBtn(nav, 'manage', 'Gerenciar usuários', '⚙', 'gear');
+    const box = el('div', 'nav-item');
+    box.append(el('h3', null, 'Administração'));
+    navBtn(box, 'manage', 'Gerenciar usuários', '⚙', 'gear');
+    nav.append(box);
   }
 }
+
+// ---------- reordenar arrastando ----------
+// Só o COMANDO arrasta, porque a ordem vale para todo mundo.
+let arrasto = null;   // { tipo: 'topo' | 'canal', key, id }
+
+const limpaMarcas = () => document.querySelectorAll('#chans .drop-before,#chans .drop-after,#chans .drop-into')
+  .forEach(n => n.classList.remove('drop-before', 'drop-after', 'drop-into'));
+
+function armaTopo(box) {
+  if (!isStaff()) return;
+  box.draggable = true;
+
+  box.addEventListener('dragstart', e => {
+    if (arrasto) return;                      // o canal já tomou conta do arrasto
+    arrasto = { tipo: 'topo', key: box.dataset.key };
+    box.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', box.dataset.key);
+  });
+  box.addEventListener('dragend', () => { box.classList.remove('dragging'); limpaMarcas(); arrasto = null; });
+
+  box.addEventListener('dragover', e => {
+    if (!arrasto) return;
+    e.preventDefault();
+    limpaMarcas();
+    if (arrasto.tipo === 'canal') {
+      if (box.dataset.catId) box.classList.add('drop-into');
+      return;
+    }
+    if (arrasto.key === box.dataset.key) return;
+    const r = box.getBoundingClientRect();
+    box.classList.add(e.clientY < r.top + r.height / 2 ? 'drop-before' : 'drop-after');
+  });
+
+  box.addEventListener('drop', e => {
+    if (!arrasto) return;
+    e.preventDefault(); e.stopPropagation();
+    const antes = box.classList.contains('drop-before');
+    const dentro = box.classList.contains('drop-into');
+    const alvoCat = box.dataset.catId;
+    const puxado = arrasto;
+    limpaMarcas(); arrasto = null;
+
+    if (puxado.tipo === 'canal') {
+      if (dentro && alvoCat) moveCanal(puxado.id, alvoCat);
+      return;
+    }
+    if (puxado.key === box.dataset.key) return;
+    const keys = topItems().items.map(i => i.key).filter(k => k !== puxado.key);
+    const at = keys.indexOf(box.dataset.key);
+    keys.splice(antes ? at : at + 1, 0, puxado.key);
+    salvaOrdemTopo(keys);
+  });
+}
+
+function armaCanal(btn, ch) {
+  if (!isStaff()) return btn;
+  btn.draggable = true;
+
+  btn.addEventListener('dragstart', e => {
+    arrasto = { tipo: 'canal', key: 'chan:' + ch.id, id: ch.id };
+    btn.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', ch.id);
+    e.stopPropagation();
+  });
+  btn.addEventListener('dragend', () => { btn.classList.remove('dragging'); limpaMarcas(); arrasto = null; });
+
+  btn.addEventListener('dragover', e => {
+    if (arrasto?.tipo !== 'canal' || arrasto.id === ch.id) return;
+    e.preventDefault(); e.stopPropagation();
+    limpaMarcas();
+    const r = btn.getBoundingClientRect();
+    btn.classList.add(e.clientY < r.top + r.height / 2 ? 'drop-before' : 'drop-after');
+  });
+
+  btn.addEventListener('drop', e => {
+    if (arrasto?.tipo !== 'canal' || arrasto.id === ch.id) return;
+    e.preventDefault(); e.stopPropagation();
+    const antes = btn.classList.contains('drop-before');
+    const puxado = arrasto.id;
+    limpaMarcas(); arrasto = null;
+
+    const destino = ch.category_id || null;
+    const irmaos = Object.values(chans)
+      .filter(c => (c.category_id || null) === destino && c.id !== puxado)
+      .sort((a, b) => (a.position - b.position) || a.name.localeCompare(b.name))
+      .map(c => c.id);
+    const at = irmaos.indexOf(ch.id);
+    irmaos.splice(antes ? at : at + 1, 0, puxado);
+    salvaCanais(destino, irmaos);
+  });
+  return btn;
+}
+
+async function salvaOrdemTopo(keys) {
+  const rows = keys.map((k, i) => ({ key: k, position: i }));
+  const { error } = await sb.from('sidebar_order').upsert(rows);
+  if (error) return toast('Não foi possível salvar a ordem: ' + error.message, true);
+  rows.forEach(r => order[r.key] = r.position);
+  drawChannels();
+}
+
+async function salvaCanais(catId, ids) {
+  for (let i = 0; i < ids.length; i++) {
+    const { error } = await sb.from('channels').update({ position: i, category_id: catId }).eq('id', ids[i]);
+    if (error) return toast('Não foi possível mover: ' + error.message, true);
+  }
+  await loadTree(); drawChannels();
+}
+
+async function moveCanal(chanId, catId) {
+  const irmaos = Object.values(chans)
+    .filter(c => c.category_id === catId && c.id !== chanId)
+    .sort((a, b) => a.position - b.position)
+    .map(c => c.id);
+  await salvaCanais(catId, [...irmaos, chanId]);
+}
+
+// ---------- colunas redimensionáveis e colapsáveis ----------
+const COLS = {
+  side:    { css: '--side-w', el: '#side',        min: 180, max: 460, lado: 'esq' },
+  dossier: { css: '--dos-w',  el: '#col-dossier', min: 240, max: 900, lado: 'dir' },
+  chat:    { css: '--chat-w', el: '#chat',        min: 260, max: 900, lado: 'dir' },
+  entries: { el: '#col-entries' },   // ocupa o espaço livre: só colapsa
+};
+
+function larguraCol(k, px) {
+  const c = COLS[k];
+  if (!c?.css) return;
+  const w = Math.round(Math.min(Math.max(px, c.min), Math.min(c.max, innerWidth - 260)));
+  document.documentElement.style.setProperty(c.css, w + 'px');
+  try { localStorage.setItem('cit.w.' + k, String(w)); } catch {}
+}
+
+function abreCol(k, on) {
+  document.documentElement.classList.toggle('no-' + k, !on);
+  try { localStorage.setItem('cit.col.' + k, on ? '1' : '0'); } catch {}
+  document.querySelectorAll('.col-tg[data-col="' + k + '"]').forEach(b => b.classList.toggle('on', on));
+}
+
+const colAberta = k => {
+  try { return localStorage.getItem('cit.col.' + k) !== '0'; } catch { return true; }
+};
+
+(() => {
+  Object.entries(COLS).forEach(([k, c]) => {
+    if (c.css) {
+      const w = +localStorage.getItem('cit.w.' + k);
+      if (w) document.documentElement.style.setProperty(c.css, w + 'px');
+    }
+    abreCol(k, colAberta(k));
+  });
+
+  document.querySelectorAll('.col-tg').forEach(b => {
+    b.onclick = () => abreCol(b.dataset.col, document.documentElement.classList.contains('no-' + b.dataset.col));
+  });
+  document.querySelectorAll('.col-x').forEach(b => {
+    b.onclick = () => abreCol(b.dataset.col, false);
+  });
+
+  let atual = null, caixa = null;
+  const eixo = e => (e.touches ? e.touches[0].clientX : e.clientX);
+  const move = e => {
+    if (!atual) return;
+    const x = eixo(e);
+    larguraCol(atual, COLS[atual].lado === 'esq' ? x - caixa.left : caixa.right - x);
+  };
+  const up = () => { atual = null; document.body.classList.remove('dragging'); };
+
+  document.querySelectorAll('.grip').forEach(g => {
+    const down = e => {
+      atual = g.dataset.grip;
+      caixa = $(COLS[atual].el).getBoundingClientRect();
+      document.body.classList.add('dragging');
+      e.preventDefault();
+    };
+    g.addEventListener('mousedown', down);
+    g.addEventListener('touchstart', down, { passive: false });
+  });
+  addEventListener('mousemove', move);
+  addEventListener('touchmove', move, { passive: true });
+  addEventListener('mouseup', up);
+  addEventListener('touchend', up);
+})();
 
 // ---------- abrir canal ----------
 let loadToken = 0;
@@ -296,12 +513,12 @@ async function openChannel(key, jumpTo) {
   drawChannels();
 
   const manageView = key === 'manage';
+  document.documentElement.classList.toggle('view-manage', manageView);
   $('#manage').classList.toggle('hide', !manageView);
-  $('#chat').classList.toggle('hide', manageView);
   $('#kick').classList.toggle('hide', manageView || !(isStaff() && key.startsWith('agent:')));
   $('#ch-edit').classList.toggle('hide', manageView || !(isStaff() && key.startsWith('chan:')));
   $('#op-new').classList.toggle('hide', manageView);
-  $('#ops-toggle').classList.toggle('hide', manageView);
+  document.querySelector('.col-tgs').classList.toggle('hide', manageView);
   window.OPS?.setChannel?.(key);
   if (manageView) return window.MANAGE?.open?.();
 
@@ -347,8 +564,7 @@ function buildMsg(m) {
   const who = el('span', 'who', a.codename);
   who.style.color = `hsl(${hue(a.codename)} 90% 70%)`;
   head.append(who);
-  if (a.role === 'command') head.append(el('span', 'tag', 'CMD'));
-  if (a.role === 'admin') head.append(el('span', 'tag adm', 'ADM'));
+  // sem etiqueta de cargo: ninguém deve deduzir pelo chat quem é comando ou admin
   head.append(el('time', null, new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })));
   if (m.edited_at) {
     const e = el('span', 'ed', '(editada)');
