@@ -485,14 +485,11 @@ mark{background:#45e3ff33;color:var(--cyan);padding:0 .1rem}
 .col-tg{background:none;border:1px solid var(--line);color:var(--dim);padding:.35rem .5rem}
 .col-tg.on{color:var(--cyan);border-color:var(--cyan);background:var(--panel)}
 
-/* colunas recolhidas */
+/* colunas recolhidas — as de dentro têm ordem e largura definidas pelo JS */
 :root.no-side #side,:root.no-side [data-grip="side"],
-:root.no-entries #col-entries,:root.no-entries [data-grip="dossier"],
-:root.no-dossier #col-dossier,:root.no-dossier [data-grip="dossier"],
-:root.no-chat #chat,:root.no-chat [data-grip="chat"]{display:none}
-/* quem sobrar à esquerda ocupa o espaço livre */
-:root.no-entries #col-dossier{flex:1;width:auto}
-:root.no-entries.no-dossier #chat{flex:1;width:auto}
+:root.no-entries #col-entries,
+:root.no-dossier #col-dossier,
+:root.no-chat #chat{display:none}
 /* a gestão de usuários toma a sala inteira */
 :root.view-manage #room-body>.col:not(#manage),
 :root.view-manage #room-body>.grip{display:none!important}
@@ -509,3 +506,14 @@ mark{background:#45e3ff33;color:var(--cyan);padding:0 .1rem}
 #chans .drop-before{box-shadow:inset 0 2px 0 var(--cyan)}
 #chans .drop-after{box-shadow:inset 0 -2px 0 var(--cyan)}
 #chans .drop-into{background:#45e3ff1a;box-shadow:inset 0 0 0 1px var(--cyan)}
+
+/* ---------- trocar colunas de lugar ---------- */
+.col-drag{cursor:grab;user-select:none;margin-right:.1rem}
+.col-drag:active{cursor:grabbing}
+.col.col-moving{opacity:.45}
+.col-head.drop-l{box-shadow:inset 3px 0 0 var(--cyan)}
+.col-head.drop-r{box-shadow:inset -3px 0 0 var(--cyan)}
+#ent-add{margin-left:auto}
+.col-head #ent-count,.col-head #ops-count{margin-right:0}
+.col-head b+span{margin-right:auto}
+@media(max-width:900px){.col-drag{cursor:default}}

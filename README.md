@@ -58,8 +58,14 @@ Quatro colunas, todas **redimensionáveis** pelas alças entre elas e
 3. **Dossiê** — as informações principais da operação.
 4. **Transmissão** — o chat do canal.
 
-Larguras e colapsos ficam guardados naquele navegador. Abaixo de 900px de
-largura as colunas empilham na vertical.
+As três de dentro da sala também **trocam de lugar**: arraste o punho ∷ do
+cabeçalho de uma sobre a outra e solte à esquerda ou à direita dela. A barra de
+canais é a exceção — fica sempre na ponta esquerda.
+
+A coluna de relatos é a elástica: ela absorve a sobra, e as outras é que têm
+largura ajustável. Se ela for recolhida, a primeira coluna visível assume esse
+papel. Ordem, larguras e colapsos ficam guardados naquele navegador. Abaixo de
+900px de largura as colunas empilham na vertical.
 
 ## Canais
 
@@ -167,8 +173,9 @@ piscando enquanto a operação corre, vermelha fraca quando encerrada. A mesma l
 aparece na aba de cada dossiê, para ver o andamento sem abrir um por um.
 
 Campos não preenchidos ficam em branco e podem ser completados depois em ✎ Editar.
-Enquanto o chat corre à esquerda, **+ ADICIONAR RELATO** registra cada nova apuração
-com os mesmos campos; nos relatos, **só o que foi preenchido aparece**.
+Enquanto o chat corre na coluna da direita, **+ RELATO** (no cabeçalho da coluna
+de relatos) ou **+ ADICIONAR RELATO** (na barra do dossiê) registram cada nova
+apuração com os mesmos campos; nos relatos, **só o que foi preenchido aparece**.
 
 Qualquer agente com acesso ao canal cria, edita e relata. Excluir a operação é do
 criador e do COMANDO/ADMIN.

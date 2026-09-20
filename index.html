@@ -74,30 +74,31 @@
     </header>
 
     <div id="room-body">
-      <section id="col-entries" class="col">
+      <section id="col-entries" class="col" data-col="entries">
         <header class="col-head">
-          <b>RELATOS</b><span id="ent-count"></span>
+          <b class="col-drag" title="Arraste para trocar a coluna de lugar">∷ RELATOS</b><span id="ent-count"></span>
+          <button id="ent-add" class="primary sm hide">+ RELATO</button>
           <button class="col-x" data-col="entries" title="Recolher" aria-label="Recolher">«</button>
         </header>
         <div id="ent-body" class="col-body"></div>
       </section>
 
-      <div class="grip" data-grip="dossier" role="separator" aria-label="Redimensionar dossiê"></div>
+      <div class="grip inner" role="separator" aria-label="Redimensionar coluna"></div>
 
-      <section id="col-dossier" class="col">
+      <section id="col-dossier" class="col" data-col="dossier">
         <header class="col-head">
-          <b>DOSSIÊ</b><span id="ops-count"></span>
+          <b class="col-drag" title="Arraste para trocar a coluna de lugar">∷ DOSSIÊ</b><span id="ops-count"></span>
           <button class="col-x" data-col="dossier" title="Recolher" aria-label="Recolher">»</button>
         </header>
         <div id="ops-tabs"></div>
         <div id="ops-body" class="col-body"></div>
       </section>
 
-      <div class="grip" data-grip="chat" role="separator" aria-label="Redimensionar transmissão"></div>
+      <div class="grip inner" role="separator" aria-label="Redimensionar coluna"></div>
 
-      <section id="chat" class="col">
+      <section id="chat" class="col" data-col="chat">
         <header class="col-head">
-          <b>TRANSMISSÃO</b>
+          <b class="col-drag" title="Arraste para trocar a coluna de lugar">∷ TRANSMISSÃO</b>
           <button class="col-x" data-col="chat" title="Recolher" aria-label="Recolher">»</button>
         </header>
         <div id="boot-line" class="hide" aria-hidden="true"></div>

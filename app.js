@@ -435,13 +435,59 @@ async function moveCanal(chanId, catId) {
   await salvaCanais(catId, [...irmaos, chanId]);
 }
 
-// ---------- colunas redimensionáveis e colapsáveis ----------
+// ---------- colunas: ordem, largura e colapso ----------
+// A barra de canais fica sempre à esquerda e fora dessa dança; as três de
+// dentro da sala trocam de lugar arrastando o cabeçalho.
 const COLS = {
-  side:    { css: '--side-w', el: '#side',        min: 180, max: 460, lado: 'esq' },
-  dossier: { css: '--dos-w',  el: '#col-dossier', min: 240, max: 900, lado: 'dir' },
-  chat:    { css: '--chat-w', el: '#chat',        min: 260, max: 900, lado: 'dir' },
-  entries: { el: '#col-entries' },   // ocupa o espaço livre: só colapsa
+  side:    { css: '--side-w', el: '#side',        min: 180, max: 460 },
+  entries: { el: '#col-entries' },   // sempre a elástica: ocupa a sobra
+  dossier: { css: '--dos-w',  el: '#col-dossier', min: 240, max: 900 },
+  chat:    { css: '--chat-w', el: '#chat',        min: 260, max: 900 },
 };
+const INNER = ['entries', 'dossier', 'chat'];
+
+let colOrder = (() => {
+  try {
+    const raw = JSON.parse(localStorage.getItem('cit.colorder') || 'null');
+    if (Array.isArray(raw) && raw.length === INNER.length && INNER.every(k => raw.includes(k))) return raw;
+  } catch {}
+  return [...INNER];
+})();
+
+const colAberta = k => {
+  try { return localStorage.getItem('cit.col.' + k) !== '0'; } catch { return true; }
+};
+const colVisivel = k => !document.documentElement.classList.contains('no-' + k);
+
+/**
+ * Reposiciona colunas e alças conforme a ordem atual.
+ * Cada alça guarda quem está à sua esquerda e à sua direita; quem ela
+ * redimensiona só se decide na hora do arrasto, porque a coluna elástica
+ * não tem largura própria para ajustar.
+ */
+function layout() {
+  const vis = colOrder.filter(colVisivel);
+  const flexKey = vis.includes('entries') ? 'entries' : vis[0];
+
+  colOrder.forEach((k, i) => {
+    const n = $(COLS[k].el);
+    if (!n) return;
+    n.style.order = i * 2;
+    if (k === flexKey) { n.style.flex = '1'; n.style.width = 'auto'; }
+    else { n.style.flex = 'none'; n.style.width = COLS[k].css ? `var(${COLS[k].css})` : ''; }
+  });
+
+  const grips = [...document.querySelectorAll('#room-body .grip.inner')];
+  grips.forEach(g => { g.style.display = 'none'; delete g.dataset.esq; delete g.dataset.dir; });
+  vis.slice(0, -1).forEach((k, i) => {
+    const g = grips[i];
+    if (!g) return;
+    g.style.display = '';
+    g.style.order = colOrder.indexOf(k) * 2 + 1;
+    g.dataset.esq = k;
+    g.dataset.dir = vis[i + 1];
+  });
+}
 
 function larguraCol(k, px) {
   const c = COLS[k];
@@ -455,11 +501,18 @@ function abreCol(k, on) {
   document.documentElement.classList.toggle('no-' + k, !on);
   try { localStorage.setItem('cit.col.' + k, on ? '1' : '0'); } catch {}
   document.querySelectorAll('.col-tg[data-col="' + k + '"]').forEach(b => b.classList.toggle('on', on));
+  layout();
 }
 
-const colAberta = k => {
-  try { return localStorage.getItem('cit.col.' + k) !== '0'; } catch { return true; }
-};
+function ordenaCols(mover, alvo, antes) {
+  if (mover === alvo) return;
+  const arr = colOrder.filter(k => k !== mover);
+  const at = arr.indexOf(alvo);
+  arr.splice(antes ? at : at + 1, 0, mover);
+  colOrder = arr;
+  try { localStorage.setItem('cit.colorder', JSON.stringify(colOrder)); } catch {}
+  layout();
+}
 
 (() => {
   Object.entries(COLS).forEach(([k, c]) => {
@@ -467,8 +520,10 @@ const colAberta = k => {
       const w = +localStorage.getItem('cit.w.' + k);
       if (w) document.documentElement.style.setProperty(c.css, w + 'px');
     }
-    abreCol(k, colAberta(k));
+    document.documentElement.classList.toggle('no-' + k, !colAberta(k));
+    document.querySelectorAll('.col-tg[data-col="' + k + '"]').forEach(b => b.classList.toggle('on', colAberta(k)));
   });
+  layout();
 
   document.querySelectorAll('.col-tg').forEach(b => {
     b.onclick = () => abreCol(b.dataset.col, document.documentElement.classList.contains('no-' + b.dataset.col));
@@ -477,19 +532,66 @@ const colAberta = k => {
     b.onclick = () => abreCol(b.dataset.col, false);
   });
 
-  let atual = null, caixa = null;
+  // ---- trocar colunas de lugar ----
+  let puxada = null;
+  const limpaCol = () => document.querySelectorAll('.col-head.drop-l,.col-head.drop-r')
+    .forEach(n => n.classList.remove('drop-l', 'drop-r'));
+
+  document.querySelectorAll('#room-body .col[data-col]').forEach(sec => {
+    const head = sec.querySelector('.col-head');
+    const alca = head?.querySelector('.col-drag');
+    if (!head || !alca) return;
+    const key = sec.dataset.col;
+    alca.draggable = true;
+
+    alca.addEventListener('dragstart', e => {
+      puxada = key;
+      sec.classList.add('col-moving');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', key);
+    });
+    alca.addEventListener('dragend', () => { sec.classList.remove('col-moving'); limpaCol(); puxada = null; });
+
+    head.addEventListener('dragover', e => {
+      if (!puxada || puxada === key) return;
+      e.preventDefault();
+      limpaCol();
+      const r = head.getBoundingClientRect();
+      head.classList.add(e.clientX < r.left + r.width / 2 ? 'drop-l' : 'drop-r');
+    });
+    head.addEventListener('drop', e => {
+      if (!puxada || puxada === key) return;
+      e.preventDefault();
+      const antes = head.classList.contains('drop-l');
+      const mover = puxada;
+      limpaCol(); puxada = null;
+      ordenaCols(mover, key, antes);
+    });
+  });
+
+  // ---- redimensionar ----
+  let alvo = null, lado = null, caixa = null;
   const eixo = e => (e.touches ? e.touches[0].clientX : e.clientX);
   const move = e => {
-    if (!atual) return;
+    if (!alvo) return;
     const x = eixo(e);
-    larguraCol(atual, COLS[atual].lado === 'esq' ? x - caixa.left : caixa.right - x);
+    larguraCol(alvo, lado === 'esq' ? x - caixa.left : caixa.right - x);
   };
-  const up = () => { atual = null; document.body.classList.remove('dragging'); };
+  const up = () => { alvo = null; document.body.classList.remove('dragging'); };
 
   document.querySelectorAll('.grip').forEach(g => {
     const down = e => {
-      atual = g.dataset.grip;
-      caixa = $(COLS[atual].el).getBoundingClientRect();
+      if (g.dataset.grip === 'side') {
+        alvo = 'side'; lado = 'esq';
+      } else {
+        // a coluna elástica não tem largura própria: nesse caso a alça
+        // ajusta a vizinha do outro lado
+        const esq = g.dataset.esq, dir = g.dataset.dir;
+        if (COLS[esq]?.css) { alvo = esq; lado = 'esq'; }
+        else if (COLS[dir]?.css) { alvo = dir; lado = 'dir'; }
+        else return;
+      }
+      caixa = $(COLS[alvo].el).getBoundingClientRect();
       document.body.classList.add('dragging');
       e.preventDefault();
     };

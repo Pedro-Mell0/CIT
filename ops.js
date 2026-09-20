@@ -113,6 +113,7 @@
     box.innerHTML = '';
     $('#ent-count').textContent = entries.length
       ? entries.length + (entries.length === 1 ? ' relato' : ' relatos') : '';
+    $('#ent-add').classList.toggle('hide', !op);
 
     if (!op) {
       box.append(el('p', 'empty', '> nenhuma operação aberta neste canal.'));
@@ -349,6 +350,7 @@
 
   // ---------- ligações ----------
   $('#op-new').onclick = () => { if (curChan && curChan !== 'manage') create(); };
+  $('#ent-add').onclick = () => { if (sel) entryForm(null); };
 
   window.OPS = {
     setChannel(key) {
