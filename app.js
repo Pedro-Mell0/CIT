@@ -723,10 +723,19 @@ function layout() {
  */
 const FOLGA_ELASTICA = 180;   // respiro mínimo da coluna que absorve a sobra
 
+/** Largura útil da sala, ou 0 enquanto ela não estiver na tela. */
+function salaMedida() {
+  const l = $('#room-body')?.getBoundingClientRect().width || 0;
+  return l < 360 ? 0 : l;
+}
+
 function maxCol(k) {
   const c = COLS[k];
   if (!c?.css) return 0;
   if (k === 'side') return Math.max(c.min, Math.min(c.max, innerWidth - 480));
+  // Sem medida ainda (app escondido, primeira pintura): nenhum teto. Apertar
+  // com base em zero devolveria o mínimo e apagaria a largura escolhida.
+  if (!salaMedida()) return c.max;
 
   const body = $('#room-body');
   const cs = getComputedStyle(body);
@@ -779,10 +788,10 @@ function alvoDaAlca(g) {
  * A barra de canais fica de fora: ela é navegação, não conteúdo.
  */
 function igualaColunas(forcar) {
-  const body = $('#room-body');
-  const largura = body?.getBoundingClientRect().width || 0;
-  if (largura < 360) return false;
+  const largura = salaMedida();
+  if (!largura) return false;
 
+  const body = $('#room-body');
   const cs = getComputedStyle(body);
   const gap = parseFloat(cs.gap) || 0;
   const livre = largura
@@ -795,11 +804,11 @@ function igualaColunas(forcar) {
     const c = COLS[k];
     if (!c.css) return;                       // a elástica recebe a sobra sozinha
     let salva = null;
-    try { salva = localStorage.getItem('cit.w2.' + k); } catch {}
+    try { salva = localStorage.getItem('cit.w3.' + k); } catch {}
     if (!forcar && salva) return;
     const w = Math.round(Math.min(Math.max(fatia, c.min), c.max));
     document.documentElement.style.setProperty(c.css, w + 'px');
-    try { localStorage.setItem('cit.w2.' + k, String(w)); } catch {}
+    try { localStorage.setItem('cit.w3.' + k, String(w)); } catch {}
   });
   return true;
 }
@@ -809,11 +818,12 @@ function larguraCol(k, px) {
   if (!c?.css) return;
   const w = Math.round(Math.min(Math.max(px, c.min), maxCol(k)));
   document.documentElement.style.setProperty(c.css, w + 'px');
-  try { localStorage.setItem('cit.w2.' + k, String(w)); } catch {}
+  try { localStorage.setItem('cit.w3.' + k, String(w)); } catch {}
 }
 
 /** Reaplica as larguras dentro do teto atual (janela menor, coluna recolhida). */
 function reajustaLarguras() {
+  if (!salaMedida()) return;          // nada a reajustar antes de existir sala
   Object.keys(COLS).forEach(k => {
     if (!COLS[k].css) return;
     const atual = parseFloat(getComputedStyle(document.documentElement).getPropertyValue(COLS[k].css));
@@ -845,7 +855,7 @@ function ordenaCols(mover, alvo, antes) {
 (() => {
   Object.entries(COLS).forEach(([k, c]) => {
     if (!c.css) return;
-    const w = +localStorage.getItem('cit.w2.' + k);
+    const w = +localStorage.getItem('cit.w3.' + k);
     if (w) document.documentElement.style.setProperty(c.css, w + 'px');
   });
   layout();
