@@ -84,6 +84,11 @@ papel. Ordem, larguras e colapsos ficam guardados naquele navegador. Abaixo de
 
 Quem cria entra automaticamente na lista de acesso. O ADMIN enxerga tudo.
 
+**MEMBROS**, no topo de qualquer canal, lista os codinomes de quem tem acesso a
+ele. Mostra só codinomes — o cargo continua invisível, como no chat. Onde o
+acesso vem do comando (canais individuais) ou da administração (canais
+restritos), a lista diz isso sem nomear ninguém.
+
 **Reordenar**: quem tem COMANDO arrasta os itens da barra lateral — dá para pôr
 uma categoria acima do `# geral`, mandar os canais individuais para baixo, mover
 um canal para dentro de uma categoria (soltando sobre o nome dela) ou reordenar

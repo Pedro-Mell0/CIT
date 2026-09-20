@@ -325,6 +325,79 @@ function drawChannels() {
   }
 }
 
+// ---------- membros do canal ----------
+// Mostra só codinomes: o cargo continua invisível, como no chat. Onde o acesso
+// vem do comando ou da administração, a lista diz isso sem nomear ninguém.
+function membrosDoCanal(key) {
+  const todos = () => Object.values(people);
+  if (key === 'geral') {
+    return { regra: 'Canal aberto: todos os agentes cadastrados.', lista: todos() };
+  }
+  if (key.startsWith('agent:')) {
+    const p = people[key.slice(6)];
+    return {
+      regra: 'Canal privado, entre o agente e o comando.',
+      lista: p ? [p] : [],
+      extra: 'o comando',
+    };
+  }
+  const c = chans[key.slice(5)];
+  if (!c) return { regra: 'Canal não encontrado.', lista: [] };
+
+  const herda = !!c.category_id && c.inherit_access && cats[c.category_id];
+  const cat = herda ? cats[c.category_id] : null;
+  const aberto = herda ? cat.everyone : c.everyone;
+
+  if (aberto) {
+    return {
+      regra: herda
+        ? `Aberto a todos os agentes, pela categoria ${cat.name}.`
+        : 'Aberto a todos os agentes.',
+      lista: todos(),
+    };
+  }
+  const ids = herda ? (catMem[c.category_id] || new Set()) : (chanMem[c.id] || new Set());
+  return {
+    regra: herda
+      ? `Acesso restrito, herdado da categoria ${cat.name}.`
+      : 'Acesso restrito aos agentes abaixo.',
+    lista: [...ids].map(id => people[id]).filter(Boolean),
+    extra: 'a administração',
+  };
+}
+
+function abreMembros(key) {
+  const info = chanInfo(key);
+  const { regra, lista, extra } = membrosDoCanal(key);
+  const m = modal('MEMBROS · ' + info.label);
+  m.body.append(el('p', 'form-note', regra));
+
+  const ul = el('div', 'membros');
+  lista.sort((a, b) => a.codename.localeCompare(b.codename)).forEach(p => {
+    const li = el('div', 'membro');
+    const pt = el('span', 'mb-dot');
+    pt.style.background = `hsl(${hue(p.codename)} 90% 70%)`;
+    li.append(pt, el('span', 'mb-nome', p.codename));
+    if (p.id === me.id) li.append(el('em', 'mb-voce', 'você'));
+    ul.append(li);
+  });
+  if (extra) {
+    const li = el('div', 'membro extra');
+    li.append(el('span', 'mb-dot vazio'), el('span', 'mb-nome', extra));
+    ul.append(li);
+  }
+  if (!lista.length && !extra) ul.append(el('p', 'empty', '> ninguém com acesso.'));
+  m.body.append(ul);
+
+  const n = lista.length;
+  m.foot.append(el('span', 'form-note', n + (n === 1 ? ' agente' : ' agentes') + (extra ? ' · e ' + extra : '')));
+  const ok = el('button', 'primary', 'Fechar');
+  ok.onclick = m.close;
+  m.foot.append(ok);
+}
+
+$('#members').onclick = () => { if (chan !== 'manage') abreMembros(chan); };
+
 // ---------- reordenar arrastando ----------
 // Só o COMANDO arrasta, porque a ordem vale para todo mundo.
 let arrasto = null;   // { tipo: 'topo' | 'canal', key, id }
@@ -660,6 +733,7 @@ async function openChannel(key, jumpTo) {
   $('#ch-edit').classList.toggle('hide', manageView || !(isStaff() && key.startsWith('chan:')));
   $('#op-new').classList.toggle('hide', manageView || apenasChat);
   document.querySelector('.col-tgs').classList.toggle('hide', manageView);
+  $('#members').classList.toggle('hide', manageView);
   window.OPS?.setChannel?.(key);
   if (manageView) return window.MANAGE?.open?.();
 
