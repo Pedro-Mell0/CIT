@@ -86,10 +86,11 @@ do PDF. Os dois botões no rodapé da barra lateral ligam e desligam **♪ som**
 - **Ruído de CRT** — de 9 em 9 a 30 segundos a tela dá uma "vacilada" de sinal,
   com uma faixa de imagem rasgada atravessando o vídeo, além de uma varredura
   lenta e contínua. É uma camada sobreposta que não captura clique.
-- **Som** — estalo de tecla ao enviar, bipe duplo ao chegar transmissão, tom
-  grave na falha, e um chiado de fundo em laço. Gerado na hora com Web Audio:
-  nenhum arquivo, nenhuma requisição. O navegador só libera o áudio depois do
-  primeiro clique ou tecla na página.
+- **Som** — estalo leve a cada tecla digitada (espaço mais grave, apagar mais
+  abafado, afinação sorteada a cada toque), estalo firme ao enviar, bipe duplo
+  ao chegar transmissão, tom grave na falha, e um chiado de fundo em laço.
+  Gerado na hora com Web Audio: nenhum arquivo, nenhuma requisição. O navegador
+  só libera o áudio depois do primeiro clique ou tecla na página.
 - **Chuva de caracteres** — atrás de todo o conteúdo, a ~18 fps, pausada quando
   a aba perde o foco.
 - **Texto que se decodifica** — nomes de canal e títulos de operação entram

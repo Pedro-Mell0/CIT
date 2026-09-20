@@ -31,6 +31,11 @@
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
       return ctx;
     }
+    const pronto = () => {
+      const c = acorda();
+      if (c?.state === 'suspended') c.resume();
+      return c;
+    };
 
     const tom = (freq, ini, dur, tipo, vol) => {
       const o = ctx.createOscillator(), g = ctx.createGain();
@@ -42,14 +47,14 @@
       o.start(ini); o.stop(ini + dur + 0.02);
     };
 
-    const estalo = (ini, vol, corte) => {
+    const estalo = (ini, vol, corte, dec = 0.035) => {
       const n = ctx.createBufferSource(); n.buffer = ruido;
       const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = corte;
       const g = ctx.createGain();
       g.gain.setValueAtTime(vol, ini);
-      g.gain.exponentialRampToValueAtTime(0.0001, ini + 0.035);
+      g.gain.exponentialRampToValueAtTime(0.0001, ini + dec);
       n.connect(f); f.connect(g); g.connect(master);
-      n.start(ini); n.stop(ini + 0.05);
+      n.start(ini); n.stop(ini + dec + 0.02);
     };
 
     return {
@@ -57,7 +62,7 @@
 
       /** tecla mecânica: estalo agudo + batida curta */
       envio() {
-        if (!on || !acorda()) return;
+        if (!on || !pronto()) return;
         const t = ctx.currentTime;
         estalo(t, 0.22, 2200);
         const o = ctx.createOscillator(), g = ctx.createGain();
@@ -70,9 +75,31 @@
         o.start(t); o.stop(t + 0.08);
       },
 
+      /**
+       * Tecla digitada: versão bem mais fraca e curta que a do envio, com
+       * afinação sorteada a cada toque — teclas idênticas em sequência soam
+       * mecânicas demais. Espaço sai mais grave, apagar sai mais abafado.
+       */
+      tecla(tipo) {
+        if (!on || !pronto()) return;
+        const t = ctx.currentTime;
+        const espaco = tipo === 'space', apaga = tipo === 'back';
+        estalo(t, espaco ? 0.075 : apaga ? 0.04 : 0.055,
+          espaco ? 1500 : apaga ? 1100 : 2600 + Math.random() * 1400, 0.016);
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = 'square';
+        const f0 = espaco ? 150 : apaga ? 220 : 360 + Math.random() * 140;
+        o.frequency.setValueAtTime(f0, t);
+        o.frequency.exponentialRampToValueAtTime(f0 * 0.55, t + 0.018);
+        g.gain.setValueAtTime(espaco ? 0.045 : 0.03, t);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.026);
+        o.connect(g); g.connect(master);
+        o.start(t); o.stop(t + 0.04);
+      },
+
       /** transmissão recebida em outro canal: dois tons curtos */
       recebida() {
-        if (!on || !acorda()) return;
+        if (!on || !pronto()) return;
         const t = ctx.currentTime;
         tom(880, t, 0.07, 'triangle', 0.09);
         tom(1320, t + 0.085, 0.09, 'triangle', 0.07);
@@ -80,7 +107,7 @@
 
       /** aviso de erro */
       falha() {
-        if (!on || !acorda()) return;
+        if (!on || !pronto()) return;
         const t = ctx.currentTime;
         tom(200, t, 0.12, 'sawtooth', 0.08);
         tom(140, t + 0.1, 0.16, 'sawtooth', 0.07);
@@ -106,6 +133,23 @@
       },
     };
   })();
+
+  // ---------- som leve a cada tecla ----------
+  const DIGITAVEL = n => n && (n.tagName === 'TEXTAREA' ||
+    (n.tagName === 'INPUT' && !['checkbox', 'radio', 'range', 'submit', 'button', 'file'].includes(n.type)));
+  let ultimaTecla = 0;
+
+  addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+    if (!DIGITAVEL(e.target)) return;
+    const k = e.key;
+    if (k === 'Enter') return;                       // o envio tem som próprio
+    if (k !== ' ' && k !== 'Backspace' && k !== 'Delete' && k.length !== 1) return;
+    const agora = performance.now();
+    if (agora - ultimaTecla < 16) return;            // segura o digitador veloz
+    ultimaTecla = agora;
+    SFX.tecla(k === ' ' ? 'space' : (k === 'Backspace' || k === 'Delete') ? 'back' : 'key');
+  }, true);
 
   // O navegador só libera áudio depois de um gesto do usuário.
   const liberar = () => {
