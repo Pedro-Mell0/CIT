@@ -29,7 +29,7 @@ $('#go').onclick = async () => {
     ? await sb.auth.signUp({ email, password: pass, options: { data: { codename: name, code } } })
     : await sb.auth.signInWithPassword({ email, password: pass });
   $('#go').disabled = false;
-  if (error) err.textContent = signup ? 'Código de acesso inválido ou codinome já em uso.' : 'Codinome ou senha incorretos.';
+  if (error) { console.error(error); err.textContent = error.message; }
   else start();
 };
 
