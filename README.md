@@ -214,6 +214,16 @@ apuração com os mesmos campos; nos relatos, **só o que foi preenchido aparece
 Qualquer agente com acesso ao canal cria, edita e relata. Excluir a operação é do
 criador e do COMANDO/ADMIN.
 
+### Anexar imagens
+
+O dossiê e cada relato aceitam imagens: pelo botão **+ Anexar imagem**, colando
+com **Ctrl+V** ou arrastando o arquivo para a área tracejada. Até 8MB por
+imagem. As miniaturas abrem em tamanho grande no clique e entram no PDF.
+
+Os arquivos ficam num bucket privado do Supabase Storage, servidos por URL
+assinada de 1 hora. A permissão de ver o anexo é a mesma de ver o canal onde a
+operação está — quem não alcança o canal não abre a imagem nem com o endereço.
+
 ### Exportar em PDF
 
 O botão **⎙ PDF** monta o dossiê inteiro — título, luz de status, os três blocos

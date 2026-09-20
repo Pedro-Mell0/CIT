@@ -208,6 +208,39 @@ create table if not exists public.operation_entries (
 );
 create index if not exists operation_entries_op_idx on public.operation_entries (operation_id, created_at);
 
+-- ---------- imagens anexadas ----------
+-- O caminho de cada arquivo é '<id da operação>/<uuid>.<ext>', e é isso que
+-- permite à policy de leitura reaproveitar a regra de acesso do canal.
+alter table public.operations        add column if not exists images text[] not null default '{}';
+alter table public.operation_entries add column if not exists images text[] not null default '{}';
+
+insert into storage.buckets (id, name, public)
+  values ('operacoes', 'operacoes', false)
+  on conflict (id) do nothing;
+
+drop policy if exists anexo_read   on storage.objects;
+drop policy if exists anexo_insert on storage.objects;
+drop policy if exists anexo_delete on storage.objects;
+
+-- Ver o anexo exige poder ver o canal onde a operação vive.
+create policy anexo_read on storage.objects for select to authenticated
+using (
+  bucket_id = 'operacoes'
+  and exists (
+    select 1 from public.operations o
+     where o.id::text = split_part(name, '/', 1)
+       and public.can_read_channel(o.channel)
+  )
+);
+
+-- O envio acontece antes de a operação existir (ela é criada junto), então
+-- aqui basta ser o dono do arquivo.
+create policy anexo_insert on storage.objects for insert to authenticated
+with check (bucket_id = 'operacoes' and owner = auth.uid());
+
+create policy anexo_delete on storage.objects for delete to authenticated
+using (bucket_id = 'operacoes' and (owner = auth.uid() or public.is_staff()));
+
 -- ============================================================================
 -- 2. FUNÇÕES DE APOIO
 -- ============================================================================

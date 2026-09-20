@@ -566,3 +566,24 @@ mark{background:#45e3ff33;color:var(--cyan);padding:0 .1rem}
 .prova{font-family:'Chakra Petch',sans-serif;font-size:1.3rem;letter-spacing:.06em;
   text-shadow:0 0 12px currentColor;word-break:break-all;min-height:1.4em}
 @media(max-width:520px){.paleta{grid-template-columns:repeat(4,1fr)}}
+
+/* ---------- anexos de imagem ---------- */
+.anexo-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:.4rem;margin-top:.35rem}
+.anexo{position:relative;aspect-ratio:1;background:#0a0622;border:1px solid var(--line);
+  padding:0;overflow:hidden;cursor:zoom-in;border-radius:2px}
+.anexo:hover{border-color:var(--cyan);box-shadow:0 0 12px #45e3ff33}
+.anexo img{width:100%;height:100%;object-fit:cover;display:block}
+.anexo.quebrado::after{content:"sem acesso";position:absolute;inset:0;display:grid;place-items:center;
+  color:var(--dim);font-size:.6rem;background:#0a0622}
+.anexo-x{position:absolute;top:2px;right:2px;background:#04020ccc;border:1px solid var(--line);
+  color:var(--dim);font-size:.65rem;line-height:1;padding:.15rem .3rem;cursor:pointer}
+.anexo-x:hover{color:var(--danger);border-color:var(--danger)}
+.anexo-zona{border:1px dashed var(--line);border-radius:2px;padding:.6rem;display:grid;gap:.5rem;
+  justify-items:start}
+.anexo-zona.sobre{border-color:var(--cyan);background:#45e3ff12}
+.anexo-grande{max-width:100%;max-height:70vh;display:block;margin:auto;border:1px solid var(--line)}
+@media print{
+  #print-root .anexo{cursor:default;aspect-ratio:auto;height:auto;break-inside:avoid}
+  #print-root .anexo img{height:auto;object-fit:contain}
+  #print-root .anexo-grade{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+}

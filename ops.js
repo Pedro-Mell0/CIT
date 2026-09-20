@@ -104,7 +104,15 @@
     // blocos 2 a 4 — todos os rótulos aparecem, mesmo em branco
     BLOCKS.forEach(b => body.append(blockView(b, op, false)));
 
+    if (op.images?.length) {
+      const sec = el('section', 'op-block');
+      sec.append(el('h4', null, 'ANEXOS'));
+      sec.append(anexosView(op.images));
+      body.append(sec);
+    }
+
     drawEntries(op);
+    pintaAnexos();
   }
 
   /** Coluna dos relatos: do mais antigo no topo ao mais novo embaixo,
@@ -132,6 +140,7 @@
     box.append(el('div', 'ent-top', '↑ relatos mais antigos'));
     entries.forEach((en, i) => box.append(entryView(en, i + 1)));
     box.scrollTop = box.scrollHeight;     // abre no mais recente
+    pintaAnexos();
   }
 
   function blockView(b, row, onlyFilled) {
@@ -192,15 +201,168 @@
       const sec = blockView(b, en, true);
       if (sec.childNodes.length) card.append(sec);
     });
+    if (en.images?.length) card.append(anexosView(en.images));
     if (en.edited_at || en.updated_at !== en.created_at) card.append(el('p', 'op-meta', 'atualizado em ' + new Date(en.updated_at).toLocaleString('pt-BR')));
     return card;
+  }
+
+  // ---------- anexos de imagem ----------
+  // Bucket privado: nada é servido por URL pública. Cada imagem só aparece
+  // depois de uma URL assinada, que o banco só emite a quem enxerga o canal.
+  const BUCKET = 'operacoes';
+  const MAX_MB = 8;
+
+  async function urlsAssinadas(paths) {
+    const mapa = {};
+    if (!paths.length) return mapa;
+    const { data, error } = await sb.storage.from(BUCKET).createSignedUrls(paths, 3600);
+    if (error) { console.error('anexos:', error); return mapa; }
+    (data || []).forEach(d => { if (d.path && d.signedUrl) mapa[d.path] = d.signedUrl; });
+    return mapa;
+  }
+
+  /** Preenche as imagens já desenhadas que ainda estão sem endereço. */
+  async function pintaAnexos() {
+    const imgs = [...document.querySelectorAll('img[data-path]:not([src])')];
+    if (!imgs.length) return;
+    const mapa = await urlsAssinadas([...new Set(imgs.map(i => i.dataset.path))]);
+    imgs.forEach(i => {
+      const u = mapa[i.dataset.path];
+      if (u) i.src = u; else i.closest('.anexo')?.classList.add('quebrado');
+    });
+  }
+
+  function lightbox(src, legenda) {
+    const m = modal(legenda || 'ANEXO');
+    const img = el('img', 'anexo-grande');
+    img.src = src;
+    img.alt = legenda || 'anexo';
+    m.body.append(img);
+    const abrir = el('button', 'ghost', 'Abrir em nova aba');
+    abrir.onclick = () => window.open(src, '_blank', 'noopener');
+    const ok = el('button', 'primary', 'Fechar');
+    ok.onclick = m.close;
+    m.foot.append(abrir, ok);
+  }
+
+  /** Grade de miniaturas exibida no dossiê e nos relatos. */
+  function anexosView(paths) {
+    const grade = el('div', 'anexo-grade');
+    (paths || []).forEach(p => {
+      const cel = el('button', 'anexo');
+      const img = el('img');
+      img.dataset.path = p;
+      img.alt = 'anexo da operação';
+      img.loading = 'lazy';
+      cel.append(img);
+      cel.onclick = () => { if (img.src) lightbox(img.src); };
+      grade.append(cel);
+    });
+    return grade;
+  }
+
+  /**
+   * Campo de anexos dos formulários: botão de escolher arquivo, Ctrl+V e
+   * arrastar-e-soltar. Os arquivos novos só sobem ao salvar, então cancelar o
+   * formulário não deixa lixo no armazenamento.
+   */
+  function anexosField(m, iniciais) {
+    m.body.append(el('h4', 'form-block', 'ANEXOS'));
+    const dica = el('p', 'form-note', 'Escolha um arquivo, cole com Ctrl+V ou arraste a imagem para cá.');
+    m.body.append(dica);
+
+    const zona = el('div', 'anexo-zona');
+    const grade = el('div', 'anexo-grade');
+    const itens = [];   // { path } já salvo · { file, url } novo
+
+    const escolher = el('button', 'ghost', '+ Anexar imagem');
+    const input = el('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.multiple = true;
+    input.className = 'hide';
+    escolher.onclick = () => input.click();
+    input.onchange = () => { aceita(input.files); input.value = ''; };
+
+    zona.append(grade, escolher, input);
+    m.body.append(zona);
+
+    function desenha() {
+      grade.innerHTML = '';
+      itens.forEach((it, i) => {
+        const cel = el('div', 'anexo');
+        const img = el('img');
+        if (it.url) img.src = it.url; else img.dataset.path = it.path;
+        img.alt = 'anexo';
+        const x = el('button', 'anexo-x', '✕');
+        x.title = 'Remover';
+        x.onclick = () => { itens.splice(i, 1); desenha(); };
+        cel.append(img, x);
+        grade.append(cel);
+      });
+      grade.classList.toggle('hide', !itens.length);
+      pintaAnexos();
+    }
+
+    function aceita(lista) {
+      let recusados = 0;
+      [...(lista || [])].forEach(f => {
+        if (!f || !f.type.startsWith('image/')) { recusados++; return; }
+        if (f.size > MAX_MB * 1024 * 1024) { recusados++; return; }
+        itens.push({ file: f, url: URL.createObjectURL(f) });
+      });
+      if (recusados) toast(`${recusados} arquivo(s) ignorado(s): só imagens de até ${MAX_MB}MB.`, true);
+      desenha();
+    }
+
+    // Ctrl+V: o evento nasce no campo com foco, então escutamos no documento
+    // e nos removemos sozinhos quando o formulário sai da tela.
+    const colar = e => {
+      if (!document.body.contains(zona)) { document.removeEventListener('paste', colar); return; }
+      const arquivos = [...(e.clipboardData?.items || [])]
+        .filter(i => i.kind === 'file' && i.type.startsWith('image/'))
+        .map(i => i.getAsFile());
+      if (!arquivos.length) return;
+      e.preventDefault();
+      aceita(arquivos);
+    };
+    document.addEventListener('paste', colar);
+
+    zona.addEventListener('dragover', e => { e.preventDefault(); zona.classList.add('sobre'); });
+    zona.addEventListener('dragleave', () => zona.classList.remove('sobre'));
+    zona.addEventListener('drop', e => {
+      e.preventDefault();
+      zona.classList.remove('sobre');
+      aceita(e.dataTransfer?.files);
+    });
+
+    (iniciais || []).forEach(p => itens.push({ path: p }));
+    desenha();
+
+    return {
+      get itens() { return itens; },
+      /** Sobe o que é novo e devolve a lista final de caminhos. */
+      async enviar(opId) {
+        const paths = [];
+        for (const it of itens) {
+          if (it.path) { paths.push(it.path); continue; }
+          const ext = (it.file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
+          const nome = `${opId}/${crypto.randomUUID()}.${ext}`;
+          const { error } = await sb.storage.from(BUCKET)
+            .upload(nome, it.file, { contentType: it.file.type || 'image/png' });
+          if (error) throw new Error('Falha ao enviar imagem: ' + error.message);
+          paths.push(nome);
+        }
+        return paths;
+      },
+    };
   }
 
   // ---------- exportar em PDF ----------
   // Monta um documento próprio e chama a impressão do navegador ("Salvar como
   // PDF"). O conteúdo sai das mesmas funções que desenham o painel, então o PDF
   // nunca fica defasado em relação à tela, e o texto continua selecionável.
-  function exportPdf(op) {
+  async function exportPdf(op) {
     document.getElementById('print-root')?.remove();
     const root = el('div');
     root.id = 'print-root';
@@ -229,6 +391,12 @@
       `última atualização ${new Date(op.updated_at).toLocaleString('pt-BR')}`));
 
     BLOCKS.forEach(b => root.append(blockView(b, op, false)));
+    if (op.images?.length) {
+      const sec = el('section', 'op-block');
+      sec.append(el('h4', null, 'ANEXOS'));
+      sec.append(anexosView(op.images));
+      root.append(sec);
+    }
 
     if (entries.length) {
       const sep = el('div', 'op-sep');
@@ -252,6 +420,19 @@
       document.title = title;
       window.removeEventListener('afterprint', done);
     };
+    // Sem esperar as imagens, o navegador imprime os quadros em branco. Mas a
+    // espera tem teto: uma imagem que nunca carrega não pode engolir o clique.
+    await pintaAnexos();
+    const carregando = [...root.querySelectorAll('img')]
+      .filter(i => !i.complete)
+      .map(i => new Promise(pronto => { i.onload = i.onerror = pronto; }));
+    if (carregando.length) {
+      await Promise.race([
+        Promise.all(carregando),
+        new Promise(pronto => setTimeout(pronto, 2500)),
+      ]);
+    }
+
     window.addEventListener('afterprint', done);
     window.print();
     done();   // navegadores que não disparam afterprint
@@ -291,6 +472,7 @@
     m.body.append(el('h4', 'form-block', 'TÍTULO DA OPERAÇÃO'));
     const title = field(m.body, 'Título', op?.title || '', { ph: 'ex.: ECO NEGRO' });
     const inputs = fieldsInto(m.body, BLOCKS, op || {});
+    const anexos = anexosField(m, op?.images);
 
     const save = el('button', 'primary', op ? 'Salvar' : 'Publicar dossiê');
     const cancel = el('button', 'ghost', 'Cancelar');
@@ -304,12 +486,16 @@
       const row = { title: t, status: inputs.status.value };
       KEYS.forEach(k => row[k] = inputs[k].value.trim());
       save.disabled = true;
-      let error, id = op?.id;
+      // o id sai daqui para os anexos poderem subir antes do registro existir
+      const id = op?.id || crypto.randomUUID();
+      try { row.images = await anexos.enviar(id); }
+      catch (e) { save.disabled = false; return toast(e.message, true); }
+
+      let error;
       if (op) ({ error } = await sb.from('operations').update(row).eq('id', op.id));
       else {
-        row.channel = curChan; row.created_by = me.id;
-        const r = await sb.from('operations').insert(row).select().single();
-        error = r.error; id = r.data?.id;
+        row.id = id; row.channel = curChan; row.created_by = me.id;
+        ({ error } = await sb.from('operations').insert(row));
       }
       save.disabled = false;
       if (error) return toast('Falha ao salvar: ' + error.message, true);
@@ -325,6 +511,7 @@
     const m = modal(en ? 'EDITAR RELATO' : 'ADICIONAR RELATO');
     m.body.append(el('p', 'form-note', 'Preencha apenas o que for apurado. Campos vazios não aparecem no dossiê.'));
     const inputs = fieldsInto(m.body, entryBlocks(), en || {});
+    const anexos = anexosField(m, en?.images);
 
     const save = el('button', 'primary', en ? 'Salvar' : 'Publicar relato');
     const cancel = el('button', 'ghost', 'Cancelar');
@@ -334,8 +521,12 @@
     save.onclick = async () => {
       const row = {};
       KEYS.forEach(k => row[k] = inputs[k].value.trim());
-      if (!KEYS.some(k => row[k])) return toast('Preencha ao menos um campo.', true);
+      if (!KEYS.some(k => row[k]) && !anexos.itens.length) {
+        return toast('Preencha ao menos um campo ou anexe uma imagem.', true);
+      }
       save.disabled = true;
+      try { row.images = await anexos.enviar(sel); }
+      catch (e) { save.disabled = false; return toast(e.message, true); }
       let error;
       if (en) ({ error } = await sb.from('operation_entries').update(row).eq('id', en.id));
       else {
