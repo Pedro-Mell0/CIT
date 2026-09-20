@@ -119,11 +119,15 @@ header .tools .ghost{padding:.4rem .6rem}
 
 /* ---------- composer ---------- */
 .composer{padding:.7rem 1.2rem .9rem;border-top:1px solid var(--line);background:var(--ink);display:grid;gap:.4rem}
+#msg-grip{height:9px;margin:-.7rem -1.2rem -.1rem;cursor:row-resize;background:linear-gradient(180deg,transparent 3px,var(--line) 4px,var(--line) 5px,transparent 6px)}
+#msg-grip:hover{background:linear-gradient(180deg,transparent 2px,var(--cyan) 4px,var(--cyan) 5px,transparent 7px)}
+body.dragging-v{cursor:row-resize;user-select:none}
+body.dragging-v #msg-grip{background:linear-gradient(180deg,transparent 2px,var(--cyan) 4px,var(--cyan) 5px,transparent 7px)}
 .fmt-hint{color:var(--dim);font-size:.65rem;display:flex;gap:.5rem;flex-wrap:wrap;opacity:.65}
 .fmt-hint code{background:none;color:inherit}
 .fmt-hint .k{font-family:'JetBrains Mono',monospace}
 .composer-row{display:flex;gap:.6rem;align-items:flex-end}
-.composer-row textarea{flex:1;max-height:180px;overflow-y:auto}
+.composer-row textarea{flex:1;overflow-y:auto;resize:none}
 
 /* ---------- dossiês ---------- */
 #ops-grip{flex:none;width:7px;cursor:col-resize;background:linear-gradient(90deg,transparent,var(--line),transparent)}
@@ -318,3 +322,50 @@ mark{background:#45e3ff33;color:var(--cyan);padding:0 .1rem}
     break-inside:avoid;page-break-inside:avoid}
   #print-root .op-sep{margin-top:1.2rem;break-after:avoid;page-break-after:avoid}
 }
+
+/* ---------- ruído de CRT ---------- */
+/* Camada puramente decorativa: fixa, sem captar clique, acima de tudo. */
+#crt{position:fixed;inset:0;pointer-events:none;z-index:100;overflow:hidden}
+:root.no-crt #crt{display:none}
+
+/* varredura lenta e contínua, como o feixe de um tubo antigo */
+.crt-scan{position:absolute;left:0;right:0;height:38vh;
+  background:linear-gradient(180deg,transparent,#45e3ff08 35%,#9b5cff12 50%,#45e3ff08 65%,transparent);
+  animation:crt-sweep 9s linear infinite}
+@keyframes crt-sweep{from{transform:translateY(-40vh)}to{transform:translateY(105vh)}}
+
+/* lavada de luz da "vacilada" */
+.crt-flick{position:absolute;inset:0;opacity:0;
+  background:linear-gradient(120deg,#45e3ff,#9b5cff 60%,#3d8bff)}
+:root.flick .crt-flick{animation:crt-flick .28s steps(4)}
+@keyframes crt-flick{
+  0%{opacity:0}12%{opacity:.11}22%{opacity:.01}
+  38%{opacity:.16}48%{opacity:.03}
+  62%{opacity:.09}74%{opacity:0}86%{opacity:.06}100%{opacity:0}
+}
+
+/* faixa de imagem "rasgada" que atravessa a tela durante a vacilada */
+.crt-tear{position:absolute;left:-4%;right:-4%;height:9vh;top:0;opacity:0;
+  background:repeating-linear-gradient(0deg,#0000 0 2px,#45e3ff22 2px 3px);
+  box-shadow:0 0 30px #9b5cff55;mix-blend-mode:screen}
+:root.flick .crt-tear{animation:crt-tear .28s linear}
+@keyframes crt-tear{
+  0%{opacity:0;top:8%;transform:translateX(0)}
+  20%{opacity:.9;transform:translateX(-9px) scaleY(.6)}
+  45%{opacity:.7;top:46%;transform:translateX(7px) scaleY(1.3)}
+  70%{opacity:.85;top:72%;transform:translateX(-5px) scaleY(.8)}
+  100%{opacity:0;top:96%;transform:translateX(0)}
+}
+
+/* durante a vacilada o próprio texto perde o sinal por um instante */
+:root.flick #app,:root.flick #auth{animation:crt-shift .28s steps(3)}
+@keyframes crt-shift{
+  0%,100%{opacity:1}
+  18%{opacity:.86}
+  40%{opacity:1}
+  58%{opacity:.9}
+  72%{opacity:1}
+}
+
+@media print{#crt{display:none!important}}
+@media(prefers-reduced-motion:reduce){#crt{display:none!important}}

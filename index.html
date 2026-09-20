@@ -61,6 +61,8 @@
       <div id="chat">
         <div id="msgs" aria-live="polite"></div>
         <div class="composer">
+          <div id="msg-grip" role="separator" aria-label="Redimensionar caixa de texto"
+               title="Arraste para redimensionar · duplo clique volta ao automático"></div>
           <div class="fmt-hint">
             <b>**negrito**</b> · <i>'itálico'</i> · <u>__sublinhado__</u> · <s>~~riscado~~</s> · <code>`código`</code> · <span class="k">- tópico</span> · <span class="k">&gt; citação</span> · <span class="k">||spoiler||</span>
           </div>
@@ -86,6 +88,12 @@
       <section id="manage" class="hide" aria-label="Gerenciar usuários"></section>
     </div>
   </section>
+</div>
+
+<div id="crt" aria-hidden="true">
+  <div class="crt-scan"></div>
+  <div class="crt-flick"></div>
+  <div class="crt-tear"></div>
 </div>
 
 <div id="modal" class="hide" role="dialog" aria-modal="true"></div>

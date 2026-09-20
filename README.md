@@ -73,6 +73,18 @@ devolver a sessão junto; para garantir a saída, use *Encerrar sessão*.
 - **Apagar**: 🗑 ao lado do ✎. O autor apaga a própria; COMANDO e ADMIN apagam
   a de qualquer um. Some da tela de todo mundo na hora, e não há desfazer.
 - **Enviar**: Enter. **Quebra de linha**: Shift+Enter.
+- **Tamanho da caixa**: arraste a alça logo acima dela. A altura escolhida fica
+  guardada; duplo clique na alça devolve o crescimento automático.
+
+## Ruído de CRT
+
+De 9 em 9 a 30 segundos a tela dá uma "vacilada" de sinal, com uma faixa de
+imagem rasgada atravessando o vídeo, além de uma varredura lenta e contínua.
+É uma camada sobreposta que não captura clique nem altera o layout, some na
+impressão do PDF, e respeita `prefers-reduced-motion` do sistema.
+
+Para desligar, no console do navegador (F12): `CRT.toggle()`. A escolha fica
+guardada naquele navegador.
 
 ### Formatação
 

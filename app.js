@@ -448,11 +448,56 @@ async function send() {
   }
 }
 
+// Altura da caixa de texto: cresce sozinha até 180px, ou fica na altura que o
+// usuário arrastar. Duplo clique na alça volta para o automático.
+let msgH = +localStorage.getItem('cit.msgh') || 0;
+
 function grow() {
   const ta = $('#msg');
+  if (msgH) { ta.style.height = msgH + 'px'; return; }
   ta.style.height = 'auto';
   ta.style.height = Math.min(180, ta.scrollHeight) + 'px';
 }
+
+(() => {
+  const grip = $('#msg-grip');
+  let from = 0, base = 0, dragging = false;
+  const y = e => (e.touches ? e.touches[0].clientY : e.clientY);
+
+  const down = e => {
+    dragging = true;
+    from = y(e);
+    base = $('#msg').getBoundingClientRect().height;
+    document.body.classList.add('dragging-v');
+    e.preventDefault();
+  };
+  const move = e => {
+    if (!dragging) return;
+    const h = Math.round(Math.min(Math.max(base + (from - y(e)), 38), innerHeight * 0.65));
+    msgH = h;
+    $('#msg').style.height = h + 'px';
+  };
+  const up = () => {
+    if (!dragging) return;
+    dragging = false;
+    document.body.classList.remove('dragging-v');
+    localStorage.setItem('cit.msgh', String(msgH));
+  };
+
+  grip.addEventListener('mousedown', down);
+  grip.addEventListener('touchstart', down, { passive: false });
+  addEventListener('mousemove', move);
+  addEventListener('touchmove', move, { passive: true });
+  addEventListener('mouseup', up);
+  addEventListener('touchend', up);
+  grip.addEventListener('dblclick', () => {
+    msgH = 0;
+    localStorage.removeItem('cit.msgh');
+    grow();
+    toast('Caixa de texto voltou ao tamanho automático.');
+  });
+  grow();
+})();
 
 $('#send').onclick = send;
 $('#msg').addEventListener('input', grow);
@@ -472,6 +517,38 @@ $('#kick').onclick = async () => {
 
 $('#ch-edit').onclick = () => window.MANAGE?.channelForm?.(chans[chan.slice(5)]);
 $('#new-ch').onclick = () => window.MANAGE?.newMenu?.();
+
+// ---------- ruído de CRT ----------
+// A cada 9 a 30 segundos a tela dá uma "vacilada" de sinal. Puramente visual:
+// tudo acontece numa camada sobreposta, sem tocar no layout nem capturar clique.
+(() => {
+  const html = document.documentElement;
+  const calmo = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+  const pref = k => { try { return localStorage.getItem(k); } catch { return null; } };
+  const ligado = () => pref('cit.crt') !== '0' && !calmo?.matches;
+
+  const pulso = () => {
+    setTimeout(() => {
+      if (ligado() && !document.hidden) {
+        html.classList.add('flick');
+        setTimeout(() => html.classList.remove('flick'), 280);
+      }
+      pulso();
+    }, 9000 + Math.random() * 21000);
+  };
+  pulso();
+
+  // atalho para quem se incomodar: desliga e lembra da escolha
+  window.CRT = {
+    toggle() {
+      const on = !ligado();
+      try { localStorage.setItem('cit.crt', on ? '1' : '0'); } catch {}
+      html.classList.toggle('no-crt', !on);
+      return on;
+    },
+  };
+  if (!ligado()) html.classList.add('no-crt');
+})();
 
 // os complementos (ops/manage/search) carregam depois deste arquivo
 if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', start);
