@@ -155,6 +155,7 @@ async function start() {
   $('#me-role').className = 'role-' + me.role;
   $('#new-ch').classList.toggle('hide', !isStaff());
 
+  igualaColunas(false);
   drawChannels();
   openChannel('geral');
   listen();
@@ -678,12 +679,44 @@ function alvoDaAlca(g) {
   return COLS[t.alvo]?.css ? t : null;
 }
 
+/**
+ * Reparte a sala em três fatias iguais entre relatos, dossiê e transmissão.
+ * A conta é sempre sobre as três colunas, mesmo que alguma esteja recolhida no
+ * momento, para o padrão não depender do canal em que o site abriu.
+ * A barra de canais fica de fora: ela é navegação, não conteúdo.
+ */
+function igualaColunas(forcar) {
+  const body = $('#room-body');
+  const largura = body?.getBoundingClientRect().width || 0;
+  if (largura < 360) return false;
+
+  const cs = getComputedStyle(body);
+  const gap = parseFloat(cs.gap) || 0;
+  const livre = largura
+    - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0)
+    - 4 * gap      // 3 colunas + 2 alças => 4 vãos
+    - 2 * 8;       // as duas alças
+  const fatia = Math.floor(livre / 3);
+
+  INNER.forEach(k => {
+    const c = COLS[k];
+    if (!c.css) return;                       // a elástica recebe a sobra sozinha
+    let salva = null;
+    try { salva = localStorage.getItem('cit.w2.' + k); } catch {}
+    if (!forcar && salva) return;
+    const w = Math.round(Math.min(Math.max(fatia, c.min), c.max));
+    document.documentElement.style.setProperty(c.css, w + 'px');
+    try { localStorage.setItem('cit.w2.' + k, String(w)); } catch {}
+  });
+  return true;
+}
+
 function larguraCol(k, px) {
   const c = COLS[k];
   if (!c?.css) return;
   const w = Math.round(Math.min(Math.max(px, c.min), maxCol(k)));
   document.documentElement.style.setProperty(c.css, w + 'px');
-  try { localStorage.setItem('cit.w.' + k, String(w)); } catch {}
+  try { localStorage.setItem('cit.w2.' + k, String(w)); } catch {}
 }
 
 /** Reaplica as larguras dentro do teto atual (janela menor, coluna recolhida). */
@@ -719,7 +752,7 @@ function ordenaCols(mover, alvo, antes) {
 (() => {
   Object.entries(COLS).forEach(([k, c]) => {
     if (!c.css) return;
-    const w = +localStorage.getItem('cit.w.' + k);
+    const w = +localStorage.getItem('cit.w2.' + k);
     if (w) document.documentElement.style.setProperty(c.css, w + 'px');
   });
   layout();
@@ -790,6 +823,9 @@ function ordenaCols(mover, alvo, antes) {
     };
     g.addEventListener('mousedown', down);
     g.addEventListener('touchstart', down, { passive: false });
+    g.addEventListener('dblclick', () => {
+      if (igualaColunas(true)) toast('Colunas repartidas em partes iguais.');
+    });
   });
   addEventListener('mousemove', move);
   addEventListener('touchmove', move, { passive: true });

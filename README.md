@@ -68,6 +68,8 @@ As três de dentro da sala também **trocam de lugar**: arraste o punho ∷ do
 cabeçalho de uma sobre a outra e solte à esquerda ou à direita dela. A barra de
 canais é a exceção — fica sempre na ponta esquerda.
 
+Por padrão as três dividem a sala em partes iguais; **duplo clique em qualquer
+alça** reparte tudo de novo em terços, se você quiser voltar ao equilíbrio.
 A coluna de relatos é a elástica: ela absorve a sobra, e as outras é que têm
 largura ajustável. Se ela for recolhida, a primeira coluna visível assume esse
 papel. Ordem, larguras e colapsos ficam guardados naquele navegador. Abaixo de
