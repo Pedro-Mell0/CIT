@@ -658,3 +658,11 @@ alter table public.messages          replica identity full;
 alter table public.operations        replica identity full;
 alter table public.operation_entries replica identity full;
 alter table public.sidebar_order     replica identity full;
+
+-- ============================================================================
+-- 7. RECARGA DO CACHE
+-- ============================================================================
+-- O PostgREST guarda um retrato do schema; sem este aviso, uma tabela ou
+-- função recém-criada pode demorar a aparecer para o site, com o erro
+-- "Could not find the table ... in the schema cache".
+notify pgrst, 'reload schema';
