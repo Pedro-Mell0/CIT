@@ -215,7 +215,13 @@ function chanInfo(key) {
   if (key === 'manage') return { label: 'Gerenciar usuários', icon: '⚙', hint: 'administração' };
   if (key.startsWith('agent:')) {
     const p = people[key.slice(6)];
-    return { label: p ? (p.id === me.id ? 'canal do comando' : p.codename) : '[removido]', icon: '🔒', hint: 'privado · comando ⇄ agente' };
+    if (!p) return { label: '[removido]', icon: '🔒', hint: 'privado' };
+    const meu = p.id === me.id;
+    return {
+      label: meu && me.role === 'agent' ? 'canal do comando' : p.codename + (meu ? ' (você)' : ''),
+      icon: '🔒',
+      hint: 'privado · ' + (meu ? 'você' : p.codename) + ' ⇄ comando',
+    };
   }
   const c = chans[key.slice(5)];
   if (!c) return { label: 'canal', icon: '#', hint: '' };
@@ -273,11 +279,13 @@ function drawChannels() {
       if (me.role === 'agent') {
         navBtn(box, 'agent:' + me.id, 'canal do comando', '🔒');
       } else {
-        const agents = Object.values(people).filter(p => p.role === 'agent')
-          .sort((a, b) => a.codename.localeCompare(b.codename));
-        if (!agents.length) { box.remove(); return; }
+        // todo mundo tem canal individual, inclusive o próprio comando;
+        // quem tem COMANDO ou ADMIN enxerga todos eles
+        const todos = Object.values(people).sort((a, b) => a.codename.localeCompare(b.codename));
+        if (!todos.length) { box.remove(); return; }
         box.append(el('h3', null, 'Canais individuais'));
-        agents.forEach(a => navBtn(box, 'agent:' + a.id, a.codename, '🔒'));
+        todos.forEach(p => navBtn(box, 'agent:' + p.id,
+          p.codename + (p.id === me.id ? ' (você)' : ''), '🔒'));
       }
 
     } else if (it.kind === 'cat') {
@@ -617,7 +625,9 @@ async function openChannel(key, jumpTo) {
   const manageView = key === 'manage';
   document.documentElement.classList.toggle('view-manage', manageView);
   $('#manage').classList.toggle('hide', !manageView);
-  $('#kick').classList.toggle('hide', manageView || !(isStaff() && key.startsWith('agent:')));
+  const alvoKick = key.startsWith('agent:') ? people[key.slice(6)] : null;
+  $('#kick').classList.toggle('hide', manageView || !alvoKick || alvoKick.id === me.id
+    || !(isAdmin() || (isStaff() && alvoKick.role === 'agent')));
   $('#ch-edit').classList.toggle('hide', manageView || !(isStaff() && key.startsWith('chan:')));
   $('#op-new').classList.toggle('hide', manageView);
   document.querySelector('.col-tgs').classList.toggle('hide', manageView);

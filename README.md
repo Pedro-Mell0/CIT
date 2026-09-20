@@ -70,7 +70,9 @@ papel. Ordem, larguras e colapsos ficam guardados naquele navegador. Abaixo de
 ## Canais
 
 - `# geral` — todos os agentes.
-- `🔒 individuais` — um canal privado por agente, visível para ele e para o comando.
+- `🔒 individuais` — um canal privado por conta, inclusive das contas com
+  COMANDO e ADMIN. Cada agente vê só o seu; quem tem COMANDO ou ADMIN vê todos,
+  o próprio inclusive.
 - **Categorias e canais criados pelo COMANDO** — nome livre, acesso definido na criação:
   *todos os agentes* ou *uma lista escolhida*. Um canal pode ficar dentro de uma
   categoria (herdando o acesso dela) ou avulso, com acesso próprio.
