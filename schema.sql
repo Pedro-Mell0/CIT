@@ -142,6 +142,10 @@ create table if not exists public.operations (
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
+alter table public.operations add column if not exists status text not null default 'ativa';
+alter table public.operations drop constraint if exists operations_status_check;
+alter table public.operations add constraint operations_status_check
+  check (status in ('ativa','encerrada'));
 create index if not exists operations_channel_idx on public.operations (channel, created_at desc);
 
 -- ---------- relatos de uma operação ----------

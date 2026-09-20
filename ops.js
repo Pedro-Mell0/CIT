@@ -3,16 +3,19 @@
    =========================================================================== */
 (() => {
   const BLOCKS = [
-    { title: 'INFORMAÇÕES', items: [['f_date', 'Data inicial'], ['f_time', 'Horário'], ['f_place', 'Local'], ['f_nature', 'Natureza da ocorrência']] },
+    { title: 'INFORMAÇÕES', items: [['status', 'Status'], ['f_date', 'Data inicial'], ['f_time', 'Horário'], ['f_place', 'Local'], ['f_nature', 'Natureza da ocorrência']] },
     { title: 'ENVOLVIDOS',  items: [['f_suspects', 'Suspeitos'], ['f_agents', 'Agentes'], ['f_witnesses', 'Testemunhas'], ['f_victims', 'Vítimas']] },
     { title: 'RELATÓRIO',   items: [['f_report', 'Relatório']] },
   ];
-  // No relato, a data é a do fato relatado.
+  // O relato descreve um fato, não o andamento da operação: não leva status,
+  // e a data é a do fato relatado.
   const entryBlocks = () => BLOCKS.map(b => ({
     title: b.title,
-    items: b.items.map(([k, l]) => [k, k === 'f_date' ? 'Data' : l]),
+    items: b.items.filter(([k]) => k !== 'status').map(([k, l]) => [k, k === 'f_date' ? 'Data' : l]),
   }));
-  const KEYS = BLOCKS.flatMap(b => b.items.map(([k]) => k));
+  const KEYS = BLOCKS.flatMap(b => b.items.map(([k]) => k)).filter(k => k !== 'status');
+  const statusOf = row => (row?.status === 'encerrada' ? 'encerrada' : 'ativa');
+  const dot = st => el('span', 'op-dot ' + st);
   const LONG = new Set(['f_report', 'f_suspects', 'f_agents', 'f_witnesses', 'f_victims']);
 
   let curChan = null, ops = [], sel = null, entries = [];
@@ -74,7 +77,8 @@
     $('#ops-count').textContent = ops.length ? `${ops.length} em curso` : '';
     const tabs = $('#ops-tabs'); tabs.innerHTML = '';
     ops.forEach(o => {
-      const b = el('button', 'op-tab' + (o.id === sel ? ' on' : ''), o.title);
+      const b = el('button', 'op-tab' + (o.id === sel ? ' on' : ''));
+      b.append(dot(statusOf(o)), el('span', null, o.title));
       b.onclick = async () => { sel = o.id; await loadEntries(); draw(); };
       tabs.append(b);
     });
@@ -92,11 +96,16 @@
       return;
     }
 
-    // bloco 1 — título
+    // bloco 1 — título, com a luz de status ao lado
+    const st = statusOf(op);
+    const row = el('div', 'op-head-row');
+    const led = dot(st);
+    led.title = st === 'ativa' ? 'operação ativa' : 'operação encerrada';
     const h = el('h2', 'op-title');
     h.dataset.text = op.title;
     h.textContent = op.title;
-    body.append(h);
+    row.append(led, h);
+    body.append(row);
 
     const meta = el('p', 'op-meta');
     meta.textContent = `aberta por ${people[op.created_by]?.codename || '[removido]'} · ${new Date(op.created_at).toLocaleString('pt-BR')}`;
@@ -139,6 +148,16 @@
     sec.append(el('h4', null, b.title));
     (onlyFilled ? filled : b.items).forEach(([k, label]) => {
       const v = (row[k] || '').trim();
+      if (k === 'status') {
+        const st = statusOf(row);
+        const line = el('div', 'op-line');
+        line.append(el('span', 'lbl', 'Status:'));
+        const val = el('span', 'op-status ' + st);
+        val.append(dot(st), el('b', null, st.toUpperCase()));
+        line.append(val);
+        sec.append(line);
+        return;
+      }
       if (k === 'f_report') {
         const d = el('div', 'op-report md');
         if (v) d.append(MD.render(v)); else d.append(el('span', 'blank', '—'));
@@ -185,12 +204,27 @@
   }
 
   // ---------- formulários ----------
+  function statusField(parent, value) {
+    const w = el('label', 'fld');
+    w.append(el('span', null, 'Status'));
+    const s = el('select', 'sel-status');
+    [['ativa', 'ATIVA'], ['encerrada', 'ENCERRADA']].forEach(([v, t]) => {
+      const o = el('option', null, t); o.value = v; s.append(o);
+    });
+    s.value = value;
+    w.append(s);
+    parent.append(w);
+    return s;
+  }
+
   function fieldsInto(body, blocks, row = {}) {
     const inputs = {};
     blocks.forEach(b => {
       body.append(el('h4', 'form-block', b.title));
       b.items.forEach(([k, label]) => {
-        inputs[k] = field(body, label, row[k] || '', { area: LONG.has(k), ph: LONG.has(k) ? 'aceita formatação: **negrito**, - tópicos...' : '' });
+        inputs[k] = k === 'status'
+          ? statusField(body, statusOf(row))
+          : field(body, label, row[k] || '', { area: LONG.has(k), ph: LONG.has(k) ? 'aceita formatação: **negrito**, - tópicos...' : '' });
       });
     });
     return inputs;
@@ -213,7 +247,7 @@
     save.onclick = async () => {
       const t = title.value.trim();
       if (!t) { title.focus(); return toast('A operação precisa de um título.', true); }
-      const row = { title: t };
+      const row = { title: t, status: inputs.status.value };
       KEYS.forEach(k => row[k] = inputs[k].value.trim());
       save.disabled = true;
       let error, id = op?.id;

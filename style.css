@@ -1,4 +1,4 @@
-:root{--void:#04020c;--ink:#09061d;--panel:#0f0a2b;--line:#2a2170;--blue:#3d8bff;--cyan:#45e3ff;--violet:#9b5cff;--text:#d8d5ff;--dim:#7d76b9;--danger:#ff5c8a;--gold:#ffc74d;--ops-w:380px}
+:root{--void:#04020c;--ink:#09061d;--panel:#0f0a2b;--line:#2a2170;--blue:#3d8bff;--cyan:#45e3ff;--violet:#9b5cff;--text:#d8d5ff;--dim:#7d76b9;--danger:#ff5c8a;--gold:#ffc74d;--live:#37ff8b;--dead:#ff2e5f;--ops-w:380px}
 *{box-sizing:border-box;margin:0}
 html,body{height:100%}
 body{background:radial-gradient(900px 500px at 15% -10%,#2a1a6e55,transparent),radial-gradient(700px 500px at 100% 100%,#0f3a8a44,transparent),var(--void);color:var(--text);font:14px/1.5 'JetBrains Mono',monospace}
@@ -134,10 +134,29 @@ header .tools .ghost{padding:.4rem .6rem}
 #ops-count{color:var(--dim);font-size:.68rem}
 #ops-close{margin-left:auto;padding:.25rem .55rem}
 #ops-tabs{display:flex;gap:.3rem;padding:.6rem .9rem 0;flex-wrap:wrap}
-.op-tab{background:none;border:1px solid var(--line);color:var(--dim);padding:.25rem .5rem;font-size:.7rem;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.op-tab{background:none;border:1px solid var(--line);color:var(--dim);padding:.25rem .5rem;font-size:.7rem;max-width:100%;display:inline-flex;align-items:center;gap:.35rem;min-width:0}
+.op-tab span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .op-tab.on{color:var(--cyan);border-color:var(--cyan);background:var(--panel)}
 #ops-body{padding:.9rem;display:grid;gap:.9rem;align-content:start}
 .ops-empty{display:grid;gap:.8rem;justify-items:center;color:var(--dim);text-align:center;padding:2rem .5rem}
+
+/* luz de status */
+.op-head-row{display:flex;align-items:center;gap:.55rem;min-width:0}
+.op-dot{width:10px;height:10px;border-radius:50%;flex:none;display:inline-block}
+.op-dot.ativa{background:var(--live);box-shadow:0 0 6px var(--live),0 0 16px #37ff8b66;animation:led-on 2.6s infinite}
+.op-dot.encerrada{background:var(--dead);box-shadow:0 0 6px var(--dead),0 0 14px #ff2e5f55;animation:led-off 4.2s infinite}
+@keyframes led-on{
+  0%,100%{opacity:1}
+  38%{opacity:1}39%{opacity:.25}41%{opacity:1}
+  62%{opacity:.4}64%{opacity:1}65%{opacity:.3}67%{opacity:1}
+  88%{opacity:.6}90%{opacity:1}
+}
+@keyframes led-off{0%,100%{opacity:.75}50%{opacity:.3}}
+.op-status{display:inline-flex;align-items:center;gap:.4rem;font-size:.78rem}
+.op-status.ativa b{color:var(--live)}
+.op-status.encerrada b{color:var(--dead)}
+.op-tab .op-dot{width:7px;height:7px}
+.sel-status{text-transform:uppercase;letter-spacing:.08em}
 
 /* título piscando */
 .op-title{position:relative;font-size:1.45rem;line-height:1.15;letter-spacing:.1em;text-transform:uppercase;color:var(--cyan);animation:op-flicker 3.4s infinite}

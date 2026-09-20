@@ -100,10 +100,14 @@ Vale em mensagens e em todos os campos dos dossiês.
 O botão **⬢ CRIAR OPERAÇÃO** abre o formulário. Publicado, o dossiê aparece no
 painel da direita — redimensionável pela alça e colapsável pelo botão ▤.
 
-1. **TÍTULO DA OPERAÇÃO** (pisca, em destaque)
-2. **INFORMAÇÕES** — Data inicial, Horário, Local, Natureza da ocorrência
+1. **TÍTULO DA OPERAÇÃO** (pisca, em destaque), com a luz de status ao lado
+2. **INFORMAÇÕES** — Status, Data inicial, Horário, Local, Natureza da ocorrência
 3. **ENVOLVIDOS** — Suspeitos, Agentes, Testemunhas, Vítimas
 4. **RELATÓRIO**
+
+O **Status** é *ativa* ou *encerrada*, e acende uma luz ao lado do título: verde
+piscando enquanto a operação corre, vermelha fraca quando encerrada. A mesma luz
+aparece na aba de cada dossiê, para ver o andamento sem abrir um por um.
 
 Campos não preenchidos ficam em branco e podem ser completados depois em ✎ Editar.
 Enquanto o chat corre à esquerda, **+ ADICIONAR RELATO** registra cada nova apuração
