@@ -103,9 +103,12 @@ create table if not exists public.messages (
   body       text not null,
   created_at timestamptz not null default now()
 );
--- O schema anterior só conhecia 'geral' e 'agent:<uuid>'. Se ele deixou um CHECK
--- limitando os valores de `channel`, o formato novo 'chan:<uuid>' seria rejeitado
--- na hora de enviar mensagem num canal criado pelo comando.
+-- O schema anterior só conhecia 'geral' e 'agent:<uuid>'. O CHECK que ele deixou
+-- em `channel` rejeita o formato novo 'chan:<uuid>', quebrando o envio de
+-- mensagem em canal criado pelo comando. Pelo nome conhecido e, por garantia,
+-- por varredura (o nome pode variar entre instalações).
+alter table public.messages drop constraint if exists messages_channel_check;
+
 do $do$
 declare c record;
 begin
