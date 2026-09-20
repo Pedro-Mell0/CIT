@@ -29,6 +29,7 @@ const catMem = {};        // categoria -> Set(perfil)
 const chanMem = {};       // canal     -> Set(perfil)
 const msgEls = new Map(); // id da mensagem -> elemento
 const order  = {};        // chave da barra lateral -> posição
+const unread = new Set(); // canais com mensagem nova ainda não vista
 
 const isStaff = () => me && (me.role === 'command' || me.role === 'admin');
 const isAdmin = () => me && me.role === 'admin';
@@ -175,7 +176,7 @@ function listen() {
       if (p.eventType === 'INSERT') {
         if (m.channel === chan) { addMsg(m); if (m.author_id !== me.id) window.FX?.som.recebida(); }
         else {
-          document.querySelector(`[data-ch="${CSS.escape(m.channel)}"]`)?.classList.add('new');
+          if (!unread.has(m.channel)) { unread.add(m.channel); drawChannels(); }
           window.FX?.som.recebida();
         }
       } else if (p.eventType === 'UPDATE' && m.channel === chan) {
@@ -232,11 +233,32 @@ function chanInfo(key) {
   return { label: c.name, icon: '#', hint: (c.topic ? c.topic + ' · ' : '') + 'acesso: ' + who, ch: c };
 }
 
+/** Cabeçalho recolhível, usado pelas categorias e pelos canais individuais. */
+function grupoHead(id, label, n, filhos) {
+  const fechado = collapsed.has(id);
+  const h = el('h3', 'cat' + (fechado ? ' fechada' : ''));
+  const tw = el('button', 'cat-tw');
+  tw.setAttribute('aria-expanded', String(!fechado));
+  tw.title = fechado ? 'Mostrar os canais' : 'Esconder os canais';
+  tw.append(el('span', 'arw', fechado ? '▸' : '▾'), el('span', 'cat-nm', label));
+  if (n) tw.append(el('span', 'cat-n', n));
+  // recolhido, o grupo avisa por dentro o que chegou e o que está aberto
+  if (fechado && filhos?.some(k => unread.has(k))) tw.classList.add('new');
+  if (fechado && filhos?.includes(chan)) tw.classList.add('dentro');
+  tw.onclick = () => {
+    fechado ? collapsed.delete(id) : collapsed.add(id);
+    saveCollapsed(); drawChannels();
+  };
+  h.append(tw);
+  return h;
+}
+
 function navBtn(parent, key, label, icon, cls) {
   const b = el('button', cls);
   b.dataset.ch = key;
   b.append(el('span', 'ic', icon), el('span', 'nm', label));
   b.classList.toggle('on', key === chan);
+  b.classList.toggle('new', unread.has(key));
   b.onclick = () => { openChannel(key); if (innerWidth <= 760) $('#side').classList.remove('open'); };
   parent.append(b);
   return b;
@@ -283,21 +305,18 @@ function drawChannels() {
         // quem tem COMANDO ou ADMIN enxerga todos eles
         const todos = Object.values(people).sort((a, b) => a.codename.localeCompare(b.codename));
         if (!todos.length) { box.remove(); return; }
-        box.append(el('h3', null, 'Canais individuais'));
-        todos.forEach(p => navBtn(box, 'agent:' + p.id,
-          p.codename + (p.id === me.id ? ' (você)' : ''), '🔒'));
+        const chaves = todos.map(p => 'agent:' + p.id);
+        box.append(grupoHead('individuais', 'Canais individuais', todos.length, chaves));
+        if (!collapsed.has('individuais')) {
+          todos.forEach(p => navBtn(box, 'agent:' + p.id,
+            p.codename + (p.id === me.id ? ' (você)' : ''), '🔒'));
+        }
       }
 
     } else if (it.kind === 'cat') {
       const cat = it.cat;
-      const head = el('h3', 'cat');
-      const tw = el('button', 'cat-tw');
-      tw.append(el('span', 'arw', collapsed.has(cat.id) ? '▸' : '▾'), el('span', null, cat.name));
-      tw.onclick = () => {
-        collapsed.has(cat.id) ? collapsed.delete(cat.id) : collapsed.add(cat.id);
-        saveCollapsed(); drawChannels();
-      };
-      head.append(tw);
+      const dentro = byCat[cat.id] || [];
+      const head = grupoHead(cat.id, cat.name, dentro.length, dentro.map(c => 'chan:' + c.id));
       if (isStaff()) {
         const ed = el('button', 'cat-ed', '✎');
         ed.title = 'Editar ou excluir categoria';
@@ -307,7 +326,7 @@ function drawChannels() {
       box.append(head);
       box.dataset.catId = cat.id;
       if (!collapsed.has(cat.id)) {
-        (byCat[cat.id] || []).forEach(c => armaCanal(navBtn(box, 'chan:' + c.id, c.name, '#', 'sub'), c));
+        dentro.forEach(c => armaCanal(navBtn(box, 'chan:' + c.id, c.name, '#', 'sub'), c));
       }
 
     } else {
@@ -737,7 +756,7 @@ async function openChannel(key, jumpTo) {
   window.OPS?.setChannel?.(key);
   if (manageView) return window.MANAGE?.open?.();
 
-  document.querySelector(`[data-ch="${CSS.escape(key)}"]`)?.classList.remove('new');
+  unread.delete(key);
   window.FX?.bootLine(info.label);
 
   const token = ++loadToken;

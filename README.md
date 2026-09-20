@@ -84,6 +84,11 @@ papel. Ordem, larguras e colapsos ficam guardados naquele navegador. Abaixo de
 
 Quem cria entra automaticamente na lista de acesso. O ADMIN enxerga tudo.
 
+**Recolher grupos**: a seta ▾ ao lado de *Canais individuais* e de cada
+categoria esconde os canais dali, com a contagem ao lado para você saber quanto
+ficou guardado. Recolhido, o grupo fica em ciano se o canal aberto estiver
+dentro dele, e a contagem acende em roxo se chegou mensagem nova lá.
+
 **MEMBROS**, no topo de qualquer canal, lista os codinomes de quem tem acesso a
 ele. Mostra só codinomes — o cargo continua invisível, como no chat. Onde o
 acesso vem do comando (canais individuais) ou da administração (canais

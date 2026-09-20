@@ -57,9 +57,21 @@ small{color:var(--dim);font-size:.7rem}
 #chans button.new::after{content:"●";color:var(--violet);text-shadow:0 0 8px var(--violet);margin-left:auto}
 #chans h3{font-size:.68rem;color:var(--dim);font-weight:400;margin:.9rem 0 .2rem;letter-spacing:.1em;text-transform:uppercase}
 #chans h3.cat{display:flex;align-items:center;margin:.9rem 0 .1rem}
-.cat-tw{background:none;border:0;color:var(--dim);font:inherit;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;display:flex;gap:.3rem;align-items:center;padding:.15rem 0;flex:1;text-align:left}
-.cat-tw:hover{color:var(--cyan)}
-.cat-tw .arw{font-size:.6rem}
+.cat-tw{background:none;border:0;color:var(--dim);font:inherit;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;display:flex;gap:.35rem;align-items:center;padding:.2rem .2rem;flex:1;text-align:left;border-radius:2px}
+.cat-tw:hover{color:var(--cyan);background:var(--panel)}
+.cat-tw .arw{font-size:.62rem;width:.7em;flex:none;transition:transform .12s}
+.cat-tw .cat-nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* contagem de canais dentro do grupo */
+.cat-tw .cat-n{margin-left:auto;font-size:.6rem;color:var(--dim);border:1px solid var(--line);
+  border-radius:8px;padding:0 .35rem;letter-spacing:0}
+.cat-tw:hover .cat-n{border-color:var(--cyan)}
+/* recolhido, o grupo avisa o que está escondido lá dentro */
+.cat-tw.dentro{color:var(--cyan)}
+.cat-tw.dentro .arw{color:var(--cyan)}
+.cat-tw.new .cat-n{border-color:var(--violet);color:var(--violet);
+  box-shadow:0 0 8px #9b5cff55}
+.cat-tw.new .cat-n::after{content:" ●";font-size:.5rem;vertical-align:middle}
+h3.cat.fechada{opacity:.85}
 .cat-ed{background:none;border:0;color:var(--dim);opacity:.45;padding:0 .2rem}
 h3.cat:hover .cat-ed{opacity:1}
 .cat-ed:hover{color:var(--cyan)}
