@@ -462,10 +462,30 @@ let colOrder = (() => {
   return [...INNER];
 })();
 
-const colAberta = k => {
-  try { return localStorage.getItem('cit.col.' + k) !== '0'; } catch { return true; }
-};
-const colVisivel = k => !document.documentElement.classList.contains('no-' + k);
+// Preferência explícita do usuário: '1' aberta, '0' recolhida, null automático.
+const colPref = k => { try { return localStorage.getItem('cit.col2.' + k); } catch { return null; } };
+const soChat = () => document.documentElement.classList.contains('view-chat-only');
+
+let temDossie = false;   // o canal atual tem alguma operação?
+function marcaDossies(v) {
+  const antes = temDossie;
+  temDossie = !!v;
+  if (antes !== temDossie) layout();
+}
+
+/**
+ * No automático, relatos e dossiê só aparecem quando há operação no canal —
+ * um canal de conversa abre com a transmissão inteira. Basta o usuário mexer
+ * no botão da coluna para a escolha dele passar a mandar.
+ */
+function colVisivel(k) {
+  if (soChat() && (k === 'entries' || k === 'dossier')) return false;
+  const p = colPref(k);
+  if (p === '0') return false;
+  if (p === '1') return true;
+  if (k === 'entries' || k === 'dossier') return temDossie;
+  return true;
+}
 
 /**
  * Reposiciona colunas e alças conforme a ordem atual.
@@ -474,6 +494,11 @@ const colVisivel = k => !document.documentElement.classList.contains('no-' + k);
  * não tem largura própria para ajustar.
  */
 function layout() {
+  ['side', ...INNER].forEach(k => {
+    const on = colVisivel(k);
+    document.documentElement.classList.toggle('no-' + k, !on);
+    document.querySelectorAll('.col-tg[data-col="' + k + '"]').forEach(b => b.classList.toggle('on', on));
+  });
   const vis = colOrder.filter(colVisivel);
   const flexKey = vis.includes('entries') ? 'entries' : vis[0];
 
@@ -506,9 +531,13 @@ function larguraCol(k, px) {
 }
 
 function abreCol(k, on) {
-  document.documentElement.classList.toggle('no-' + k, !on);
-  try { localStorage.setItem('cit.col.' + k, on ? '1' : '0'); } catch {}
-  document.querySelectorAll('.col-tg[data-col="' + k + '"]').forEach(b => b.classList.toggle('on', on));
+  try { localStorage.setItem('cit.col2.' + k, on ? '1' : '0'); } catch {}
+  layout();
+}
+
+/** Devolve a coluna ao comportamento automático. */
+function autoCol(k) {
+  try { localStorage.removeItem('cit.col2.' + k); } catch {}
   layout();
 }
 
@@ -524,12 +553,9 @@ function ordenaCols(mover, alvo, antes) {
 
 (() => {
   Object.entries(COLS).forEach(([k, c]) => {
-    if (c.css) {
-      const w = +localStorage.getItem('cit.w.' + k);
-      if (w) document.documentElement.style.setProperty(c.css, w + 'px');
-    }
-    document.documentElement.classList.toggle('no-' + k, !colAberta(k));
-    document.querySelectorAll('.col-tg[data-col="' + k + '"]').forEach(b => b.classList.toggle('on', colAberta(k)));
+    if (!c.css) return;
+    const w = +localStorage.getItem('cit.w.' + k);
+    if (w) document.documentElement.style.setProperty(c.css, w + 'px');
   });
   layout();
 
@@ -623,13 +649,16 @@ async function openChannel(key, jumpTo) {
   drawChannels();
 
   const manageView = key === 'manage';
+  const apenasChat = key === 'geral';
   document.documentElement.classList.toggle('view-manage', manageView);
+  document.documentElement.classList.toggle('view-chat-only', apenasChat);
+  layout();
   $('#manage').classList.toggle('hide', !manageView);
   const alvoKick = key.startsWith('agent:') ? people[key.slice(6)] : null;
   $('#kick').classList.toggle('hide', manageView || !alvoKick || alvoKick.id === me.id
     || !(isAdmin() || (isStaff() && alvoKick.role === 'agent')));
   $('#ch-edit').classList.toggle('hide', manageView || !(isStaff() && key.startsWith('chan:')));
-  $('#op-new').classList.toggle('hide', manageView);
+  $('#op-new').classList.toggle('hide', manageView || apenasChat);
   document.querySelector('.col-tgs').classList.toggle('hide', manageView);
   window.OPS?.setChannel?.(key);
   if (manageView) return window.MANAGE?.open?.();

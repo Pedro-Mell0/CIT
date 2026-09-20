@@ -517,3 +517,9 @@ mark{background:#45e3ff33;color:var(--cyan);padding:0 .1rem}
 .col-head #ent-count,.col-head #ops-count{margin-right:0}
 .col-head b+span{margin-right:auto}
 @media(max-width:900px){.col-drag{cursor:default}}
+
+/* ---------- # geral: só conversa ---------- */
+:root.view-chat-only #col-entries,
+:root.view-chat-only #col-dossier,
+:root.view-chat-only .col-tg[data-col="entries"],
+:root.view-chat-only .col-tg[data-col="dossier"]{display:none!important}

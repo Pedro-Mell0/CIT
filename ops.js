@@ -23,9 +23,10 @@
 
   // ---------- dados ----------
   async function load() {
-    if (!curChan || curChan === 'manage') { ops = []; sel = null; entries = []; return draw(); }
+    if (!curChan || curChan === 'manage') { ops = []; sel = null; entries = []; marcaDossies(false); return draw(); }
     const { data } = await sb.from('operations').select('*').eq('channel', curChan).order('created_at', { ascending: false });
     ops = data || [];
+    marcaDossies(ops.length > 0);
     if (sel && !ops.find(o => o.id === sel)) sel = null;
     sel = sel || ops[0]?.id || null;
     await loadEntries();
@@ -314,7 +315,7 @@
       if (error) return toast('Falha ao salvar: ' + error.message, true);
       m.close();
       sel = id;
-      abreCol('dossier', true);
+      autoCol('dossier'); autoCol('entries');
       load();
     };
   }
@@ -366,7 +367,7 @@
     },
     async focus(opId) {
       sel = opId;
-      abreCol('dossier', true);
+      autoCol('dossier'); autoCol('entries');
       await load();
       sel = opId;
       await loadEntries();
