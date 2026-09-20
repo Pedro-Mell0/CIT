@@ -1,2 +1,117 @@
-# CIT
-Projeto pessoal referente a jogos.
+# CIT · Paralela — comunicação anônima para RolePlay
+
+Site estático (sem build). Backend: Supabase. Hospedagem: Vercel.
+
+```
+index.html   estrutura
+style.css    visual
+config.js    URL e chave anon do Supabase
+format.js    formatação de texto (negrito, tópicos, etc.)
+app.js       acesso, barra de canais, mensagens e edição
+ops.js       dossiês de operação (painel lateral direito)
+manage.js    gerenciar usuários (ADMIN) e criar canais/categorias (COMANDO)
+search.js    varredura global (Ctrl+F)
+schema.sql   banco de dados completo
+```
+
+## Setup
+
+1. Crie um projeto em supabase.com.
+2. **Authentication → Providers → Email**: desligue *Confirm email* (os agentes usam e-mails fictícios derivados do codinome).
+3. **SQL Editor**: cole o `schema.sql` inteiro e rode. Ele é **idempotente** — rode de novo a cada atualização do site, sem perder dados.
+4. **Project Settings → API**: copie *Project URL* e *anon public key* para o `config.js`.
+5. Suba para o GitHub e importe no Vercel (Framework: *Other*, sem build command).
+
+> A chave `anon` pode ficar no código: a segurança vem das regras de RLS do `schema.sql`.
+
+## Códigos de acesso
+
+Digitados uma única vez, no cadastro. Definem o cargo da conta.
+
+| Código       | Cargo   | Pode                                                                 |
+|--------------|---------|----------------------------------------------------------------------|
+| `AGENTE`     | AGENTE  | ler/escrever nos canais liberados, criar e editar dossiês e relatos  |
+| `COMANDOCIT` | COMANDO | tudo do agente + criar categorias e canais, editar mensagens alheias, remover agentes |
+| `ADMIN!@#`   | ADMIN   | tudo do comando + criar/excluir contas, dar e tirar privilégios, redefinir senhas |
+
+Trocar um código:
+
+```sql
+update invite_codes set code = 'NOVO' where role = 'command';
+```
+
+A primeira conta ADMIN precisa ser criada pelo cadastro normal, usando `ADMIN!@#`.
+Depois disso o ADMIN cria as demais contas pelo painel, sem distribuir códigos.
+
+## Canais
+
+- `# geral` — todos os agentes.
+- `🔒 individuais` — um canal privado por agente, visível para ele e para o comando.
+- **Categorias e canais criados pelo COMANDO** — nome livre, acesso definido na criação:
+  *todos os agentes* ou *uma lista escolhida*. Um canal pode ficar dentro de uma
+  categoria (herdando o acesso dela) ou avulso, com acesso próprio.
+
+Quem cria entra automaticamente na lista de acesso. O ADMIN enxerga tudo.
+Excluir uma categoria não esconde os canais dentro dela: eles viram avulsos
+mantendo o mesmo acesso.
+
+## Mensagens
+
+- **Editar**: passe o mouse na mensagem e clique em ✎. O autor edita a própria;
+  COMANDO e ADMIN editam a de qualquer um. Mensagens editadas ficam marcadas.
+- **Enviar**: Enter. **Quebra de linha**: Shift+Enter.
+
+### Formatação
+
+Vale em mensagens e em todos os campos dos dossiês.
+
+| Escreva          | Vira              |
+|------------------|-------------------|
+| `**texto**`      | **negrito**       |
+| `'texto'`        | *itálico*         |
+| `*texto*` `_texto_` | *itálico*      |
+| `__texto__`      | sublinhado        |
+| `~~texto~~`      | ~~riscado~~       |
+| `` `texto` ``    | `código`          |
+| ` ```…``` `      | bloco de código   |
+| `- item`         | tópico            |
+| `1. item`        | lista numerada    |
+| `> texto`        | citação           |
+| `# Título`       | título            |
+| `---`            | linha divisória   |
+| `\|\|texto\|\|`  | spoiler (revela no clique) |
+| `https://…`      | link              |
+
+## Operações (dossiês)
+
+O botão **⬢ CRIAR OPERAÇÃO** abre o formulário. Publicado, o dossiê aparece no
+painel da direita — redimensionável pela alça e colapsável pelo botão ▤.
+
+1. **TÍTULO DA OPERAÇÃO** (pisca, em destaque)
+2. **INFORMAÇÕES** — Data inicial, Horário, Local, Natureza da ocorrência
+3. **ENVOLVIDOS** — Suspeitos, Agentes, Testemunhas, Vítimas
+4. **RELATÓRIO**
+
+Campos não preenchidos ficam em branco e podem ser completados depois em ✎ Editar.
+Enquanto o chat corre à esquerda, **+ ADICIONAR RELATO** registra cada nova apuração
+com os mesmos campos; nos relatos, **só o que foi preenchido aparece**.
+
+Qualquer agente com acesso ao canal cria, edita e relata. Excluir a operação é do
+criador e do COMANDO/ADMIN.
+
+## Busca
+
+**Ctrl+F** (ou o botão ⌕) varre mensagens, dossiês e relatos de **todos os canais que
+aquele usuário acessa** — o RLS garante que nada fora disso aparece. Clicar em um
+resultado abre o canal e salta até a mensagem ou dossiê.
+
+## Manutenção
+
+Promover alguém pelo SQL, se preciso:
+
+```sql
+update profiles set role = 'admin' where codename = 'Fulano';
+```
+
+Se o cadastro falhar com *Database error saving new user*, o código de acesso
+digitado não existe em `invite_codes`.

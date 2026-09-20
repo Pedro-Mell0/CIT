@@ -1,6 +1,27 @@
+/* ===========================================================================
+   app.js — núcleo: acesso, barra de canais, mensagens e edição.
+   Complementos: ops.js (dossiês), manage.js (usuários/canais), search.js.
+   =========================================================================== */
 const sb = supabase.createClient(CFG.url, CFG.key);
 const $ = s => document.querySelector(s);
-let me, chan = 'geral', people = {}, signup = false, live;
+
+let me, chan = 'geral', signup = false, live;
+const people = {};        // id -> perfil
+const cats   = {};        // id -> categoria
+const chans  = {};        // id -> canal
+const catMem = {};        // categoria -> Set(perfil)
+const chanMem = {};       // canal     -> Set(perfil)
+const msgEls = new Map(); // id da mensagem -> elemento
+
+const isStaff = () => me && (me.role === 'command' || me.role === 'admin');
+const isAdmin = () => me && me.role === 'admin';
+
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+}
 
 // ---------- tela de acesso ----------
 const boot = ['> interceptando transmissão............ SINAL LIMPO', '> origem............................... REALIDADE NÃO CATALOGADA', '> canal seguro CIT.................... AGUARDANDO CREDENCIAIS'];
@@ -35,104 +56,382 @@ $('#go').onclick = async () => {
 
 $('#out').onclick = async () => { await sb.auth.signOut(); location.reload(); };
 
+// ---------- janelas ----------
+function modal(title) {
+  const root = $('#modal');
+  root.innerHTML = '';
+  root.classList.remove('hide');
+  const box = el('div', 'modal-box');
+  const head = el('header');
+  head.append(el('b', null, title));
+  const x = el('button', 'ghost', '✕');
+  x.setAttribute('aria-label', 'Fechar');
+  head.append(x);
+  const body = el('div', 'modal-body');
+  const foot = el('div', 'modal-foot');
+  box.append(head, body, foot);
+  root.append(box);
+
+  const close = () => { root.classList.add('hide'); root.innerHTML = ''; document.removeEventListener('keydown', esc); };
+  const esc = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+  document.addEventListener('keydown', esc);
+  x.onclick = close;
+  root.onmousedown = e => { if (e.target === root) close(); };
+  return { body, foot, close };
+}
+
+function field(parent, label, value = '', { area = false, ph = '' } = {}) {
+  const w = el('label', 'fld');
+  w.append(el('span', null, label));
+  const i = area ? el('textarea') : el('input');
+  i.value = value || '';
+  if (ph) i.placeholder = ph;
+  if (area) i.rows = 4;
+  w.append(i);
+  parent.append(w);
+  return i;
+}
+
+function toast(text, bad) {
+  const t = el('div', 'toast' + (bad ? ' bad' : ''), text);
+  document.body.append(t);
+  setTimeout(() => t.remove(), 3600);
+}
+
+// ---------- carregamento ----------
+async function loadPeople() {
+  const { data } = await sb.from('profiles').select('*');
+  Object.keys(people).forEach(k => delete people[k]);
+  (data || []).forEach(p => people[p.id] = p);
+}
+
+async function loadTree() {
+  const [c, ch, cm, chm] = await Promise.all([
+    sb.from('categories').select('*').order('position').order('name'),
+    sb.from('channels').select('*').order('position').order('name'),
+    sb.from('category_members').select('*'),
+    sb.from('channel_members').select('*'),
+  ]);
+  [cats, chans, catMem, chanMem].forEach(o => Object.keys(o).forEach(k => delete o[k]));
+  (c.data || []).forEach(x => cats[x.id] = x);
+  (ch.data || []).forEach(x => chans[x.id] = x);
+  (cm.data || []).forEach(x => (catMem[x.category_id] ||= new Set()).add(x.profile_id));
+  (chm.data || []).forEach(x => (chanMem[x.channel_id] ||= new Set()).add(x.profile_id));
+}
+
 // ---------- app ----------
 async function start() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return;
-  const { data: list } = await sb.from('profiles').select('*');
-  if (!list) return;
-  list.forEach(p => people[p.id] = p);
+  await loadPeople();
   me = people[session.user.id];
   if (!me) return $('#err').textContent = 'Perfil não encontrado. Fale com o comando.';
+  await loadTree();
 
   $('#auth').classList.add('hide'); $('#app').classList.remove('hide');
   $('#me-name').textContent = me.codename;
-  $('#me-role').textContent = me.role === 'command' ? 'COMANDO' : 'AGENTE';
-  drawChannels(); open('geral');
+  $('#me-role').textContent = { admin: 'ADMIN', command: 'COMANDO', agent: 'AGENTE' }[me.role] || 'AGENTE';
+  $('#me-role').className = 'role-' + me.role;
+  $('#new-ch').classList.toggle('hide', !isStaff());
 
-  live?.unsubscribe();
-  live = sb.channel('cit')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, ({ new: m }) => {
-      if (m.channel === chan) addMsg(m);
-      else document.querySelector(`[data-ch="${CSS.escape(m.channel)}"]`)?.classList.add('new');
-    })
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'profiles' }, ({ new: p }) => {
-      people[p.id] = p; drawChannels();
-    })
-    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'profiles' }, ({ old }) => {
-      if (old.id === me.id) return sb.auth.signOut().then(() => location.reload());
-      delete people[old.id];
-      if (chan === 'agent:' + old.id) open('geral'); else drawChannels();
-    }).subscribe();
+  drawChannels();
+  openChannel('geral');
+  listen();
 }
 
-function channels() {
-  if (me.role === 'agent') return [['geral', '# geral'], ['agent:' + me.id, '🔒 canal do comando']];
-  const agents = Object.values(people).filter(p => p.role === 'agent').sort((a, b) => a.codename.localeCompare(b.codename));
-  return [['geral', '# geral'], ...agents.map(a => ['agent:' + a.id, '🔒 ' + a.codename])];
+function listen() {
+  live?.unsubscribe();
+  const reload = async () => {
+    await loadTree();
+    // canal excluído (ou acesso revogado) enquanto estava aberto
+    if (chan.startsWith('chan:') && !chans[chan.slice(5)]) return openChannel('geral');
+    drawChannels();
+  };
+
+  live = sb.channel('cit')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, p => {
+      const m = p.new || p.old;
+      if (!m) return;
+      if (p.eventType === 'INSERT') {
+        if (m.channel === chan) addMsg(m);
+        else document.querySelector(`[data-ch="${CSS.escape(m.channel)}"]`)?.classList.add('new');
+      } else if (p.eventType === 'UPDATE' && m.channel === chan) {
+        const old = msgEls.get(String(m.id));
+        if (old) { const n = buildMsg(m); old.replaceWith(n); msgEls.set(String(m.id), n); }
+      } else if (p.eventType === 'DELETE') {
+        msgEls.get(String(m.id))?.remove();
+        msgEls.delete(String(m.id));
+      }
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, async p => {
+      if (p.eventType === 'DELETE' && p.old?.id === me.id) return sb.auth.signOut().then(() => location.reload());
+      await loadPeople();
+      if (people[me.id]) {
+        const changed = people[me.id].role !== me.role;
+        me = people[me.id];
+        if (changed) return location.reload();
+      }
+      drawChannels();
+      window.MANAGE?.refresh?.();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, reload)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'channels' }, reload)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'category_members' }, reload)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'channel_members' }, reload)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'operations' }, p => window.OPS?.realtime?.('operations', p))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'operation_entries' }, p => window.OPS?.realtime?.('operation_entries', p))
+    .subscribe();
+}
+
+// ---------- barra lateral ----------
+const collapsed = new Set(JSON.parse(localStorage.getItem('cit.collapsed') || '[]'));
+const saveCollapsed = () => localStorage.setItem('cit.collapsed', JSON.stringify([...collapsed]));
+
+function chanInfo(key) {
+  if (key === 'geral') return { label: 'geral', icon: '#', hint: 'todos os agentes · anônimo' };
+  if (key === 'manage') return { label: 'Gerenciar usuários', icon: '⚙', hint: 'administração' };
+  if (key.startsWith('agent:')) {
+    const p = people[key.slice(6)];
+    return { label: p ? (p.id === me.id ? 'canal do comando' : p.codename) : '[removido]', icon: '🔒', hint: 'privado · comando ⇄ agente' };
+  }
+  const c = chans[key.slice(5)];
+  if (!c) return { label: 'canal', icon: '#', hint: '' };
+  const cat = c.category_id && cats[c.category_id];
+  const who = (c.category_id && c.inherit_access)
+    ? (cat?.everyone ? 'todos' : `${(catMem[c.category_id] || new Set()).size} agente(s)`)
+    : (c.everyone ? 'todos' : `${(chanMem[c.id] || new Set()).size} agente(s)`);
+  return { label: c.name, icon: '#', hint: (c.topic ? c.topic + ' · ' : '') + 'acesso: ' + who, ch: c };
+}
+
+function navBtn(nav, key, label, icon, cls) {
+  const b = el('button', cls);
+  b.dataset.ch = key;
+  b.append(el('span', 'ic', icon), el('span', 'nm', label));
+  b.classList.toggle('on', key === chan);
+  b.onclick = () => { openChannel(key); $('#side').classList.remove('open'); };
+  nav.append(b);
+  return b;
 }
 
 function drawChannels() {
   const nav = $('#chans'); nav.innerHTML = '';
-  channels().forEach(([id, label], i) => {
-    if (me.role === 'command' && i === 1) { const h = document.createElement('h3'); h.textContent = 'Canais individuais'; nav.append(h); }
-    const b = document.createElement('button');
-    b.dataset.ch = id; b.textContent = label;
-    b.classList.toggle('on', id === chan);
-    b.onclick = () => { open(id); $('#side').classList.remove('open'); };
-    nav.append(b);
-  });
+  navBtn(nav, 'geral', 'geral', '#');
+
+  if (me.role === 'agent') {
+    navBtn(nav, 'agent:' + me.id, 'canal do comando', '🔒');
+  } else {
+    const agents = Object.values(people).filter(p => p.role === 'agent')
+      .sort((a, b) => a.codename.localeCompare(b.codename));
+    if (agents.length) nav.append(el('h3', null, 'Canais individuais'));
+    agents.forEach(a => navBtn(nav, 'agent:' + a.id, a.codename, '🔒'));
+  }
+
+  const byCat = {}, loose = [];
+  Object.values(chans)
+    .sort((a, b) => (a.position - b.position) || a.name.localeCompare(b.name))
+    .forEach(c => {
+      if (c.category_id && cats[c.category_id]) (byCat[c.category_id] ||= []).push(c);
+      else loose.push(c);
+    });
+
+  Object.values(cats)
+    .sort((a, b) => (a.position - b.position) || a.name.localeCompare(b.name))
+    .forEach(cat => {
+      const head = el('h3', 'cat');
+      const tw = el('button', 'cat-tw');
+      tw.append(el('span', 'arw', collapsed.has(cat.id) ? '▸' : '▾'), el('span', null, cat.name));
+      tw.onclick = () => {
+        collapsed.has(cat.id) ? collapsed.delete(cat.id) : collapsed.add(cat.id);
+        saveCollapsed(); drawChannels();
+      };
+      head.append(tw);
+      if (isStaff()) {
+        const ed = el('button', 'cat-ed', '✎');
+        ed.title = 'Editar categoria';
+        ed.onclick = e => { e.stopPropagation(); window.MANAGE?.categoryForm?.(cat); };
+        head.append(ed);
+      }
+      nav.append(head);
+      if (!collapsed.has(cat.id)) (byCat[cat.id] || []).forEach(c => navBtn(nav, 'chan:' + c.id, c.name, '#', 'sub'));
+    });
+
+  if (loose.length) {
+    nav.append(el('h3', null, 'Canais'));
+    loose.forEach(c => navBtn(nav, 'chan:' + c.id, c.name, '#'));
+  }
+
+  if (isAdmin()) {
+    nav.append(el('h3', null, 'Administração'));
+    navBtn(nav, 'manage', 'Gerenciar usuários', '⚙', 'gear');
+  }
 }
 
-async function open(id) {
-  chan = id;
-  const c = channels().find(x => x[0] === id) || [id, id];
-  $('#ch-title').textContent = c[1].replace('🔒 ', '');
-  $('#ch-hint').textContent = id === 'geral' ? 'todos os agentes · anônimo' : 'privado · comando ⇄ agente';
+// ---------- abrir canal ----------
+let loadToken = 0;
+
+async function openChannel(key, jumpTo) {
+  chan = key;
+  const info = chanInfo(key);
+  $('#ch-title').textContent = info.label;
+  $('#ch-hint').textContent = info.hint;
   drawChannels();
-  $('#kick').classList.toggle('hide', !(me.role === 'command' && id !== 'geral'));
-  const box = $('#msgs'); box.innerHTML = '';
-  const { data } = await sb.from('messages').select('*').eq('channel', id).order('created_at').limit(200);
-  if (!data?.length) box.innerHTML = '<p class="empty">> canal silencioso.<br>> seja o primeiro a transmitir.</p>';
-  data?.forEach(addMsg);
+
+  const manageView = key === 'manage';
+  $('#manage').classList.toggle('hide', !manageView);
+  $('#chat').classList.toggle('hide', manageView);
+  $('#kick').classList.toggle('hide', manageView || !(isStaff() && key.startsWith('agent:')));
+  $('#ch-edit').classList.toggle('hide', manageView || !(isStaff() && key.startsWith('chan:')));
+  $('#op-new').classList.toggle('hide', manageView);
+  $('#ops-toggle').classList.toggle('hide', manageView);
+  window.OPS?.setChannel?.(key);
+  if (manageView) return window.MANAGE?.open?.();
+
+  document.querySelector(`[data-ch="${CSS.escape(key)}"]`)?.classList.remove('new');
+
+  const token = ++loadToken;
+  const box = $('#msgs');
+  box.innerHTML = '';
+  msgEls.clear();
+
+  let data;
+  if (jumpTo?.created_at) {
+    const [before, after] = await Promise.all([
+      sb.from('messages').select('*').eq('channel', key).lte('created_at', jumpTo.created_at).order('created_at', { ascending: false }).limit(80),
+      sb.from('messages').select('*').eq('channel', key).gt('created_at', jumpTo.created_at).order('created_at').limit(40),
+    ]);
+    data = [...(before.data || []).reverse(), ...(after.data || [])];
+  } else {
+    ({ data } = await sb.from('messages').select('*').eq('channel', key).order('created_at').limit(300));
+  }
+  if (token !== loadToken) return;
+
+  if (!data?.length) box.innerHTML = '<p class="empty">&gt; canal silencioso.<br>&gt; seja o primeiro a transmitir.</p>';
+  data?.forEach(m => addMsg(m, true));
+  box.scrollTop = box.scrollHeight;
+
+  if (jumpTo?.id) {
+    const t = msgEls.get(String(jumpTo.id));
+    if (t) { t.scrollIntoView({ block: 'center' }); t.classList.add('hit'); setTimeout(() => t.classList.remove('hit'), 2500); }
+  }
 }
 
+// ---------- mensagens ----------
 function hue(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360; return 180 + (h % 130); } // azul → roxo
 
-function addMsg(m) {
-  const box = $('#msgs'); box.querySelector('.empty')?.remove();
+function buildMsg(m) {
   const a = people[m.author_id] || { codename: '[removido]', role: 'agent' };
-  const el = document.createElement('div');
-  el.className = 'm' + (m.author_id === me.id ? ' mine' : '');
-  const who = document.createElement('span'); who.className = 'who'; who.textContent = a.codename;
+  const wrap = el('div', 'm' + (m.author_id === me.id ? ' mine' : ''));
+  wrap.dataset.id = m.id;
+
+  const head = el('div', 'head');
+  const who = el('span', 'who', a.codename);
   who.style.color = `hsl(${hue(a.codename)} 90% 70%)`;
-  el.append(who);
-  if (a.role === 'command') { const t = document.createElement('span'); t.className = 'tag'; t.textContent = 'CMD'; el.append(t); }
-  const tm = document.createElement('time'); tm.textContent = new Date(m.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  const txt = document.createElement('div'); txt.className = 'txt'; txt.textContent = m.body;
-  el.append(tm, txt);
-  const near = box.scrollHeight - box.scrollTop - box.clientHeight < 120 || m.author_id === me.id;
-  box.append(el);
-  if (near) box.scrollTop = box.scrollHeight;
+  head.append(who);
+  if (a.role === 'command') head.append(el('span', 'tag', 'CMD'));
+  if (a.role === 'admin') head.append(el('span', 'tag adm', 'ADM'));
+  head.append(el('time', null, new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })));
+  if (m.edited_at) {
+    const e = el('span', 'ed', '(editada)');
+    const by = people[m.edited_by];
+    e.title = 'editada' + (by ? ' por ' + by.codename : '') + ' em ' + new Date(m.edited_at).toLocaleString('pt-BR');
+    head.append(e);
+  }
+  if (m.author_id === me.id || isStaff()) {
+    const b = el('button', 'act', '✎');
+    b.title = m.author_id === me.id ? 'Editar' : 'Editar (comando)';
+    b.onclick = () => editMsg(wrap, m);
+    head.append(b);
+  }
+  wrap.append(head);
+
+  const txt = el('div', 'txt md');
+  txt.append(MD.render(m.body));
+  wrap.append(txt);
+  return wrap;
+}
+
+function addMsg(m, bulk) {
+  const box = $('#msgs');
+  box.querySelector('.empty')?.remove();
+  if (msgEls.has(String(m.id))) return;
+  const node = buildMsg(m);
+  msgEls.set(String(m.id), node);
+  const near = box.scrollHeight - box.scrollTop - box.clientHeight < 140 || m.author_id === me.id;
+  box.append(node);
+  if (!bulk && near) box.scrollTop = box.scrollHeight;
+}
+
+function editMsg(wrap, m) {
+  if (wrap.querySelector('.edit-box')) return;
+  const txt = wrap.querySelector('.txt');
+  txt.classList.add('hide');
+  const box = el('div', 'edit-box');
+  const ta = el('textarea');
+  ta.value = m.body;
+  ta.rows = Math.min(12, m.body.split('\n').length + 1);
+  const row = el('div', 'edit-row');
+  const save = el('button', 'primary sm', 'Salvar');
+  const cancel = el('button', 'ghost', 'Cancelar');
+  row.append(save, cancel, el('span', 'tip', 'Esc cancela · Ctrl+Enter salva'));
+  box.append(ta, row);
+  wrap.append(box);
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+
+  const done = () => { box.remove(); txt.classList.remove('hide'); };
+  cancel.onclick = done;
+  save.onclick = async () => {
+    const body = ta.value.trim();
+    if (!body) return;
+    save.disabled = true;
+    const { error } = await sb.from('messages').update({ body }).eq('id', m.id);
+    save.disabled = false;
+    if (error) return toast('Não foi possível editar: ' + error.message, true);
+    m.body = body; m.edited_at = new Date().toISOString(); m.edited_by = me.id;
+    const n = buildMsg(m);
+    wrap.replaceWith(n);
+    msgEls.set(String(m.id), n);
+  };
+  ta.onkeydown = e => {
+    if (e.key === 'Escape') { e.stopPropagation(); done(); }
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) save.onclick();
+  };
 }
 
 async function send() {
-  const body = $('#msg').value.trim();
+  const ta = $('#msg');
+  const body = ta.value.trim();
   if (!body) return;
-  $('#msg').value = '';
-  const { error } = await sb.from('messages').insert({ channel: chan, body });
-  if (error) { $('#msg').value = body; $('#ch-hint').textContent = 'falha ao enviar — tente de novo'; }
+  ta.value = ''; grow();
+  const { error } = await sb.from('messages').insert({ channel: chan, body, author_id: me.id });
+  if (error) { ta.value = body; grow(); toast('Falha ao enviar — tente de novo.', true); }
 }
+
+function grow() {
+  const ta = $('#msg');
+  ta.style.height = 'auto';
+  ta.style.height = Math.min(180, ta.scrollHeight) + 'px';
+}
+
 $('#send').onclick = send;
-$('#msg').addEventListener('keydown', e => e.key === 'Enter' && send());
+$('#msg').addEventListener('input', grow);
+$('#msg').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+});
 $('#menu').onclick = () => $('#side').classList.toggle('open');
 
 $('#kick').onclick = async () => {
   const id = chan.replace('agent:', ''), p = people[id];
   if (!p || !confirm(`Remover o agente ${p.codename}? O acesso e o canal individual dele serão apagados.`)) return;
   const { error } = await sb.rpc('remove_agent', { target: id });
-  if (error) return alert('Não foi possível remover: ' + error.message);
-  delete people[id]; open('geral');
+  if (error) return toast('Não foi possível remover: ' + error.message, true);
+  delete people[id];
+  openChannel('geral');
 };
 
-start(); // retoma sessão salva
+$('#ch-edit').onclick = () => window.MANAGE?.channelForm?.(chans[chan.slice(5)]);
+$('#new-ch').onclick = () => window.MANAGE?.newMenu?.();
+
+// os complementos (ops/manage/search) carregam depois deste arquivo
+if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', start);
+else setTimeout(start);

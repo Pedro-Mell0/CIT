@@ -37,16 +37,77 @@
     <div class="me"><svg class="logo sm"><use href="#owl"/></svg>
       <div><b id="me-name"></b><span id="me-role"></span></div></div>
     <nav id="chans"></nav>
-    <button id="out" class="ghost">Encerrar sessão</button>
+    <div class="side-foot">
+      <button id="new-ch" class="ghost hide">+ Canal / categoria</button>
+      <button id="out" class="ghost">Encerrar sessão</button>
+    </div>
   </aside>
+
   <section id="room">
-    <header><button id="menu" class="ghost" aria-label="Canais">☰</button><h2 id="ch-title"></h2><span id="ch-hint"></span><button id="kick" class="ghost hide">Remover agente</button></header>
-    <div id="msgs" aria-live="polite"></div>
-    <div class="composer"><input id="msg" placeholder="Transmitir mensagem..." autocomplete="off" maxlength="2000"><button id="send" class="primary">Enviar</button></div>
+    <header>
+      <button id="menu" class="ghost" aria-label="Canais">☰</button>
+      <h2 id="ch-title"></h2>
+      <span id="ch-hint"></span>
+      <div class="tools">
+        <button id="find-btn" class="ghost" title="Buscar (Ctrl+F)" aria-label="Buscar">⌕</button>
+        <button id="ch-edit" class="ghost hide" title="Editar canal" aria-label="Editar canal">✎</button>
+        <button id="kick" class="ghost hide">Remover agente</button>
+        <button id="op-new" class="primary sm hide">⬢ CRIAR OPERAÇÃO</button>
+        <button id="ops-toggle" class="ghost hide" title="Dossiês" aria-label="Dossiês">▤</button>
+      </div>
+    </header>
+
+    <div id="room-body">
+      <div id="chat">
+        <div id="msgs" aria-live="polite"></div>
+        <div class="composer">
+          <div class="fmt-hint">
+            <b>**negrito**</b> · <i>'itálico'</i> · <u>__sublinhado__</u> · <s>~~riscado~~</s> · <code>`código`</code> · <span class="k">- tópico</span> · <span class="k">&gt; citação</span> · <span class="k">||spoiler||</span>
+          </div>
+          <div class="composer-row">
+            <textarea id="msg" placeholder="Transmitir mensagem..." rows="1" maxlength="4000" autocomplete="off"></textarea>
+            <button id="send" class="primary">Enviar</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="ops-grip" class="hide" role="separator" aria-label="Redimensionar dossiê"></div>
+
+      <aside id="ops" class="hide" aria-label="Operações">
+        <header class="ops-head">
+          <b>DOSSIÊS</b>
+          <span id="ops-count"></span>
+          <button id="ops-close" class="ghost" title="Recolher" aria-label="Recolher">»</button>
+        </header>
+        <div id="ops-tabs"></div>
+        <div id="ops-body"></div>
+      </aside>
+
+      <section id="manage" class="hide" aria-label="Gerenciar usuários"></section>
+    </div>
   </section>
 </div>
+
+<div id="modal" class="hide" role="dialog" aria-modal="true"></div>
+
+<div id="find" class="hide" role="dialog" aria-modal="true" aria-label="Busca">
+  <div class="find-box">
+    <div class="find-top">
+      <span class="find-ico">⌕</span>
+      <input id="find-q" placeholder="varrer arquivos, canais e dossiês..." autocomplete="off" spellcheck="false">
+      <span id="find-stat"></span>
+      <button id="find-x" class="ghost" aria-label="Fechar">ESC</button>
+    </div>
+    <div id="find-res"></div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
+<script src="format.js"></script>
 <script src="app.js"></script>
+<script src="ops.js"></script>
+<script src="manage.js"></script>
+<script src="search.js"></script>
 </body>
 </html>
