@@ -116,6 +116,17 @@ com os mesmos campos; nos relatos, **só o que foi preenchido aparece**.
 Qualquer agente com acesso ao canal cria, edita e relata. Excluir a operação é do
 criador e do COMANDO/ADMIN.
 
+### Exportar em PDF
+
+O botão **⎙ PDF** monta o dossiê inteiro — título, luz de status, os três blocos
+e todos os relatos — num documento com o visual do site e abre a impressão do
+navegador; escolha *Destino: Salvar como PDF*. O texto sai selecionável e
+pesquisável, não é print de tela.
+
+O fundo preto depende de `print-color-adjust: exact`, respeitado por Chrome,
+Edge e Firefox. Se algum navegador ainda imprimir em branco, ligue
+*Mais definições → Gráficos de plano de fundo* na caixa de impressão.
+
 ## Busca
 
 **Ctrl+F** (ou o botão ⌕) varre mensagens, dossiês e relatos de **todos os canais que

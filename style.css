@@ -281,3 +281,40 @@ mark{background:#45e3ff33;color:var(--cyan);padding:0 .1rem}
   .fmt-hint{display:none}
 }
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- exportar dossiê em PDF ---------- */
+#print-root{display:none}
+@media print{
+  /* sem margem de página: o preto sangra até a borda do papel */
+  @page{margin:0}
+  /* print-color-adjust obriga o navegador a imprimir fundos e cores */
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;
+    animation:none!important;transition:none!important;box-shadow:none!important}
+  html,body{background:var(--void)!important;height:auto;overflow:visible}
+  body::after{display:none!important}
+  body>*{display:none!important}
+  body>#print-root{display:block!important}
+
+  #print-root{padding:14mm 12mm;background:var(--void);color:var(--text);
+    font:11px/1.6 'JetBrains Mono',monospace}
+  .p-head{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;
+    border-bottom:1px solid var(--line);padding-bottom:.5rem;margin-bottom:1.1rem}
+  .p-brand{font-family:'Chakra Petch',sans-serif;color:var(--cyan);
+    letter-spacing:.2em;font-size:.74rem}
+  .p-meta{color:var(--dim);font-size:.62rem;text-align:right}
+  .p-foot{margin-top:1.4rem;border-top:1px solid var(--line);padding-top:.5rem;
+    color:var(--dim);font-size:.6rem;text-align:center;letter-spacing:.1em}
+
+  #print-root .op-head-row{margin-bottom:.2rem}
+  #print-root .op-title{font-size:1.9rem;color:var(--cyan)}
+  #print-root .op-title::before,#print-root .op-title::after{display:none}
+  #print-root .op-dot{width:12px;height:12px}
+  #print-root .op-block{margin-top:.7rem;background:#0b0726;border:1px solid var(--line);
+    border-left:3px solid var(--violet)}
+  #print-root .op-entry{margin-top:.6rem;background:#0a0622;border:1px solid var(--line)}
+  #print-root .op-entry .op-block{background:none;border:0;border-left:2px solid var(--blue)}
+  #print-root .op-line .val{font-size:.85rem}
+  #print-root .op-block,#print-root .op-entry,#print-root .op-head-row{
+    break-inside:avoid;page-break-inside:avoid}
+  #print-root .op-sep{margin-top:1.2rem;break-after:avoid;page-break-after:avoid}
+}

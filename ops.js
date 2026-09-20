@@ -116,7 +116,10 @@
     edit.onclick = () => form(op);
     const add = el('button', 'primary sm', '+ ADICIONAR RELATO');
     add.onclick = () => entryForm(null);
-    bar.append(edit, add);
+    const pdf = el('button', 'ghost', '⎙ PDF');
+    pdf.title = 'Exportar dossiê em PDF';
+    pdf.onclick = () => exportPdf(op);
+    bar.append(edit, add, pdf);
     if (op.created_by === me.id || isStaff()) {
       const del = el('button', 'ghost danger', 'Excluir');
       del.onclick = async () => {
@@ -174,13 +177,13 @@
     return sec;
   }
 
-  function entryView(en, n) {
+  function entryView(en, n, noActions) {
     const card = el('article', 'op-entry');
     const head = el('header');
     head.append(el('b', null, 'RELATO #' + String(n).padStart(2, '0')));
     head.append(el('span', 'by', (people[en.created_by]?.codename || '[removido]') + ' · ' +
       new Date(en.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })));
-    if (en.created_by === me.id || isStaff()) {
+    if (!noActions && (en.created_by === me.id || isStaff())) {
       const ed = el('button', 'act', '✎');
       ed.title = 'Editar relato';
       ed.onclick = () => entryForm(en);
@@ -201,6 +204,64 @@
     });
     if (en.edited_at || en.updated_at !== en.created_at) card.append(el('p', 'op-meta', 'atualizado em ' + new Date(en.updated_at).toLocaleString('pt-BR')));
     return card;
+  }
+
+  // ---------- exportar em PDF ----------
+  // Monta um documento próprio e chama a impressão do navegador ("Salvar como
+  // PDF"). O conteúdo sai das mesmas funções que desenham o painel, então o PDF
+  // nunca fica defasado em relação à tela, e o texto continua selecionável.
+  function exportPdf(op) {
+    document.getElementById('print-root')?.remove();
+    const root = el('div');
+    root.id = 'print-root';
+
+    const head = el('header', 'p-head');
+    head.append(el('span', 'p-brand', 'CIT · DEPARTAMENTO DE POLÍCIA PARALELA'));
+    head.append(el('span', 'p-meta',
+      'canal: ' + chanInfo(curChan).label + ' · emitido em ' +
+      new Date().toLocaleString('pt-BR') + ' por ' + me.codename));
+    root.append(head);
+
+    const st = statusOf(op);
+    const row = el('div', 'op-head-row');
+    row.append(dot(st));
+    const h = el('h2', 'op-title');
+    h.dataset.text = op.title;
+    h.textContent = op.title;
+    row.append(h);
+    root.append(row);
+    root.append(el('p', 'op-meta',
+      `aberta por ${people[op.created_by]?.codename || '[removido]'} · ` +
+      `${new Date(op.created_at).toLocaleString('pt-BR')} · ` +
+      `última atualização ${new Date(op.updated_at).toLocaleString('pt-BR')}`));
+
+    BLOCKS.forEach(b => root.append(blockView(b, op, false)));
+
+    if (entries.length) {
+      const sep = el('div', 'op-sep');
+      sep.append(el('span', null, 'RELATOS'));
+      root.append(sep);
+      entries.forEach((en, i) => root.append(entryView(en, i + 1, true)));
+    }
+
+    root.append(el('p', 'p-foot',
+      'documento gerado pelo sistema CIT · uso interno · não catalogado'));
+
+    document.body.append(root);
+    const title = document.title;
+    document.title = 'CIT — ' + op.title;   // vira o nome sugerido do arquivo
+
+    let cleaned = false;
+    const done = () => {
+      if (cleaned) return;
+      cleaned = true;
+      root.remove();
+      document.title = title;
+      window.removeEventListener('afterprint', done);
+    };
+    window.addEventListener('afterprint', done);
+    window.print();
+    done();   // navegadores que não disparam afterprint
   }
 
   // ---------- formulários ----------
