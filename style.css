@@ -65,4 +65,5 @@ header h2{font-size:1.2rem;letter-spacing:.06em}
   #side.open{transform:none;box-shadow:0 0 0 100vmax #000a}
   #menu{display:block}
 }
-@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}
+#kick:hover{color:var(--danger);border-color:var(--danger)}}

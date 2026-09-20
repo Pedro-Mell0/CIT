@@ -58,6 +58,11 @@ async function start() {
     })
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'profiles' }, ({ new: p }) => {
       people[p.id] = p; drawChannels();
+    })
+    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'profiles' }, ({ old }) => {
+      if (old.id === me.id) return sb.auth.signOut().then(() => location.reload());
+      delete people[old.id];
+      if (chan === 'agent:' + old.id) open('geral'); else drawChannels();
     }).subscribe();
 }
 
@@ -85,6 +90,7 @@ async function open(id) {
   $('#ch-title').textContent = c[1].replace('🔒 ', '');
   $('#ch-hint').textContent = id === 'geral' ? 'todos os agentes · anônimo' : 'privado · comando ⇄ agente';
   drawChannels();
+  $('#kick').classList.toggle('hide', !(me.role === 'command' && id !== 'geral'));
   const box = $('#msgs'); box.innerHTML = '';
   const { data } = await sb.from('messages').select('*').eq('channel', id).order('created_at').limit(200);
   if (!data?.length) box.innerHTML = '<p class="empty">> canal silencioso.<br>> seja o primeiro a transmitir.</p>';
@@ -95,7 +101,7 @@ function hue(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) %
 
 function addMsg(m) {
   const box = $('#msgs'); box.querySelector('.empty')?.remove();
-  const a = people[m.author_id] || { codename: '???', role: 'agent' };
+  const a = people[m.author_id] || { codename: '[removido]', role: 'agent' };
   const el = document.createElement('div');
   el.className = 'm' + (m.author_id === me.id ? ' mine' : '');
   const who = document.createElement('span'); who.className = 'who'; who.textContent = a.codename;
@@ -120,5 +126,13 @@ async function send() {
 $('#send').onclick = send;
 $('#msg').addEventListener('keydown', e => e.key === 'Enter' && send());
 $('#menu').onclick = () => $('#side').classList.toggle('open');
+
+$('#kick').onclick = async () => {
+  const id = chan.replace('agent:', ''), p = people[id];
+  if (!p || !confirm(`Remover o agente ${p.codename}? O acesso e o canal individual dele serão apagados.`)) return;
+  const { error } = await sb.rpc('remove_agent', { target: id });
+  if (error) return alert('Não foi possível remover: ' + error.message);
+  delete people[id]; open('geral');
+};
 
 start(); // retoma sessão salva
