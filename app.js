@@ -539,10 +539,10 @@ async function moveCanal(chanId, catId) {
 // A barra de canais fica sempre à esquerda e fora dessa dança; as três de
 // dentro da sala trocam de lugar arrastando o cabeçalho.
 const COLS = {
-  side:    { css: '--side-w', el: '#side',        min: 180, max: 460 },
+  side:    { css: '--side-w', el: '#side',        min: 150, max: 460 },
   entries: { el: '#col-entries' },   // sempre a elástica: ocupa a sobra
-  dossier: { css: '--dos-w',  el: '#col-dossier', min: 240, max: 900 },
-  chat:    { css: '--chat-w', el: '#chat',        min: 260, max: 900 },
+  dossier: { css: '--dos-w',  el: '#col-dossier', min: 190, max: 900 },
+  chat:    { css: '--chat-w', el: '#chat',        min: 200, max: 900 },
 };
 const INNER = ['entries', 'dossier', 'chat'];
 
@@ -627,7 +627,7 @@ function layout() {
  * no papel depois que a elástica encolhia a zero, a fila estourava a largura da
  * sala e a alça descolava do cursor — que é a sensação de travar.
  */
-const FOLGA_ELASTICA = 220;   // respiro mínimo da coluna que absorve a sobra
+const FOLGA_ELASTICA = 180;   // respiro mínimo da coluna que absorve a sobra
 
 function maxCol(k) {
   const c = COLS[k];
@@ -654,6 +654,28 @@ function maxCol(k) {
       : $(COLS[o].el).getBoundingClientRect().width;
   });
   return Math.max(c.min, Math.min(c.max, livre));
+}
+
+/**
+ * Qual coluna uma alça redimensiona, e ancorada em qual borda.
+ *
+ * A coluna elástica absorve toda mudança de largura, então ela é quem faz as
+ * bordas vizinhas andarem. Ancorar o cálculo numa borda que se move durante o
+ * arrasto faz a divisória descolar do cursor e mexer em duas fronteiras ao
+ * mesmo tempo. A regra, então, é sempre mexer na vizinha do lado oposto à
+ * elástica, que é a única cuja borda de referência fica parada.
+ */
+function alvoDaAlca(g) {
+  if (g.dataset.grip === 'side') return { alvo: 'side', lado: 'esq' };
+  const vis = colOrder.filter(colVisivel);
+  const iEsq = vis.indexOf(g.dataset.esq);
+  if (iEsq < 0) return null;
+  const iFlex = vis.includes('entries') ? vis.indexOf('entries') : 0;
+  // elástica à esquerda da alça: a borda direita da vizinha da direita é a fixa
+  const t = iFlex <= iEsq
+    ? { alvo: g.dataset.dir, lado: 'dir' }
+    : { alvo: g.dataset.esq, lado: 'esq' };
+  return COLS[t.alvo]?.css ? t : null;
 }
 
 function larguraCol(k, px) {
@@ -748,6 +770,7 @@ function ordenaCols(mover, alvo, antes) {
 
   // ---- redimensionar ----
   let alvo = null, lado = null, caixa = null;
+
   const eixo = e => (e.touches ? e.touches[0].clientX : e.clientX);
   const move = e => {
     if (!alvo) return;
@@ -758,16 +781,9 @@ function ordenaCols(mover, alvo, antes) {
 
   document.querySelectorAll('.grip').forEach(g => {
     const down = e => {
-      if (g.dataset.grip === 'side') {
-        alvo = 'side'; lado = 'esq';
-      } else {
-        // a coluna elástica não tem largura própria: nesse caso a alça
-        // ajusta a vizinha do outro lado
-        const esq = g.dataset.esq, dir = g.dataset.dir;
-        if (COLS[esq]?.css) { alvo = esq; lado = 'esq'; }
-        else if (COLS[dir]?.css) { alvo = dir; lado = 'dir'; }
-        else return;
-      }
+      const t = alvoDaAlca(g);
+      if (!t) return;
+      alvo = t.alvo; lado = t.lado;
       caixa = $(COLS[alvo].el).getBoundingClientRect();
       document.body.classList.add('dragging');
       e.preventDefault();
