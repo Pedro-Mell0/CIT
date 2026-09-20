@@ -151,6 +151,7 @@ async function start() {
   $('#auth').classList.add('hide'); $('#app').classList.remove('hide');
   window.FX?.rain?.visivel(false);   // a chuva fica só na tela de acesso
   $('#me-name').textContent = me.codename;
+  $('#me-name').style.color = corDe(me);
   $('#me-role').textContent = { admin: 'ADMIN', command: 'COMANDO', agent: 'AGENTE' }[me.role] || 'AGENTE';
   $('#me-role').className = 'role-' + me.role;
   $('#new-ch').classList.toggle('hide', !isStaff());
@@ -196,6 +197,7 @@ function listen() {
         if (changed) return location.reload();
       }
       drawChannels();
+      pintaMensagens();
       window.MANAGE?.refresh?.();
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, reload)
@@ -345,6 +347,97 @@ function drawChannels() {
   }
 }
 
+// ---------- cores dos agentes ----------
+// Mesma paleta do banco (cit_palette). A cor fica no perfil; o cálculo pelo
+// codinome só serve de rede para contas antigas que ainda não têm cor.
+const PALETA = [
+  '#45e3ff', '#9b5cff', '#ff3fa4', '#ff2e5f', '#37ff8b', '#ffc74d', '#3d8bff', '#ff7a1a',
+  '#00ffd5', '#c86bff', '#ff5cf0', '#7dff3f', '#ffe14d', '#4dffea', '#ff8fa3', '#8affff',
+];
+
+function hue(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360; return 180 + (h % 130); }
+
+/** Cor de um perfil, com reserva para quem ainda não tem uma gravada. */
+function corDe(p) {
+  if (!p) return 'var(--dim)';
+  return p.color || `hsl(${hue(p.codename || '?')} 90% 70%)`;
+}
+
+/** Grade de cores clicável; devolve um objeto com a escolha atual. */
+function paletaPicker(parent, atual) {
+  const box = el('div', 'paleta');
+  let escolhida = atual && PALETA.includes(atual) ? atual : (atual || PALETA[0]);
+  const botoes = [];
+  PALETA.forEach(c => {
+    const b = el('button', 'swatch' + (c === escolhida ? ' on' : ''));
+    b.style.background = c;
+    b.title = c;
+    b.setAttribute('aria-label', 'cor ' + c);
+    b.onclick = () => {
+      escolhida = c;
+      botoes.forEach(x => x.classList.toggle('on', x === b));
+      parent.querySelectorAll('.prova').forEach(n => n.style.color = c);
+    };
+    botoes.push(b);
+    box.append(b);
+  });
+  parent.append(box);
+  return { get value() { return escolhida; } };
+}
+
+// ---------- minhas configurações ----------
+// Único painel a que o AGENTE tem acesso: o próprio codinome e a própria cor.
+function abreConfig() {
+  const m = modal('MINHAS CONFIGURAÇÕES');
+
+  const nome = field(m.body, 'Codinome', me.codename, { ph: '3 a 20 caracteres (letras, números e _)' });
+  m.body.append(el('p', 'form-note',
+    'O login é derivado do codinome: trocando aqui, você passa a entrar com o nome novo e a mesma senha.'));
+
+  m.body.append(el('h4', 'form-block', 'SUA COR'));
+  const prova = el('p', 'prova');
+  prova.style.color = corDe(me);
+  prova.textContent = me.codename;
+  m.body.append(prova);
+  const cor = paletaPicker(m.body, me.color);
+
+  nome.addEventListener('input', () => { prova.textContent = nome.value.trim() || me.codename; });
+
+  const save = el('button', 'primary', 'Salvar');
+  const cancel = el('button', 'ghost', 'Cancelar');
+  cancel.onclick = m.close;
+  m.foot.append(cancel, save);
+  nome.focus();
+
+  save.onclick = async () => {
+    const novo = nome.value.trim();
+    save.disabled = true;
+    const { error } = await sb.rpc('update_me', { new_name: novo, new_color: cor.value });
+    save.disabled = false;
+    if (error) return toast(error.message, true);
+    m.close();
+    await loadPeople();
+    me = people[me.id] || me;
+    $('#me-name').textContent = me.codename;
+    $('#me-name').style.color = corDe(me);
+    pintaMensagens();
+    drawChannels();
+    toast('Configurações salvas.');
+  };
+}
+
+/** Repinta os codinomes já desenhados quando alguém troca de cor. */
+function pintaMensagens() {
+  msgEls.forEach((elm, id) => {
+    const quem = elm.querySelector('.who');
+    if (!quem) return;
+    const p = Object.values(people).find(x => x.codename === quem.textContent);
+    if (p) quem.style.color = corDe(p);
+  });
+}
+
+$('#me-cfg').onclick = abreConfig;
+
 // ---------- membros do canal ----------
 // Mostra só codinomes: o cargo continua invisível, como no chat. Onde o acesso
 // vem do comando ou da administração, a lista diz isso sem nomear ninguém.
@@ -396,7 +489,7 @@ function abreMembros(key) {
   lista.sort((a, b) => a.codename.localeCompare(b.codename)).forEach(p => {
     const li = el('div', 'membro');
     const pt = el('span', 'mb-dot');
-    pt.style.background = `hsl(${hue(p.codename)} 90% 70%)`;
+    pt.style.background = corDe(p);
     li.append(pt, el('span', 'mb-nome', p.codename));
     if (p.id === me.id) li.append(el('em', 'mb-voce', 'você'));
     ul.append(li);
@@ -891,7 +984,6 @@ async function openChannel(key, jumpTo) {
 }
 
 // ---------- mensagens ----------
-function hue(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360; return 180 + (h % 130); } // azul → roxo
 
 function buildMsg(m) {
   const a = people[m.author_id] || { codename: '[removido]', role: 'agent' };
@@ -900,7 +992,7 @@ function buildMsg(m) {
 
   const head = el('div', 'head');
   const who = el('span', 'who', a.codename);
-  who.style.color = `hsl(${hue(a.codename)} 90% 70%)`;
+  who.style.color = corDe(a);
   head.append(who);
   // sem etiqueta de cargo: ninguém deve deduzir pelo chat quem é comando ou admin
   head.append(el('time', null, new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })));

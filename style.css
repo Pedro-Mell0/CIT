@@ -552,3 +552,17 @@ mark{background:#45e3ff33;color:var(--cyan);padding:0 .1rem}
 /* no geral não faz sentido recolher a única coluna que existe */
 :root.view-chat-only .col-tg[data-col="chat"],
 :root.view-chat-only #chat .col-x{display:none!important}
+
+/* ---------- cor do agente ---------- */
+#me-cfg{margin-left:auto;flex:none;padding:.3rem .45rem;font-size:.9rem}
+#me-cfg:hover{color:var(--cyan)}
+.paleta{display:grid;grid-template-columns:repeat(8,1fr);gap:.4rem}
+.swatch{height:1.9rem;border:1px solid var(--line);border-radius:2px;padding:0;
+  position:relative;transition:transform .1s}
+.swatch:hover{transform:scale(1.12)}
+.swatch.on{border-color:#fff;box-shadow:0 0 0 2px var(--void),0 0 0 3px currentColor,0 0 14px}
+.swatch.on::after{content:"✓";position:absolute;inset:0;display:grid;place-items:center;
+  color:#04020c;font-size:.9rem;font-weight:700;text-shadow:0 0 4px #fff8}
+.prova{font-family:'Chakra Petch',sans-serif;font-size:1.3rem;letter-spacing:.06em;
+  text-shadow:0 0 12px currentColor;word-break:break-all;min-height:1.4em}
+@media(max-width:520px){.paleta{grid-template-columns:repeat(4,1fr)}}

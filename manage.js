@@ -39,7 +39,7 @@
   function userRow(p) {
     const row = el('div', 'mg-row');
     const name = el('span', 'mg-name', p.codename);
-    name.style.color = `hsl(${hue(p.codename)} 90% 70%)`;
+    name.style.color = corDe(p);
     if (p.id === me.id) name.append(el('em', null, ' (você)'));
     row.append(name);
     row.append(el('span', 'badge r-' + p.role, ROLES[p.role] || p.role));
@@ -56,7 +56,7 @@
       }
       if (p.role === 'admin') acts.append(btn('▼ tirar ADMIN', () => setRole(p, 'command')));
     }
-    acts.append(btn('✎ nome', () => renomear(p)));
+    acts.append(btn('✎ nome/cor', () => renomear(p)));
     acts.append(btn('⚿ senha', () => resetPass(p)));
     if (!self) acts.append(btn('✕ excluir', () => removeUser(p), 'danger'));
     row.append(acts);
@@ -88,10 +88,17 @@
   }
 
   function renomear(p) {
-    const m = modal('ALTERAR CODINOME · ' + p.codename);
+    const m = modal('CODINOME E COR · ' + p.codename);
     m.body.append(el('p', 'form-note',
       'O login é derivado do codinome: depois da troca, o agente entra com o nome novo e a mesma senha.'));
     const nome = field(m.body, 'Novo codinome', p.codename, { ph: '3 a 20 caracteres (letras, números e _)' });
+    m.body.append(el('h4', 'form-block', 'COR'));
+    const prova = el('p', 'prova', p.codename);
+    prova.style.color = corDe(p);
+    m.body.append(prova);
+    const cor = paletaPicker(m.body, p.color);
+    nome.addEventListener('input', () => { prova.textContent = nome.value.trim() || p.codename; });
+
     const save = el('button', 'primary', 'Salvar');
     const cancel = el('button', 'ghost', 'Cancelar');
     cancel.onclick = m.close;
@@ -100,16 +107,21 @@
     nome.select();
     save.onclick = async () => {
       const novo = nome.value.trim();
-      if (novo === p.codename) return m.close();
-      save.disabled = true;
-      const { error } = await sb.rpc('set_codename', { target: p.id, new_name: novo });
-      save.disabled = false;
-      if (error) return toast(error.message, true);
-      m.close();
       const antigo = p.codename;
+      save.disabled = true;
+      if (novo !== antigo) {
+        const { error } = await sb.rpc('set_codename', { target: p.id, new_name: novo });
+        if (error) { save.disabled = false; return toast(error.message, true); }
+      }
+      if (cor.value !== p.color) {
+        const { error } = await sb.rpc('admin_set_color', { target: p.id, new_color: cor.value });
+        if (error) { save.disabled = false; return toast(error.message, true); }
+      }
+      save.disabled = false;
+      m.close();
       await loadPeople();
-      open(); drawChannels();
-      toast(`${antigo} agora é ${novo}.`);
+      open(); drawChannels(); pintaMensagens();
+      toast(novo !== antigo ? `${antigo} agora é ${novo}.` : 'Cor atualizada.');
     };
   }
 

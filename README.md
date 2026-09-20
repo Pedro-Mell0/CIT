@@ -108,6 +108,20 @@ categoria na barra lateral. Excluir um canal apaga junto as mensagens e os
 dossiês dele. Excluir uma categoria **não** esconde os canais dentro dela: eles
 viram avulsos mantendo o mesmo acesso.
 
+## Cores e configurações pessoais
+
+Cada conta tem uma cor, usada no codinome do chat e nas listas. Contas novas
+recebem a cor menos usada de uma paleta neon de 16, para dois agentes não
+nascerem iguais.
+
+O ⚙ ao lado do seu nome, na barra lateral, abre **minhas configurações** —
+codinome e cor. É a única configuração a que o AGENTE tem acesso, e vale para
+todos os cargos. Trocar o codinome ali muda o login junto: você passa a entrar
+com o nome novo e a mesma senha.
+
+O ADMIN também ajusta codinome e cor de qualquer conta, pelo ✎ nome/cor no
+painel ⚙.
+
 ## Sessão
 
 O login fica no `sessionStorage`: sobrevive a F5 e à navegação normal, mas cai

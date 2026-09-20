@@ -20,6 +20,36 @@ create table if not exists public.profiles (
 );
 alter table public.profiles add column if not exists created_at timestamptz not null default now();
 
+-- ---------- cor de cada agente ----------
+-- A cor identifica o codinome no chat e nas listas. Cada conta nova recebe a
+-- cor menos usada da paleta, para dois agentes não nascerem iguais.
+alter table public.profiles add column if not exists color text;
+alter table public.profiles drop constraint if exists profiles_color_check;
+alter table public.profiles add constraint profiles_color_check
+  check (color is null or color ~ '^#[0-9a-fA-F]{6}$');
+
+create or replace function public.cit_palette()
+returns text[] language sql immutable as $fn$
+  select array[
+    '#45e3ff','#9b5cff','#ff3fa4','#ff2e5f','#37ff8b','#ffc74d','#3d8bff','#ff7a1a',
+    '#00ffd5','#c86bff','#ff5cf0','#7dff3f','#ffe14d','#4dffea','#ff8fa3','#8affff'
+  ]
+$fn$;
+
+/** A cor da paleta que menos gente está usando; empate vai pela ordem dela. */
+create or replace function public.cor_livre()
+returns text language plpgsql stable security definer set search_path = public as $fn$
+declare pal text[] := public.cit_palette(); escolhida text;
+begin
+  select p into escolhida
+    from unnest(pal) as p
+    left join public.profiles pr on pr.color = p
+   group by p
+   order by count(pr.id), array_position(pal, p)
+   limit 1;
+  return coalesce(escolhida, pal[1]);
+end $fn$;
+
 -- ---------- códigos de acesso ----------
 create table if not exists public.invite_codes (
   code text primary key,
@@ -323,7 +353,8 @@ begin
   if r is null then
     raise exception 'Código de acesso inválido.';
   end if;
-  insert into public.profiles (id, codename, role) values (new.id, cn, r);
+  insert into public.profiles (id, codename, role, color)
+    values (new.id, cn, r, public.cor_livre());
   return new;
 end $fn$;
 
@@ -466,6 +497,66 @@ begin
    where user_id = target and provider = 'email';
 end $fn$;
 
+-- Cada agente ajusta o próprio codinome e a própria cor. Vale para todos os
+-- cargos; é a única configuração a que o AGENTE tem acesso.
+create or replace function public.update_me(new_name text, new_color text)
+returns void language plpgsql security definer
+set search_path = public, auth as $fn$
+declare mail text; atual text; eu uuid := auth.uid();
+begin
+  if eu is null then
+    raise exception 'Sessão expirada. Entre de novo.';
+  end if;
+  if new_color is not null and new_color !~ '^#[0-9a-fA-F]{6}$' then
+    raise exception 'Cor inválida.';
+  end if;
+
+  select codename into atual from public.profiles where id = eu;
+
+  if new_name is not null and new_name <> atual then
+    if new_name !~ '^[A-Za-z0-9_]{3,20}$' then
+      raise exception 'Codinome: 3 a 20 caracteres (letras, números e _).';
+    end if;
+    if exists (select 1 from public.profiles where codename = new_name and id <> eu) then
+      raise exception 'Já existe um agente com esse codinome.';
+    end if;
+    mail := lower(new_name) || '.cit.paralela@gmail.com';
+    if exists (select 1 from auth.users where email = mail and id <> eu) then
+      raise exception 'Já existe uma conta com esse codinome.';
+    end if;
+
+    update public.profiles set codename = new_name where id = eu;
+    update auth.users
+       set email = mail,
+           raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb)
+                                || jsonb_build_object('codename', new_name),
+           updated_at = now()
+     where id = eu;
+    update auth.identities
+       set identity_data = coalesce(identity_data, '{}'::jsonb)
+                           || jsonb_build_object('email', mail),
+           updated_at = now()
+     where user_id = eu and provider = 'email';
+  end if;
+
+  if new_color is not null then
+    update public.profiles set color = new_color where id = eu;
+  end if;
+end $fn$;
+
+-- ADMIN troca a cor de qualquer conta.
+create or replace function public.admin_set_color(target uuid, new_color text)
+returns void language plpgsql security definer set search_path = public as $fn$
+begin
+  if not public.is_admin() then
+    raise exception 'Apenas o ADMIN pode alterar a cor de outra conta.';
+  end if;
+  if new_color !~ '^#[0-9a-fA-F]{6}$' then
+    raise exception 'Cor inválida.';
+  end if;
+  update public.profiles set color = new_color where id = target;
+end $fn$;
+
 -- ADMIN redefine a senha de qualquer conta.
 create or replace function public.admin_set_password(target uuid, p_password text)
 returns void language plpgsql security definer
@@ -513,6 +604,18 @@ create or replace function public.admin_delete_user(target uuid)
 returns void language sql security definer set search_path = public as $fn$
   select public.remove_agent(target);
 $fn$;
+
+-- ---------- cores das contas que já existiam ----------
+update public.profiles set color = '#ff3fa4' where color is null and lower(codename) = 'nemesis';
+update public.profiles set color = '#ff2e5f' where color is null and lower(codename) = 'aries';
+
+do $do$
+declare r record;
+begin
+  for r in select id from public.profiles where color is null order by created_at loop
+    update public.profiles set color = public.cor_livre() where id = r.id;
+  end loop;
+end $do$;
 
 -- ============================================================================
 -- 5. RLS
