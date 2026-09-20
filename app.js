@@ -2,7 +2,23 @@
    app.js — núcleo: acesso, barra de canais, mensagens e edição.
    Complementos: ops.js (dossiês), manage.js (usuários/canais), search.js.
    =========================================================================== */
-const sb = supabase.createClient(CFG.url, CFG.key);
+// A sessão vive no sessionStorage: sobrevive ao F5, morre ao fechar o navegador.
+const authStore = (() => {
+  try {
+    const s = window.sessionStorage;
+    s.setItem('cit.probe', '1'); s.removeItem('cit.probe');
+    return s;
+  } catch {                       // navegação privada com storage bloqueado
+    const m = new Map();
+    return { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) };
+  }
+})();
+// versões antigas guardavam a sessão no localStorage, que sobrevivia ao fechamento
+try { Object.keys(localStorage).filter(k => /^sb-.*-auth-token/.test(k)).forEach(k => localStorage.removeItem(k)); } catch {}
+
+const sb = supabase.createClient(CFG.url, CFG.key, {
+  auth: { storage: authStore, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+});
 const $ = s => document.querySelector(s);
 
 let me, chan = 'geral', signup = false, live;
@@ -159,8 +175,7 @@ function listen() {
         const old = msgEls.get(String(m.id));
         if (old) { const n = buildMsg(m); old.replaceWith(n); msgEls.set(String(m.id), n); }
       } else if (p.eventType === 'DELETE') {
-        msgEls.get(String(m.id))?.remove();
-        msgEls.delete(String(m.id));
+        dropMsg(m.id);
       }
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, async p => {
@@ -247,7 +262,7 @@ function drawChannels() {
       head.append(tw);
       if (isStaff()) {
         const ed = el('button', 'cat-ed', '✎');
-        ed.title = 'Editar categoria';
+        ed.title = 'Editar ou excluir categoria';
         ed.onclick = e => { e.stopPropagation(); window.MANAGE?.categoryForm?.(cat); };
         head.append(ed);
       }
@@ -305,7 +320,7 @@ async function openChannel(key, jumpTo) {
   }
   if (token !== loadToken) return;
 
-  if (!data?.length) box.innerHTML = '<p class="empty">&gt; canal silencioso.<br>&gt; seja o primeiro a transmitir.</p>';
+  if (!data?.length) box.innerHTML = EMPTY_CH;
   data?.forEach(m => addMsg(m, true));
   box.scrollTop = box.scrollHeight;
 
@@ -337,10 +352,14 @@ function buildMsg(m) {
     head.append(e);
   }
   if (m.author_id === me.id || isStaff()) {
+    const own = m.author_id === me.id;
     const b = el('button', 'act', '✎');
-    b.title = m.author_id === me.id ? 'Editar' : 'Editar (comando)';
+    b.title = own ? 'Editar' : 'Editar (comando)';
     b.onclick = () => editMsg(wrap, m);
-    head.append(b);
+    const d = el('button', 'act del', '🗑');
+    d.title = own ? 'Apagar' : 'Apagar (comando)';
+    d.onclick = () => delMsg(wrap, m);
+    head.append(b, d);
   }
   wrap.append(head);
 
@@ -359,6 +378,24 @@ function addMsg(m, bulk) {
   const near = box.scrollHeight - box.scrollTop - box.clientHeight < 140 || m.author_id === me.id;
   box.append(node);
   if (!bulk && near) box.scrollTop = box.scrollHeight;
+}
+
+const EMPTY_CH = '<p class="empty">&gt; canal silencioso.<br>&gt; seja o primeiro a transmitir.</p>';
+
+async function delMsg(wrap, m) {
+  const own = m.author_id === me.id;
+  const who = people[m.author_id]?.codename || 'agente removido';
+  if (!confirm(own ? 'Apagar esta mensagem?' : `Apagar a mensagem de ${who}? Não há volta.`)) return;
+  const { error } = await sb.from('messages').delete().eq('id', m.id);
+  if (error) return toast('Não foi possível apagar: ' + error.message, true);
+  dropMsg(m.id);
+}
+
+function dropMsg(id) {
+  msgEls.get(String(id))?.remove();
+  msgEls.delete(String(id));
+  const box = $('#msgs');
+  if (!box.querySelector('.m')) box.innerHTML = EMPTY_CH;
 }
 
 function editMsg(wrap, m) {

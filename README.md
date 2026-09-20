@@ -52,13 +52,26 @@ Depois disso o ADMIN cria as demais contas pelo painel, sem distribuir códigos.
   categoria (herdando o acesso dela) ou avulso, com acesso próprio.
 
 Quem cria entra automaticamente na lista de acesso. O ADMIN enxerga tudo.
-Excluir uma categoria não esconde os canais dentro dela: eles viram avulsos
-mantendo o mesmo acesso.
+
+Para **editar ou excluir**: o ✎ no topo do canal, e o ✎ ao lado do nome da
+categoria na barra lateral. Excluir um canal apaga junto as mensagens e os
+dossiês dele. Excluir uma categoria **não** esconde os canais dentro dela: eles
+viram avulsos mantendo o mesmo acesso.
+
+## Sessão
+
+O login fica no `sessionStorage`: sobrevive a F5 e à navegação normal, mas cai
+quando o navegador é fechado — na volta, é preciso entrar de novo. Como o
+`sessionStorage` é por aba, abrir o site numa aba nova também pede login.
+Se o navegador estiver configurado para restaurar as abas ao iniciar, ele pode
+devolver a sessão junto; para garantir a saída, use *Encerrar sessão*.
 
 ## Mensagens
 
 - **Editar**: passe o mouse na mensagem e clique em ✎. O autor edita a própria;
   COMANDO e ADMIN editam a de qualquer um. Mensagens editadas ficam marcadas.
+- **Apagar**: 🗑 ao lado do ✎. O autor apaga a própria; COMANDO e ADMIN apagam
+  a de qualquer um. Some da tela de todo mundo na hora, e não há desfazer.
 - **Enviar**: Enter. **Quebra de linha**: Shift+Enter.
 
 ### Formatação
