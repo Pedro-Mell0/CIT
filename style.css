@@ -256,26 +256,23 @@ body.dragging-v #msg-grip{background:linear-gradient(180deg,transparent 2px,var(
 .lock-err{color:var(--danger);font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:.9rem;
   letter-spacing:.14em;text-align:center;padding:.6rem;border:1px solid var(--danger);
   background:#ff5c8a12;text-shadow:0 0 14px #ff5c8a99;box-shadow:inset 0 0 26px #ff5c8a22}
-.lock-err.nega{animation:nega-pisca .42s steps(1) 3}
+.lock-err.nega{animation:nega-pisca .14s steps(1) 3}
 @keyframes nega-pisca{0%,100%{opacity:1}50%{opacity:.2}}
-/* a tela inteira pisca em vermelho e treme quando o código sai errado */
+/* Glitch vermelho quando o código sai errado.
+   A camada fica na tela o tempo todo, invisível e promovida para a GPU: a
+   animação mexe só em `opacity`, que o compositor resolve sozinho, sem
+   repintar nada. Nada de `mix-blend-mode` nem de animar o <body> — os dois
+   obrigavam a recompor a página inteira a cada quadro, com a chuva e o CRT
+   por baixo, e era isso que engasgava. */
 #nega-flash{position:fixed;inset:0;z-index:998;pointer-events:none;opacity:0;
-  background:radial-gradient(ellipse at center,#ff174455 0%,#ff2e5f77 55%,#ff0033cc 100%);
-  mix-blend-mode:screen}
-/* steps(1) para o vermelho estalar em vez de desbotar: é pisca, não pulso */
-#nega-flash.on{animation:nega-flash 1s steps(1)}
+  background:radial-gradient(ellipse at center,#ff174433 0%,#ff2e5f66 55%,#ff0033b3 100%);
+  will-change:opacity;transform:translateZ(0)}
+/* steps(1) para o vermelho estalar em vez de desbotar: é glitch, não pulso */
+#nega-flash.on{animation:nega-flash .42s steps(1)}
 @keyframes nega-flash{
-  0%{opacity:.9}   6%{opacity:0}    11%{opacity:.75} 16%{opacity:.05}
-  21%{opacity:.85} 27%{opacity:0}   34%{opacity:.6}  40%{opacity:.1}
-  47%{opacity:.7}  55%{opacity:0}   63%{opacity:.45} 72%{opacity:.08}
-  81%{opacity:.3}  90%{opacity:.04} 100%{opacity:0}
-}
-body.nega-tela{animation:nega-treme .62s cubic-bezier(.36,.07,.19,.97)}
-@keyframes nega-treme{
-  10%,90%{transform:translate3d(-3px,1px,0)}
-  20%,80%{transform:translate3d(6px,-2px,0)}
-  30%,50%,70%{transform:translate3d(-10px,2px,0) rotate(-.3deg)}
-  40%,60%{transform:translate3d(10px,-1px,0) rotate(.3deg)}
+  0%{opacity:.95} 9%{opacity:0}   16%{opacity:.8} 23%{opacity:.04}
+  34%{opacity:.9} 45%{opacity:0}  56%{opacity:.5} 68%{opacity:.06}
+  79%{opacity:.3} 90%{opacity:0}  100%{opacity:0}
 }
 
 /* ---------- gerenciar usuários ---------- */

@@ -135,78 +135,80 @@
         tom(140, t + 0.1, 0.16, 'sawtooth', 0.07);
       },
 
-      /** acesso negado: alarme de três batidas, bem mais áspero que a falha */
+      /** acesso negado: duas batidas secas, à frente da voz, sem atropelá-la */
       negado() {
         if (!on || !pronto()) return;
         const t = ctx.currentTime;
-        for (let i = 0; i < 3; i++) {
-          const ini = t + i * 0.16;
-          estalo(ini, 0.18, 900, 0.05);
-          tom(150, ini, 0.13, 'sawtooth', 0.13);
-          tom(98, ini + 0.02, 0.15, 'square', 0.1);
+        for (let i = 0; i < 2; i++) {
+          const ini = t + i * 0.1;
+          estalo(ini, 0.18, 900, 0.04);
+          tom(150, ini, 0.08, 'sawtooth', 0.13);
+          tom(98, ini + 0.015, 0.09, 'square', 0.1);
         }
       },
 
       /**
-       * A sala diz "ACESSO NEGADO" — grave, arrastado e partido ao meio.
-       * A voz do navegador não pode ser ligada ao Web Audio (nenhum navegador
-       * entrega esse áudio de volta), então o lado robótico não vem de filtro:
-       * vem de falar no tom mais grave possível, devagar, em pedaços separados
-       * — o corte entre eles é o "glitch" — com estática e um zumbido de
-       * modulação por cima, sintetizados aqui e sincronizados com a fala.
+       * A sala diz "ACESSO NEGADO": seco, rápido e metálico.
+       *
+       * Uma fala só. Frases em pedaços separados entram na fila do navegador,
+       * e ele impõe a própria pausa entre um `speak()` e o seguinte — era
+       * dela o buraco entre "acesso" e "negado", não do código.
+       *
+       * O navegador também não devolve o áudio da fala para o Web Audio, então
+       * não há como filtrar a voz. O timbre cyberpunk vem de tocar por cima,
+       * no mesmo instante, uma cópia sintética da frase em formantes com
+       * modulação em anel: duas vozes quase juntas o ouvido funde numa só,
+       * processada. `onstart` é o que garante o "no mesmo instante" — a fala
+       * demora um tanto imprevisível para começar, e esperar por ela é mais
+       * barato que tentar adivinhar.
        */
       vozNegado() {
-        if (!on) return;
-        this.estatica();
+        if (!on || !pronto()) return;
         const fala = window.speechSynthesis;
-        if (!fala || typeof SpeechSynthesisUtterance !== 'function') return this.vocoder();
+        const voz = fala ? vozGrave() : null;
+        if (!fala || typeof SpeechSynthesisUtterance !== 'function' || (!voz && !vozesCarregadas)) {
+          return this.vozSintetica();        // aparelho sem voz instalada
+        }
 
         fala.cancel();                       // erros seguidos não empilham fala
-        const voz = vozGrave();
-        if (!voz && !vozesCarregadas) return this.vocoder();
-
-        // pitch 0 é o mais grave que a API aceita; cada pedaço sai num ritmo
-        // um pouco diferente, o que tira a naturalidade da frase
-        [['acesso', 0.62, 1], ['negado', 0.52, 1], ['negado', 1.45, 0.3]]
-          .forEach(([texto, rate, vol]) => {
-            const u = new SpeechSynthesisUtterance(texto);
-            u.pitch = 0; u.rate = rate; u.volume = vol;
-            u.lang = voz?.lang || 'pt-BR';
-            if (voz) u.voice = voz;
-            fala.speak(u);
-          });
-      },
-
-      /** Estática e zumbido que acompanham a voz, para ela soar transmitida. */
-      estatica() {
-        if (!on || !pronto()) return;
-        const t = ctx.currentTime;
-        for (let i = 0; i < 5; i++) estalo(t + i * 0.19 + Math.random() * 0.05, 0.1, 1800, 0.04);
-        // zumbido que desafina para baixo: o "sistema" reclamando
-        const o = ctx.createOscillator(), g = ctx.createGain();
-        o.type = 'sawtooth';
-        o.frequency.setValueAtTime(58, t);
-        o.frequency.linearRampToValueAtTime(41, t + 1.1);
-        g.gain.setValueAtTime(0.0001, t);
-        g.gain.exponentialRampToValueAtTime(0.055, t + 0.05);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + 1.15);
-        o.connect(g); g.connect(master);
-        o.start(t); o.stop(t + 1.2);
+        const u = new SpeechSynthesisUtterance('acesso negado');
+        u.pitch = 0; u.rate = 1.15;          // o mais grave que a API aceita, e ligeiro
+        u.lang = voz?.lang || 'pt-BR';
+        if (voz) u.voice = voz;
+        let saiu = false;
+        u.onstart = () => { saiu = true; this.vozSintetica(0.55); };
+        fala.speak(u);
+        // se a fala não arrancar em 250 ms, a camada sintética vai sozinha e
+        // em volume cheio: melhor uma voz de máquina que silêncio nenhum
+        setTimeout(() => { if (!saiu) this.vozSintetica(); }, 250);
       },
 
       /**
-       * Quando não há voz no aparelho: a mesma frase em formantes, sem palavra
-       * nenhuma. São seis sílabas ("a-ces-so ne-ga-do") tocadas por dois
-       * dentes-de-serra desafinados passando por filtros de banda — não se
-       * entende, mas se reconhece que uma máquina tentou falar.
+       * A frase em formantes: seis sílabas ("a-ces-so ne-ga-do") em meio
+       * segundo. Cada uma são dois dentes-de-serra desafinados passando por
+       * filtros de banda e por um anel de modulação a 47 Hz — é o anel que dá
+       * a aspereza de rádio velho. Serve de camada sob a voz do navegador e
+       * também sozinha, quando não há voz nenhuma no aparelho.
        */
-      vocoder() {
+      vozSintetica(vol = 1) {
         if (!on || !pronto()) return;
         const t = ctx.currentTime;
+        estalo(t, 0.16 * vol, 1600, 0.05);            // o "clique" de transmissão
+
+        // anel de modulação: uma fonte só, compartilhada por todas as sílabas
+        const anel = ctx.createGain();
+        anel.gain.value = 0;                           // o oscilador é quem abre
+        const lfo = ctx.createOscillator(), lfoG = ctx.createGain();
+        lfo.type = 'square'; lfo.frequency.value = 47;
+        lfoG.gain.value = 1;
+        lfo.connect(lfoG); lfoG.connect(anel.gain);
+        anel.connect(master);
+        lfo.start(t); lfo.stop(t + 0.75);
+
         // [início, duração, formante grave, formante agudo]
         const silabas = [
-          [0.00, 0.13, 720, 1240], [0.15, 0.12, 560, 1680], [0.29, 0.17, 440, 1020],
-          [0.54, 0.13, 640, 1760], [0.69, 0.12, 700, 1180], [0.83, 0.26, 420,  920],
+          [0.00, 0.07, 720, 1240], [0.08, 0.06, 560, 1680], [0.15, 0.10, 440, 1020],
+          [0.28, 0.07, 640, 1760], [0.36, 0.06, 700, 1180], [0.43, 0.16, 400,  900],
         ];
         silabas.forEach(([off, dur, f1, f2]) => {
           const ini = t + off;
@@ -214,14 +216,25 @@
             const o = ctx.createOscillator(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
             o.type = 'sawtooth';
             o.frequency.setValueAtTime(i ? 84 : 78, ini);   // desafinados de propósito
-            bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 7;
+            bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 9;
             g.gain.setValueAtTime(0.0001, ini);
-            g.gain.exponentialRampToValueAtTime(i ? 0.09 : 0.14, ini + 0.02);
+            g.gain.exponentialRampToValueAtTime((i ? 0.1 : 0.15) * vol, ini + 0.012);
             g.gain.exponentialRampToValueAtTime(0.0001, ini + dur);
-            o.connect(bp); bp.connect(g); g.connect(master);
+            o.connect(bp); bp.connect(g); g.connect(anel);
             o.start(ini); o.stop(ini + dur + 0.02);
           });
         });
+
+        // zumbido curto caindo de tom, fechando a frase
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(62, t);
+        o.frequency.linearRampToValueAtTime(38, t + 0.6);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.05 * vol, t + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.62);
+        o.connect(g); g.connect(master);
+        o.start(t); o.stop(t + 0.65);
       },
 
       /** chiado grave de fundo, em laço */
