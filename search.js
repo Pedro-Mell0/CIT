@@ -78,6 +78,9 @@
         who: people[e.created_by]?.codename || '[removido]', when: e.updated_at,
       });
     });
+    // canal com trava de código pendente não aparece na varredura: o trecho
+    // entregaria justamente o que a trava esconde
+    results = results.filter(r => !window.LOCKS?.travaPendente?.(r.channel));
     results.sort((a, b) => new Date(b.when) - new Date(a.when));
 
     res.innerHTML = '';

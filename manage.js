@@ -225,6 +225,48 @@
     };
   }
 
+  /** Trava por código: campo de definir, trocar ou remover. */
+  function lockPicker(parent, { locked, alvo }) {
+    parent.append(el('h4', 'form-block', '⚿ TRAVA DE ACESSO'));
+    parent.append(el('p', 'form-note', locked
+      ? `Este ${alvo} está travado. Em branco mantém o código atual; digitar um novo troca o código.`
+      : `Código opcional. Com ele, estar na lista de acesso não basta: só abre ${alvo === 'canal' ? 'o canal' : 'a categoria'} quem digitar o código — inclusive COMANDO e ADMIN.`));
+
+    const linha = el('div', 'lock-row');
+    const inp = el('input');
+    inp.placeholder = locked ? '•••••••• (em branco = manter)' : 'ex.: SIGMA-7 (em branco = sem trava)';
+    inp.autocomplete = 'off';
+    inp.spellcheck = false;
+    linha.append(inp);
+
+    let tirar = false;
+    if (locked) {
+      const rm = el('button', 'ghost sm danger', '✕ Remover trava');
+      rm.onclick = () => {
+        tirar = !tirar;
+        inp.disabled = tirar;
+        if (tirar) inp.value = '';
+        rm.textContent = tirar ? '↺ Manter trava' : '✕ Remover trava';
+        linha.classList.toggle('tirando', tirar);
+      };
+      linha.append(rm);
+    }
+    parent.append(linha);
+
+    return { get value() { return { code: inp.value.trim(), tirar }; } };
+  }
+
+  /** Grava a trava depois que a linha já existe. Devolve o erro, se houver. */
+  async function salvaTrava(tipo, id, lv) {
+    if (!lv.tirar && !lv.code) return null;
+    const rpc = tipo === 'cat' ? 'set_category_lock' : 'set_channel_lock';
+    const args = tipo === 'cat' ? { cat: id } : { cid: id };
+    const { error } = await sb.rpc(rpc, { ...args, code: lv.tirar ? null : lv.code });
+    // quem definiu o código já sabe qual é: não precisa digitá-lo em seguida
+    if (!error && !lv.tirar) window.LOCKS?.libera?.(tipo, id);
+    return error;
+  }
+
   function newMenu() {
     const m = modal('CRIAR');
     m.body.append(el('p', 'form-note', 'Categorias agrupam canais. Um canal também pode ficar avulso, fora de qualquer categoria.'));
@@ -246,6 +288,7 @@
       everyone: cat ? cat.everyone : true,
       members: cat ? [...(catMem[cat.id] || [])] : [me.id],
     });
+    const lock = lockPicker(m.body, { locked: !!cat?.locked, alvo: 'categoria' });
 
     const save = el('button', 'primary', cat ? 'Salvar' : 'Criar');
     const cancel = el('button', 'ghost', 'Cancelar');
@@ -255,7 +298,9 @@
       const del = el('button', 'ghost danger', 'Excluir');
       del.onclick = async () => {
         const inside = Object.values(chans).filter(c => c.category_id === cat.id);
-        if (!confirm(`Excluir a categoria "${cat.name}"?` + (inside.length ? ` Os ${inside.length} canal(is) dentro dela viram canais avulsos, mantendo o acesso atual.` : ''))) return;
+        if (!confirm(`Excluir a categoria "${cat.name}"?`
+          + (inside.length ? ` Os ${inside.length} canal(is) dentro dela viram canais avulsos, mantendo o acesso atual.` : '')
+          + (cat.locked ? ' A trava de código da categoria some junto: quem tinha acesso passa a entrar sem código.' : ''))) return;
         // canais que herdavam o acesso passam a ter lista própria, senão sumiriam da barra
         const heirs = inside.filter(c => c.inherit_access);
         if (heirs.length) {
@@ -295,6 +340,7 @@
           ({ error } = await sb.from('category_members').insert(rows));
         }
       }
+      if (!error && id) error = await salvaTrava('cat', id, lock.value);
       save.disabled = false;
       if (error) return toast('Falha ao salvar: ' + error.message, true);
       m.close();
@@ -327,6 +373,7 @@
       members: ch ? [...(chanMem[ch.id] || [])] : [me.id],
       inheritFrom: ch ? ch.inherit_access : false,   // canal novo começa aberto a todos
     });
+    const lock = lockPicker(m.body, { locked: !!ch?.locked, alvo: 'canal' });
 
     const save = el('button', 'primary', ch ? 'Salvar' : 'Criar');
     const cancel = el('button', 'ghost', 'Cancelar');
@@ -373,6 +420,7 @@
           ({ error } = await sb.from('channel_members').insert(rows));
         }
       }
+      if (!error && id) error = await salvaTrava('chan', id, lock.value);
       save.disabled = false;
       if (error) return toast('Falha ao salvar: ' + error.message, true);
       m.close();

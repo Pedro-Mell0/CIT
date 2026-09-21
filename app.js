@@ -75,7 +75,7 @@ $('#go').onclick = async () => {
 $('#out').onclick = async () => { await sb.auth.signOut(); location.reload(); };
 
 // ---------- janelas ----------
-function modal(title) {
+function modal(title, { onClose } = {}) {
   const root = $('#modal');
   root.innerHTML = '';
   root.classList.remove('hide');
@@ -90,7 +90,11 @@ function modal(title) {
   box.append(head, body, foot);
   root.append(box);
 
-  const close = () => { root.classList.add('hide'); root.innerHTML = ''; document.removeEventListener('keydown', esc); };
+  const close = () => {
+    root.classList.add('hide'); root.innerHTML = '';
+    document.removeEventListener('keydown', esc);
+    onClose?.();                    // vale para o ✕, o ESC e o clique fora
+  };
   const esc = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
   document.addEventListener('keydown', esc);
   x.onclick = close;
@@ -168,6 +172,8 @@ function listen() {
     await loadTree();
     // canal excluído (ou acesso revogado) enquanto estava aberto
     if (chan.startsWith('chan:') && !chans[chan.slice(5)]) return openChannel('geral');
+    // trava posta por outro agente enquanto o canal estava aberto
+    if (travaPendente(chan)) return openChannel('geral');
     drawChannels();
   };
 
@@ -233,7 +239,13 @@ function chanInfo(key) {
   const who = (c.category_id && c.inherit_access)
     ? (cat?.everyone ? 'todos' : `${(catMem[c.category_id] || new Set()).size} agente(s)`)
     : (c.everyone ? 'todos' : `${(chanMem[c.id] || new Set()).size} agente(s)`);
-  return { label: c.name, icon: '#', hint: (c.topic ? c.topic + ' · ' : '') + 'acesso: ' + who, ch: c };
+  const trava = travaDoCanal(c);
+  return {
+    label: c.name,
+    icon: trava ? '⚿' : '#',
+    hint: (c.topic ? c.topic + ' · ' : '') + 'acesso: ' + who + (trava ? ' · ⚿ trava de código' : ''),
+    ch: c,
+  };
 }
 
 /** Cabeçalho recolhível, usado pelas categorias e pelos canais individuais. */
@@ -254,6 +266,28 @@ function grupoHead(id, label, n, filhos) {
   };
   h.append(tw);
   return h;
+}
+
+/** Canal na barra: o botão, o aviso de trava e, para o comando, a engrenagem. */
+function linhaCanal(box, c, cls) {
+  const row = el('div', 'ch-row');
+  const trava = travaDoCanal(c);
+  const b = navBtn(row, 'chan:' + c.id, c.name, trava ? '⚿' : '#', 'ch-nav' + (cls ? ' ' + cls : ''));
+  if (trava) {
+    b.querySelector('.ic')?.classList.add('trava');
+    b.title = destravado[trava.tipo].has(trava.id)
+      ? 'Trava liberada nesta sessão'
+      : 'Exige código de acesso' + (trava.tipo === 'cat' ? ` (da categoria ${trava.nome})` : '');
+  }
+  armaCanal(b, c);
+  if (isStaff()) {
+    const ed = el('button', 'ch-ed', '⚙');
+    ed.title = 'Configurar canal: nome, membros e trava';
+    ed.onclick = e => { e.stopPropagation(); window.MANAGE?.channelForm?.(c); };
+    row.append(ed);
+  }
+  box.append(row);
+  return b;
 }
 
 function navBtn(parent, key, label, icon, cls) {
@@ -320,20 +354,25 @@ function drawChannels() {
       const cat = it.cat;
       const dentro = byCat[cat.id] || [];
       const head = grupoHead(cat.id, cat.name, dentro.length, dentro.map(c => 'chan:' + c.id));
+      if (cat.locked) {
+        const marca = el('span', 'trava', '⚿');
+        marca.title = destravado.cat.has(cat.id)
+          ? 'Trava liberada nesta sessão'
+          : 'Categoria travada: exige código de acesso';
+        head.querySelector('.cat-nm')?.before(marca);
+      }
       if (isStaff()) {
-        const ed = el('button', 'cat-ed', '✎');
-        ed.title = 'Editar ou excluir categoria';
+        const ed = el('button', 'cat-ed', '⚙');
+        ed.title = 'Configurar categoria: nome, membros e trava';
         ed.onclick = e => { e.stopPropagation(); window.MANAGE?.categoryForm?.(cat); };
         head.append(ed);
       }
       box.append(head);
       box.dataset.catId = cat.id;
-      if (!collapsed.has(cat.id)) {
-        dentro.forEach(c => armaCanal(navBtn(box, 'chan:' + c.id, c.name, '#', 'sub'), c));
-      }
+      if (!collapsed.has(cat.id)) dentro.forEach(c => linhaCanal(box, c, 'sub'));
 
     } else {
-      armaCanal(navBtn(box, 'chan:' + it.ch.id, it.ch.name, '#'), it.ch);
+      linhaCanal(box, it.ch);
     }
 
     armaTopo(box);
@@ -484,6 +523,13 @@ function abreMembros(key) {
   const { regra, lista, extra } = membrosDoCanal(key);
   const m = modal('MEMBROS · ' + info.label);
   m.body.append(el('p', 'form-note', regra));
+
+  const trava = key.startsWith('chan:') ? travaDoCanal(chans[key.slice(5)]) : null;
+  if (trava) {
+    m.body.append(el('p', 'form-note', trava.tipo === 'cat'
+      ? `⚿ Trava de código, herdada da categoria ${trava.nome}: estar na lista não basta, é preciso digitar o código.`
+      : '⚿ Trava de código: estar na lista não basta, é preciso digitar o código.'));
+  }
 
   const ul = el('div', 'membros');
   lista.sort((a, b) => a.codename.localeCompare(b.codename)).forEach(p => {
@@ -937,10 +983,103 @@ function ordenaCols(mover, alvo, antes) {
   addEventListener('resize', reajustaLarguras);
 })();
 
+// ---------- trava de acesso por código ----------
+// Camada por cima da lista de membros: onde há trava, só entra quem digitar o
+// código, seja AGENTE, COMANDO ou ADMIN. O que foi destravado vale pela sessão,
+// como o login: sobrevive ao F5 e cai quando o navegador fecha.
+const destravado = {
+  chan: new Set(JSON.parse(authStore.getItem('cit.destravado.chan') || '[]')),
+  cat: new Set(JSON.parse(authStore.getItem('cit.destravado.cat') || '[]')),
+};
+const salvaDestravado = () => {
+  authStore.setItem('cit.destravado.chan', JSON.stringify([...destravado.chan]));
+  authStore.setItem('cit.destravado.cat', JSON.stringify([...destravado.cat]));
+};
+
+/** Quem manda na trava de um canal: ele mesmo, a categoria onde está, ou nada. */
+// A trava da categoria vale para tudo que está dentro dela, mesmo para os
+// canais que têm lista de acesso própria: ela fecha a seção inteira.
+function travaDoCanal(c) {
+  if (!c) return null;
+  if (c.locked) return { tipo: 'chan', id: c.id, nome: c.name };
+  const cat = c.category_id ? cats[c.category_id] : null;
+  if (cat?.locked) return { tipo: 'cat', id: cat.id, nome: cat.name };
+  return null;
+}
+
+/** A trava que ainda barra este canal nesta sessão, se houver. */
+function travaPendente(key) {
+  if (typeof key !== 'string' || !key.startsWith('chan:')) return null;
+  const t = travaDoCanal(chans[key.slice(5)]);
+  return t && !destravado[t.tipo].has(t.id) ? t : null;
+}
+
+/** Libera sem perguntar: quem acabou de definir o código já sabe qual é. */
+function liberaTrava(tipo, id) {
+  destravado[tipo].add(id);
+  salvaDestravado();
+}
+
+/** Tela treme, aviso vermelho e alarme. */
+function negaAcesso(aviso) {
+  window.FX?.som.negado();
+  aviso?.classList.remove('hide', 'nega');
+  document.body.classList.remove('nega-tela');
+  void document.body.offsetWidth;          // reinicia a animação em erros seguidos
+  aviso?.classList.add('nega');
+  document.body.classList.add('nega-tela');
+  setTimeout(() => document.body.classList.remove('nega-tela'), 700);
+}
+
+function pedeCodigo(trava) {
+  return new Promise(resolve => {
+    let respondeu = false;
+    const fim = ok => { if (!respondeu) { respondeu = true; resolve(ok); } };
+    const m = modal('⚿ SEÇÃO RESTRITA', { onClose: () => fim(false) });
+    m.body.append(el('p', 'form-note',
+      `${trava.tipo === 'cat' ? 'A categoria' : 'O canal'} “${trava.nome}” exige código de acesso.`));
+    const inp = field(m.body, 'Código de acesso', '', { ph: '••••••••' });
+    inp.type = 'password';
+    inp.autocomplete = 'off';
+    const aviso = el('p', 'lock-err hide', 'ACESSO NEGADO — SEÇÃO RESTRITA');
+    aviso.setAttribute('role', 'alert');
+    m.body.append(aviso);
+
+    const go = el('button', 'primary', 'Confirmar');
+    const cancel = el('button', 'ghost', 'Cancelar');
+    cancel.onclick = m.close;
+    m.foot.append(cancel, go);
+    inp.focus();
+
+    const tenta = async () => {
+      go.disabled = true;
+      const { data, error } = trava.tipo === 'cat'
+        ? await sb.rpc('verify_category_code', { cat: trava.id, code: inp.value })
+        : await sb.rpc('verify_channel_code', { cid: trava.id, code: inp.value });
+      go.disabled = false;
+      if (!error && data === true) {
+        liberaTrava(trava.tipo, trava.id);
+        fim(true);
+        m.close();
+        return;
+      }
+      negaAcesso(aviso);
+      inp.value = '';
+      inp.focus();
+    };
+    go.onclick = tenta;
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); tenta(); } });
+  });
+}
+
+window.LOCKS = { travaPendente, libera: liberaTrava };
+
 // ---------- abrir canal ----------
 let loadToken = 0;
 
 async function openChannel(key, jumpTo) {
+  const trava = travaPendente(key);
+  if (trava && !await pedeCodigo(trava)) return;
   chan = key;
   const info = chanInfo(key);
   window.FX?.decodifica($('#ch-title'), info.label, 380);

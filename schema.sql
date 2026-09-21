@@ -121,6 +121,26 @@ create table if not exists public.channel_members (
   primary key (channel_id, profile_id)
 );
 
+-- ---------- trava por código ----------
+-- Segunda camada, por cima da lista de acesso: quem não digitar o código não
+-- entra, seja AGENTE, COMANDO ou ADMIN. `locked` é só o aviso de que existe
+-- trava (pode ser lido por qualquer um); o código em si fica hasheado nas
+-- tabelas abaixo, que o site nunca lê — só compara por verify_*_code().
+alter table public.categories add column if not exists locked boolean not null default false;
+alter table public.channels   add column if not exists locked boolean not null default false;
+
+create table if not exists public.category_locks (
+  category_id uuid primary key references public.categories(id) on delete cascade,
+  code_hash   text not null,
+  created_at  timestamptz not null default now()
+);
+
+create table if not exists public.channel_locks (
+  channel_id uuid primary key references public.channels(id) on delete cascade,
+  code_hash  text not null,
+  created_at timestamptz not null default now()
+);
+
 -- ---------- ordem da barra lateral ----------
 -- Vale para todos: quem tem COMANDO arrasta e reorganiza para o grupo inteiro.
 -- `key` é 'geral', 'individuais', 'cat:<uuid>' ou 'chan:<uuid>'.
@@ -638,6 +658,89 @@ returns void language sql security definer set search_path = public as $fn$
   select public.remove_agent(target);
 $fn$;
 
+-- ---------- trava de acesso por código ----------
+-- Quem cria ou edita define o código; passar nulo ou vazio tira a trava.
+-- Só o hash é guardado: nem o site nem quem consulta a tabela lê o código.
+create or replace function public.set_channel_lock(cid uuid, code text default null)
+returns void language plpgsql security definer
+set search_path = public, extensions as $fn$
+begin
+  if not public.is_staff() then
+    raise exception 'Apenas COMANDO ou ADMIN definem a trava de um canal.';
+  end if;
+  if not exists (select 1 from public.channels where id = cid) then
+    raise exception 'Canal não encontrado.';
+  end if;
+
+  if code is null or btrim(code) = '' then
+    delete from public.channel_locks where channel_id = cid;
+    update public.channels set locked = false where id = cid;
+    return;
+  end if;
+  if length(btrim(code)) < 3 then
+    raise exception 'Código de acesso: mínimo de 3 caracteres.';
+  end if;
+
+  insert into public.channel_locks (channel_id, code_hash)
+       values (cid, extensions.crypt(btrim(code), extensions.gen_salt('bf')))
+  on conflict (channel_id) do update set code_hash = excluded.code_hash;
+  update public.channels set locked = true where id = cid;
+end $fn$;
+
+create or replace function public.set_category_lock(cat uuid, code text default null)
+returns void language plpgsql security definer
+set search_path = public, extensions as $fn$
+begin
+  if not public.is_staff() then
+    raise exception 'Apenas COMANDO ou ADMIN definem a trava de uma categoria.';
+  end if;
+  if not exists (select 1 from public.categories where id = cat) then
+    raise exception 'Categoria não encontrada.';
+  end if;
+
+  if code is null or btrim(code) = '' then
+    delete from public.category_locks where category_id = cat;
+    update public.categories set locked = false where id = cat;
+    return;
+  end if;
+  if length(btrim(code)) < 3 then
+    raise exception 'Código de acesso: mínimo de 3 caracteres.';
+  end if;
+
+  insert into public.category_locks (category_id, code_hash)
+       values (cat, extensions.crypt(btrim(code), extensions.gen_salt('bf')))
+  on conflict (category_id) do update set code_hash = excluded.code_hash;
+  update public.categories set locked = true where id = cat;
+end $fn$;
+
+-- Confere o código digitado. A trava é uma camada a mais, não substitui o RLS:
+-- quem já não enxergava o canal continua recebendo "não".
+create or replace function public.verify_channel_code(cid uuid, code text)
+returns boolean language plpgsql security definer
+set search_path = public, extensions as $fn$
+declare h text;
+begin
+  if not public.can_read_channel('chan:' || cid::text) then
+    return false;
+  end if;
+  select code_hash into h from public.channel_locks where channel_id = cid;
+  if h is null then return true; end if;
+  return h = extensions.crypt(coalesce(code, ''), h);
+end $fn$;
+
+create or replace function public.verify_category_code(cat uuid, code text)
+returns boolean language plpgsql security definer
+set search_path = public, extensions as $fn$
+declare h text;
+begin
+  if not public.can_see_category(cat) then
+    return false;
+  end if;
+  select code_hash into h from public.category_locks where category_id = cat;
+  if h is null then return true; end if;
+  return h = extensions.crypt(coalesce(code, ''), h);
+end $fn$;
+
 -- ---------- cores das contas que já existiam ----------
 update public.profiles set color = '#ff3fa4' where color is null and lower(codename) = 'nemesis';
 update public.profiles set color = '#ff2e5f' where color is null and lower(codename) = 'aries';
@@ -658,8 +761,10 @@ alter table public.profiles          enable row level security;
 alter table public.invite_codes      enable row level security;
 alter table public.categories        enable row level security;
 alter table public.category_members  enable row level security;
+alter table public.category_locks    enable row level security;
 alter table public.channels          enable row level security;
 alter table public.channel_members   enable row level security;
+alter table public.channel_locks     enable row level security;
 alter table public.messages          enable row level security;
 alter table public.operations        enable row level security;
 alter table public.operation_entries enable row level security;
@@ -672,8 +777,8 @@ begin
     select policyname, tablename from pg_policies
      where schemaname = 'public'
        and tablename in ('profiles','invite_codes','categories','category_members',
-                         'channels','channel_members','messages','operations',
-                         'operation_entries','sidebar_order')
+                         'category_locks','channels','channel_members','channel_locks',
+                         'messages','operations','operation_entries','sidebar_order')
   loop
     execute format('drop policy if exists %I on public.%I', p.policyname, p.tablename);
   end loop;
@@ -728,6 +833,14 @@ create policy ch_delete on public.channels for delete to authenticated
 create policy chm_read  on public.channel_members for select to authenticated
   using (public.can_read_channel('chan:' || channel_id::text) or profile_id = auth.uid());
 create policy chm_write on public.channel_members for all to authenticated
+  using (public.is_staff()) with check (public.is_staff());
+
+-- ---------- travas ----------
+-- Ninguém lê estas tabelas pelo site: quem define usa set_*_lock() e quem tenta
+-- entrar usa verify_*_code(). Fora isso, só COMANDO e ADMIN alcançam as linhas.
+create policy catlock_all on public.category_locks for all to authenticated
+  using (public.is_staff()) with check (public.is_staff());
+create policy chlock_all  on public.channel_locks  for all to authenticated
   using (public.is_staff()) with check (public.is_staff());
 
 -- ---------- mensagens ----------

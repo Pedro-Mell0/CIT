@@ -113,6 +113,18 @@
         tom(140, t + 0.1, 0.16, 'sawtooth', 0.07);
       },
 
+      /** acesso negado: alarme de três batidas, bem mais áspero que a falha */
+      negado() {
+        if (!on || !pronto()) return;
+        const t = ctx.currentTime;
+        for (let i = 0; i < 3; i++) {
+          const ini = t + i * 0.16;
+          estalo(ini, 0.18, 900, 0.05);
+          tom(150, ini, 0.13, 'sawtooth', 0.13);
+          tom(98, ini + 0.02, 0.15, 'square', 0.1);
+        }
+      },
+
       /** chiado grave de fundo, em laço */
       chiado() {
         if (!acorda() || humNode) return;

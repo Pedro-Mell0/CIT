@@ -82,8 +82,9 @@ papel. Ordem, larguras e colapsos ficam guardados naquele navegador. Abaixo de
   COMANDO e ADMIN. Cada agente vê só o seu; quem tem COMANDO ou ADMIN vê todos,
   o próprio inclusive.
 - **Categorias e canais criados pelo COMANDO** — nome livre, acesso definido na criação:
-  *todos os agentes* ou *uma lista escolhida*. Um canal pode ficar dentro de uma
-  categoria (herdando o acesso dela) ou avulso, com acesso próprio.
+  *todos os agentes* ou *uma lista escolhida*, e, se quiser, uma **trava de
+  código** (logo abaixo). Um canal pode ficar dentro de uma categoria (herdando
+  o acesso dela) ou avulso, com acesso próprio.
 
 Quem cria entra automaticamente na lista de acesso. O ADMIN enxerga tudo.
 
@@ -97,16 +98,46 @@ ele. Mostra só codinomes — o cargo continua invisível, como no chat. Onde o
 acesso vem do comando (canais individuais) ou da administração (canais
 restritos), a lista diz isso sem nomear ninguém.
 
+### Trava de acesso por código
+
+Ao criar — ou depois, pelo ⚙ — um canal ou uma categoria pode receber um
+**código de acesso**. Com ele, estar na lista de acesso não basta: ao abrir o
+canal o site pede o código, e **ninguém entra sem ele, nem COMANDO nem ADMIN**.
+O código da categoria vale para todos os canais dentro dela; um canal com código
+próprio usa o seu, e não o da categoria.
+
+Canal e categoria travados aparecem com ⚿ dourado na barra lateral: a seção
+existe à vista de todos, mas só abre para quem tem o código. Acertando, a trava
+fica liberada **por aquela sessão** — igual ao login: sobrevive ao F5 e cai
+quando o navegador fecha. Enquanto não for liberada, o canal também não aparece
+na busca (Ctrl+F), para o trecho não entregar o que a trava esconde.
+
+Errando o código, **a tela treme**, sai o aviso vermelho *ACESSO NEGADO —
+SEÇÃO RESTRITA* e toca um alarme.
+
+Só o hash do código é guardado (bcrypt, tabelas `channel_locks` e
+`category_locks`), numa tabela que o site nunca lê: a conferência acontece no
+banco, por `verify_channel_code` / `verify_category_code`. Esqueceu o código?
+Abra o ⚙ e defina outro — não há como recuperar o antigo.
+
+> A trava é a porta da seção, desenhada para a mesa de RP. A parede continua
+> sendo a lista de acesso: o que o RLS não deixa o agente ler, ele não lê de
+> jeito nenhum.
+
 **Reordenar**: quem tem COMANDO arrasta os itens da barra lateral — dá para pôr
 uma categoria acima do `# geral`, mandar os canais individuais para baixo, mover
 um canal para dentro de uma categoria (soltando sobre o nome dela) ou reordenar
 os canais dentro dela. A ordem é a mesma para todo mundo. Como usa arrastar e
 soltar do navegador, funciona no computador, não no toque.
 
-Para **editar ou excluir**: o ✎ no topo do canal, e o ✎ ao lado do nome da
-categoria na barra lateral. Excluir um canal apaga junto as mensagens e os
+Para **configurar**: o ⚙ ao lado do nome do canal e do nome da categoria, na
+barra lateral (também o ✎ no topo do canal aberto). Ali ficam nome, assunto,
+categoria, **quem entra** (adicionar e remover agentes), a **trava de código** e
+o excluir. Como o ⚙ do canal está na barra, dá para mexer na trava de um canal
+sem precisar abri-lo. Excluir um canal apaga junto as mensagens e os
 dossiês dele. Excluir uma categoria **não** esconde os canais dentro dela: eles
-viram avulsos mantendo o mesmo acesso.
+viram avulsos mantendo o mesmo acesso — e, se a categoria estava travada, a
+trava dela some junto (os canais que tiverem trava própria seguem travados).
 
 ## Cores e configurações pessoais
 
@@ -151,7 +182,8 @@ do PDF. Os dois botões no rodapé da barra lateral ligam e desligam **♪ som**
   lenta e contínua. É uma camada sobreposta que não captura clique.
 - **Som** — estalo leve a cada tecla digitada (espaço mais grave, apagar mais
   abafado, afinação sorteada a cada toque), estalo firme ao enviar, bipe duplo
-  ao chegar transmissão, tom grave na falha, e um chiado de fundo em laço.
+  ao chegar transmissão, tom grave na falha, alarme de três batidas no acesso
+  negado, e um chiado de fundo em laço.
   Gerado na hora com Web Audio: nenhum arquivo, nenhuma requisição. O navegador
   só libera o áudio depois do primeiro clique ou tecla na página.
 - **Chuva de caracteres** — só na tela de acesso, a ~18 fps, pausada quando a
