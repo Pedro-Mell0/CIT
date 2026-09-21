@@ -1014,13 +1014,12 @@ function travaPendente(key) {
   return t && !mesmaTrava(t, liberada) ? t : null;
 }
 
-/** Glitch vermelho na tela, aviso piscando, alarme e a voz da sala. */
+/** Glitch vermelho na tela, aviso piscando e o alarme. */
 // A tela não treme mais: animar `transform` no <body> obrigava o navegador a
 // recompor a página inteira — chuva e CRT junto — e era de onde vinha o
 // engasgo. O glitch mexe só na opacidade de uma camada própria.
 function negaAcesso(aviso) {
   window.FX?.som.negado();
-  window.FX?.som.vozNegado();
   window.FX?.negaTela();
   aviso?.classList.remove('hide', 'nega');
   void aviso?.offsetWidth;                 // reinicia a animação em erros seguidos

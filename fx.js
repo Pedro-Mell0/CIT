@@ -47,28 +47,6 @@
       o.start(ini); o.stop(ini + dur + 0.02);
     };
 
-    /**
-     * A voz mais grave que o aparelho tiver em português. A lista costuma
-     * chegar vazia na primeira chamada e só depois do evento `voiceschanged`,
-     * por isso ela é pedida logo no carregamento e guardada aqui.
-     */
-    let vozesCarregadas = false, vozCache = null;
-    const vozGrave = () => {
-      const vozes = window.speechSynthesis?.getVoices?.() || [];
-      if (!vozes.length) return null;
-      vozesCarregadas = true;
-      if (vozCache && vozes.includes(vozCache)) return vozCache;
-      const pt = vozes.filter(v => /^pt/i.test(v.lang));
-      // as masculinas são as mais graves; sem elas, qualquer voz em português serve
-      vozCache = pt.find(v => /male|masculin|daniel|ricardo|felipe|antonio/i.test(v.name))
-              || pt[0] || vozes[0];
-      return vozCache;
-    };
-    try {
-      vozGrave();
-      window.speechSynthesis?.addEventListener?.('voiceschanged', vozGrave);
-    } catch {}
-
     const estalo = (ini, vol, corte, dec = 0.035) => {
       const n = ctx.createBufferSource(); n.buffer = ruido;
       const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = corte;
@@ -150,106 +128,47 @@
         tom(1975.5, t + 0.2, 0.26, 'sine', 0.045);        // brilho fechando
       },
 
-      /** acesso negado: duas batidas secas, à frente da voz, sem atropelá-la */
+      /**
+       * Acesso negado: um som só, sem voz nenhuma. Duas batidas secas na
+       * frente e, por baixo, uma buzina que despenca de tom — dois
+       * dentes-de-serra desafinados em meio tom passando por um anel de
+       * modulação a 41 Hz. A aspereza vem do batimento entre eles e do anel,
+       * não de ruído empilhado por cima. Meio segundo, começo ao fim.
+       */
       negado() {
         if (!on || !pronto()) return;
         const t = ctx.currentTime;
-        for (let i = 0; i < 2; i++) {
-          const ini = t + i * 0.1;
-          estalo(ini, 0.18, 900, 0.04);
-          tom(150, ini, 0.08, 'sawtooth', 0.13);
-          tom(98, ini + 0.015, 0.09, 'square', 0.1);
-        }
-      },
 
-      /**
-       * A sala diz "ACESSO NEGADO": seco, rápido e metálico.
-       *
-       * Uma fala só. Frases em pedaços separados entram na fila do navegador,
-       * e ele impõe a própria pausa entre um `speak()` e o seguinte — era
-       * dela o buraco entre "acesso" e "negado", não do código.
-       *
-       * O navegador também não devolve o áudio da fala para o Web Audio, então
-       * não há como filtrar a voz. O timbre cyberpunk vem de tocar por cima,
-       * no mesmo instante, uma cópia sintética da frase em formantes com
-       * modulação em anel: duas vozes quase juntas o ouvido funde numa só,
-       * processada. `onstart` é o que garante o "no mesmo instante" — a fala
-       * demora um tanto imprevisível para começar, e esperar por ela é mais
-       * barato que tentar adivinhar.
-       */
-      vozNegado() {
-        if (!on || !pronto()) return;
-        const fala = window.speechSynthesis;
-        const voz = fala ? vozGrave() : null;
-        if (!fala || typeof SpeechSynthesisUtterance !== 'function' || (!voz && !vozesCarregadas)) {
-          return this.vozSintetica();        // aparelho sem voz instalada
-        }
-
-        fala.cancel();                       // erros seguidos não empilham fala
-        const u = new SpeechSynthesisUtterance('acesso negado');
-        u.pitch = 0; u.rate = 1.15;          // o mais grave que a API aceita, e ligeiro
-        u.lang = voz?.lang || 'pt-BR';
-        if (voz) u.voice = voz;
-        let saiu = false;
-        u.onstart = () => { saiu = true; this.vozSintetica(0.55); };
-        fala.speak(u);
-        // se a fala não arrancar em 250 ms, a camada sintética vai sozinha e
-        // em volume cheio: melhor uma voz de máquina que silêncio nenhum
-        setTimeout(() => { if (!saiu) this.vozSintetica(); }, 250);
-      },
-
-      /**
-       * A frase em formantes: seis sílabas ("a-ces-so ne-ga-do") em meio
-       * segundo. Cada uma são dois dentes-de-serra desafinados passando por
-       * filtros de banda e por um anel de modulação a 47 Hz — é o anel que dá
-       * a aspereza de rádio velho. Serve de camada sob a voz do navegador e
-       * também sozinha, quando não há voz nenhuma no aparelho.
-       */
-      vozSintetica(vol = 1) {
-        if (!on || !pronto()) return;
-        const t = ctx.currentTime;
-        estalo(t, 0.16 * vol, 1600, 0.05);            // o "clique" de transmissão
-
-        // anel de modulação: uma fonte só, compartilhada por todas as sílabas
+        // anel de modulação: o oscilador é quem abre o ganho, do zero
         const anel = ctx.createGain();
-        anel.gain.value = 0;                           // o oscilador é quem abre
+        anel.gain.value = 0;
         const lfo = ctx.createOscillator(), lfoG = ctx.createGain();
-        lfo.type = 'square'; lfo.frequency.value = 47;
+        lfo.type = 'square'; lfo.frequency.value = 41;
         lfoG.gain.value = 1;
         lfo.connect(lfoG); lfoG.connect(anel.gain);
         anel.connect(master);
-        lfo.start(t); lfo.stop(t + 0.75);
+        lfo.start(t); lfo.stop(t + 0.52);
 
-        // [início, duração, formante grave, formante agudo]
-        const silabas = [
-          [0.00, 0.07, 720, 1240], [0.08, 0.06, 560, 1680], [0.15, 0.10, 440, 1020],
-          [0.28, 0.07, 640, 1760], [0.36, 0.06, 700, 1180], [0.43, 0.16, 400,  900],
-        ];
-        silabas.forEach(([off, dur, f1, f2]) => {
-          const ini = t + off;
-          [f1, f2].forEach((f, i) => {
-            const o = ctx.createOscillator(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
-            o.type = 'sawtooth';
-            o.frequency.setValueAtTime(i ? 84 : 78, ini);   // desafinados de propósito
-            bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 9;
-            g.gain.setValueAtTime(0.0001, ini);
-            g.gain.exponentialRampToValueAtTime((i ? 0.1 : 0.15) * vol, ini + 0.012);
-            g.gain.exponentialRampToValueAtTime(0.0001, ini + dur);
-            o.connect(bp); bp.connect(g); g.connect(anel);
-            o.start(ini); o.stop(ini + dur + 0.02);
-          });
+        // a buzina caindo
+        [1, 1.031].forEach((desafina, i) => {
+          const o = ctx.createOscillator(), g = ctx.createGain();
+          o.type = 'sawtooth';
+          o.frequency.setValueAtTime(210 * desafina, t);
+          o.frequency.exponentialRampToValueAtTime(74 * desafina, t + 0.42);
+          g.gain.setValueAtTime(0.0001, t);
+          g.gain.exponentialRampToValueAtTime(i ? 0.09 : 0.13, t + 0.015);
+          g.gain.exponentialRampToValueAtTime(0.0001, t + 0.46);
+          o.connect(g); g.connect(anel);
+          o.start(t); o.stop(t + 0.5);
         });
 
-        // zumbido curto caindo de tom, fechando a frase
-        const o = ctx.createOscillator(), g = ctx.createGain();
-        o.type = 'sawtooth';
-        o.frequency.setValueAtTime(62, t);
-        o.frequency.linearRampToValueAtTime(38, t + 0.6);
-        g.gain.setValueAtTime(0.0001, t);
-        g.gain.exponentialRampToValueAtTime(0.05 * vol, t + 0.03);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.62);
-        o.connect(g); g.connect(master);
-        o.start(t); o.stop(t + 0.65);
+        // as batidas, para o golpe chegar antes da queda
+        for (let i = 0; i < 2; i++) {
+          const ini = t + i * 0.1;
+          estalo(ini, 0.2, 900, 0.04);
+          tom(98, ini, 0.09, 'square', 0.11);
+        }
+        tom(52, t + 0.06, 0.34, 'sine', 0.12);      // sub grave fechando
       },
 
       /** chiado grave de fundo, em laço */
