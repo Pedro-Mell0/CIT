@@ -258,6 +258,17 @@ body.dragging-v #msg-grip{background:linear-gradient(180deg,transparent 2px,var(
   background:#ff5c8a12;text-shadow:0 0 14px #ff5c8a99;box-shadow:inset 0 0 26px #ff5c8a22}
 .lock-err.nega{animation:nega-pisca .14s steps(1) 3}
 @keyframes nega-pisca{0%,100%{opacity:1}50%{opacity:.2}}
+/* o selo verde do acerto: as letras chegam espalhadas e se juntam, como um
+   terminal travando o registro antes de liberar a porta */
+.lock-ok{color:var(--live);font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:.9rem;
+  letter-spacing:.14em;text-align:center;padding:.6rem;border:1px solid var(--live);
+  background:#37ff8b12;text-shadow:0 0 14px #37ff8b99;box-shadow:inset 0 0 26px #37ff8b22;
+  animation:ok-entra .34s ease-out}
+@keyframes ok-entra{
+  0%{opacity:0;letter-spacing:.55em}
+  40%{opacity:1}
+  100%{opacity:1;letter-spacing:.14em}
+}
 /* Glitch vermelho quando o código sai errado.
    A camada fica na tela o tempo todo, invisível e promovida para a GPU: a
    animação mexe só em `opacity`, que o compositor resolve sozinho, sem

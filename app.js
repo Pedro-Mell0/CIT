@@ -1027,6 +1027,22 @@ function negaAcesso(aviso) {
   aviso?.classList.add('nega');
 }
 
+/**
+ * Código aceito: a sala confirma antes de abrir. O selo verde fica um tempo
+ * curto na tela e só depois o canal entra — abrir no mesmo instante engolia a
+ * confirmação, e sem ela o acerto passava despercebido no meio do escuro.
+ */
+const PAUSA_OK = 750;
+function permiteAcesso(m, inp, go, cancel, aviso, segue) {
+  [inp, go, cancel].forEach(e => e.disabled = true);   // nada de segundo envio
+  aviso.classList.add('hide');
+  const selo = el('p', 'lock-ok', 'ACESSO PERMITIDO');
+  selo.setAttribute('role', 'status');
+  m.body.append(selo);
+  window.FX?.som.permitido();
+  setTimeout(() => { segue(); m.close(); }, PAUSA_OK);
+}
+
 function pedeCodigo(trava) {
   return new Promise(resolve => {
     let respondeu = false;
@@ -1053,11 +1069,7 @@ function pedeCodigo(trava) {
         ? await sb.rpc('verify_category_code', { cat: trava.id, code: inp.value })
         : await sb.rpc('verify_channel_code', { cid: trava.id, code: inp.value });
       go.disabled = false;
-      if (!error && data === true) {
-        fim(true);                         // quem libera é o openChannel
-        m.close();
-        return;
-      }
+      if (!error && data === true) return permiteAcesso(m, inp, go, cancel, aviso, () => fim(true));
       negaAcesso(aviso);
       inp.value = '';
       inp.focus();

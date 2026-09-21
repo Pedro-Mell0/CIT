@@ -135,6 +135,21 @@
         tom(140, t + 0.1, 0.16, 'sawtooth', 0.07);
       },
 
+      /**
+       * Acesso liberado: três tons subindo, limpos e curtos. É o contrário
+       * exato do alarme — onde o negado usa dente-de-serra grave e ruído, aqui
+       * é triângulo agudo e nenhuma estática, para o acerto soar como
+       * fechadura abrindo e não como mais um aviso.
+       */
+      permitido() {
+        if (!on || !pronto()) return;
+        const t = ctx.currentTime;
+        estalo(t, 0.07, 3200, 0.02);                      // o destravar
+        [[523.25, 0], [659.25, 0.07], [987.77, 0.14]]     // dó, mi, si
+          .forEach(([f, off]) => tom(f, t + off, 0.15, 'triangle', 0.1));
+        tom(1975.5, t + 0.2, 0.26, 'sine', 0.045);        // brilho fechando
+      },
+
       /** acesso negado: duas batidas secas, à frente da voz, sem atropelá-la */
       negado() {
         if (!on || !pronto()) return;
