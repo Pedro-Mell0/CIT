@@ -262,8 +262,7 @@
     const rpc = tipo === 'cat' ? 'set_category_lock' : 'set_channel_lock';
     const args = tipo === 'cat' ? { cat: id } : { cid: id };
     const { error } = await sb.rpc(rpc, { ...args, code: lv.tirar ? null : lv.code });
-    // quem definiu o código já sabe qual é: não precisa digitá-lo em seguida
-    if (!error && !lv.tirar) window.LOCKS?.libera?.(tipo, id);
+    // sem atalho para quem definiu o código: ao entrar, digita como todo mundo
     return error;
   }
 

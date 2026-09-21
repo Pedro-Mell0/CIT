@@ -47,6 +47,28 @@
       o.start(ini); o.stop(ini + dur + 0.02);
     };
 
+    /**
+     * A voz mais grave que o aparelho tiver em português. A lista costuma
+     * chegar vazia na primeira chamada e só depois do evento `voiceschanged`,
+     * por isso ela é pedida logo no carregamento e guardada aqui.
+     */
+    let vozesCarregadas = false, vozCache = null;
+    const vozGrave = () => {
+      const vozes = window.speechSynthesis?.getVoices?.() || [];
+      if (!vozes.length) return null;
+      vozesCarregadas = true;
+      if (vozCache && vozes.includes(vozCache)) return vozCache;
+      const pt = vozes.filter(v => /^pt/i.test(v.lang));
+      // as masculinas são as mais graves; sem elas, qualquer voz em português serve
+      vozCache = pt.find(v => /male|masculin|daniel|ricardo|felipe|antonio/i.test(v.name))
+              || pt[0] || vozes[0];
+      return vozCache;
+    };
+    try {
+      vozGrave();
+      window.speechSynthesis?.addEventListener?.('voiceschanged', vozGrave);
+    } catch {}
+
     const estalo = (ini, vol, corte, dec = 0.035) => {
       const n = ctx.createBufferSource(); n.buffer = ruido;
       const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = corte;
@@ -123,6 +145,83 @@
           tom(150, ini, 0.13, 'sawtooth', 0.13);
           tom(98, ini + 0.02, 0.15, 'square', 0.1);
         }
+      },
+
+      /**
+       * A sala diz "ACESSO NEGADO" — grave, arrastado e partido ao meio.
+       * A voz do navegador não pode ser ligada ao Web Audio (nenhum navegador
+       * entrega esse áudio de volta), então o lado robótico não vem de filtro:
+       * vem de falar no tom mais grave possível, devagar, em pedaços separados
+       * — o corte entre eles é o "glitch" — com estática e um zumbido de
+       * modulação por cima, sintetizados aqui e sincronizados com a fala.
+       */
+      vozNegado() {
+        if (!on) return;
+        this.estatica();
+        const fala = window.speechSynthesis;
+        if (!fala || typeof SpeechSynthesisUtterance !== 'function') return this.vocoder();
+
+        fala.cancel();                       // erros seguidos não empilham fala
+        const voz = vozGrave();
+        if (!voz && !vozesCarregadas) return this.vocoder();
+
+        // pitch 0 é o mais grave que a API aceita; cada pedaço sai num ritmo
+        // um pouco diferente, o que tira a naturalidade da frase
+        [['acesso', 0.62, 1], ['negado', 0.52, 1], ['negado', 1.45, 0.3]]
+          .forEach(([texto, rate, vol]) => {
+            const u = new SpeechSynthesisUtterance(texto);
+            u.pitch = 0; u.rate = rate; u.volume = vol;
+            u.lang = voz?.lang || 'pt-BR';
+            if (voz) u.voice = voz;
+            fala.speak(u);
+          });
+      },
+
+      /** Estática e zumbido que acompanham a voz, para ela soar transmitida. */
+      estatica() {
+        if (!on || !pronto()) return;
+        const t = ctx.currentTime;
+        for (let i = 0; i < 5; i++) estalo(t + i * 0.19 + Math.random() * 0.05, 0.1, 1800, 0.04);
+        // zumbido que desafina para baixo: o "sistema" reclamando
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(58, t);
+        o.frequency.linearRampToValueAtTime(41, t + 1.1);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.055, t + 0.05);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 1.15);
+        o.connect(g); g.connect(master);
+        o.start(t); o.stop(t + 1.2);
+      },
+
+      /**
+       * Quando não há voz no aparelho: a mesma frase em formantes, sem palavra
+       * nenhuma. São seis sílabas ("a-ces-so ne-ga-do") tocadas por dois
+       * dentes-de-serra desafinados passando por filtros de banda — não se
+       * entende, mas se reconhece que uma máquina tentou falar.
+       */
+      vocoder() {
+        if (!on || !pronto()) return;
+        const t = ctx.currentTime;
+        // [início, duração, formante grave, formante agudo]
+        const silabas = [
+          [0.00, 0.13, 720, 1240], [0.15, 0.12, 560, 1680], [0.29, 0.17, 440, 1020],
+          [0.54, 0.13, 640, 1760], [0.69, 0.12, 700, 1180], [0.83, 0.26, 420,  920],
+        ];
+        silabas.forEach(([off, dur, f1, f2]) => {
+          const ini = t + off;
+          [f1, f2].forEach((f, i) => {
+            const o = ctx.createOscillator(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
+            o.type = 'sawtooth';
+            o.frequency.setValueAtTime(i ? 84 : 78, ini);   // desafinados de propósito
+            bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 7;
+            g.gain.setValueAtTime(0.0001, ini);
+            g.gain.exponentialRampToValueAtTime(i ? 0.09 : 0.14, ini + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.0001, ini + dur);
+            o.connect(bp); bp.connect(g); g.connect(master);
+            o.start(ini); o.stop(ini + dur + 0.02);
+          });
+        });
       },
 
       /** chiado grave de fundo, em laço */
@@ -342,8 +441,28 @@
     }
   }
 
+  // ========================================================= tela negada
+  /**
+   * A tela inteira pisca em vermelho. A camada é criada uma vez e fica
+   * inerte; reiniciar a animação exige tirar a classe, forçar o navegador a
+   * recalcular o estilo e pôr de volta — sem isso, dois erros seguidos só
+   * animariam o primeiro.
+   */
+  let flash;
+  function negaTela() {
+    if (!flash) {
+      flash = document.createElement('div');
+      flash.id = 'nega-flash';
+      flash.setAttribute('aria-hidden', 'true');
+      document.body.append(flash);
+    }
+    flash.classList.remove('on');
+    void flash.offsetWidth;
+    flash.classList.add('on');
+  }
+
   hud(); cursor(); botoes();
   const rain = chuva();
 
-  window.FX = { decodifica, bootLine, som: SFX, rain };
+  window.FX = { decodifica, bootLine, som: SFX, rain, negaTela };
 })();

@@ -275,8 +275,8 @@ function linhaCanal(box, c, cls) {
   const b = navBtn(row, 'chan:' + c.id, c.name, trava ? '⚿' : '#', 'ch-nav' + (cls ? ' ' + cls : ''));
   if (trava) {
     b.querySelector('.ic')?.classList.add('trava');
-    b.title = destravado[trava.tipo].has(trava.id)
-      ? 'Trava liberada nesta sessão'
+    b.title = mesmaTrava(trava, liberada)
+      ? 'Trava liberada enquanto você estiver aqui'
       : 'Exige código de acesso' + (trava.tipo === 'cat' ? ` (da categoria ${trava.nome})` : '');
   }
   armaCanal(b, c);
@@ -356,8 +356,8 @@ function drawChannels() {
       const head = grupoHead(cat.id, cat.name, dentro.length, dentro.map(c => 'chan:' + c.id));
       if (cat.locked) {
         const marca = el('span', 'trava', '⚿');
-        marca.title = destravado.cat.has(cat.id)
-          ? 'Trava liberada nesta sessão'
+        marca.title = mesmaTrava({ tipo: 'cat', id: cat.id }, liberada)
+          ? 'Trava liberada enquanto você estiver aqui'
           : 'Categoria travada: exige código de acesso';
         head.querySelector('.cat-nm')?.before(marca);
       }
@@ -985,16 +985,16 @@ function ordenaCols(mover, alvo, antes) {
 
 // ---------- trava de acesso por código ----------
 // Camada por cima da lista de membros: onde há trava, só entra quem digitar o
-// código, seja AGENTE, COMANDO ou ADMIN. O que foi destravado vale pela sessão,
-// como o login: sobrevive ao F5 e cai quando o navegador fecha.
-const destravado = {
-  chan: new Set(JSON.parse(authStore.getItem('cit.destravado.chan') || '[]')),
-  cat: new Set(JSON.parse(authStore.getItem('cit.destravado.cat') || '[]')),
-};
-const salvaDestravado = () => {
-  authStore.setItem('cit.destravado.chan', JSON.stringify([...destravado.chan]));
-  authStore.setItem('cit.destravado.cat', JSON.stringify([...destravado.cat]));
-};
+// código, seja AGENTE, COMANDO ou ADMIN — inclusive quem acabou de definir o
+// código. A liberação vale só enquanto a seção fica aberta e mora apenas na
+// memória: sair dela, recarregar, abrir outra aba ou trocar de conta faz o
+// código ser pedido de novo.
+let liberada = null;                    // { tipo, id } da seção aberta agora
+// versões anteriores guardavam as liberações entre recargas
+try { authStore.removeItem('cit.destravado.chan'); authStore.removeItem('cit.destravado.cat'); } catch {}
+
+/** Mesma seção travada? */
+const mesmaTrava = (a, b) => !!a && !!b && a.tipo === b.tipo && a.id === b.id;
 
 /** Quem manda na trava de um canal: ele mesmo, a categoria onde está, ou nada. */
 // A trava da categoria vale para tudo que está dentro dela, mesmo para os
@@ -1007,22 +1007,18 @@ function travaDoCanal(c) {
   return null;
 }
 
-/** A trava que ainda barra este canal nesta sessão, se houver. */
+/** A trava que ainda barra este canal agora, se houver. */
 function travaPendente(key) {
   if (typeof key !== 'string' || !key.startsWith('chan:')) return null;
   const t = travaDoCanal(chans[key.slice(5)]);
-  return t && !destravado[t.tipo].has(t.id) ? t : null;
+  return t && !mesmaTrava(t, liberada) ? t : null;
 }
 
-/** Libera sem perguntar: quem acabou de definir o código já sabe qual é. */
-function liberaTrava(tipo, id) {
-  destravado[tipo].add(id);
-  salvaDestravado();
-}
-
-/** Tela treme, aviso vermelho e alarme. */
+/** Tela pisca em vermelho e treme, aviso vermelho, alarme e a voz da sala. */
 function negaAcesso(aviso) {
   window.FX?.som.negado();
+  window.FX?.som.vozNegado();
+  window.FX?.negaTela();
   aviso?.classList.remove('hide', 'nega');
   document.body.classList.remove('nega-tela');
   void document.body.offsetWidth;          // reinicia a animação em erros seguidos
@@ -1058,8 +1054,7 @@ function pedeCodigo(trava) {
         : await sb.rpc('verify_channel_code', { cid: trava.id, code: inp.value });
       go.disabled = false;
       if (!error && data === true) {
-        liberaTrava(trava.tipo, trava.id);
-        fim(true);
+        fim(true);                         // quem libera é o openChannel
         m.close();
         return;
       }
@@ -1072,14 +1067,18 @@ function pedeCodigo(trava) {
   });
 }
 
-window.LOCKS = { travaPendente, libera: liberaTrava };
+window.LOCKS = { travaPendente };
 
 // ---------- abrir canal ----------
 let loadToken = 0;
 
 async function openChannel(key, jumpTo) {
-  const trava = travaPendente(key);
-  if (trava && !await pedeCodigo(trava)) return;
+  // Entrar numa seção travada pede o código toda vez. A liberação só é
+  // trocada depois que o código passa: quem desiste no meio continua onde
+  // estava, sem perder a seção que já tinha aberto.
+  const alvo = key.startsWith('chan:') ? travaDoCanal(chans[key.slice(5)]) : null;
+  if (alvo && !mesmaTrava(alvo, liberada) && !await pedeCodigo(alvo)) return;
+  liberada = alvo;
   chan = key;
   const info = chanInfo(key);
   window.FX?.decodifica($('#ch-title'), info.label, 380);
