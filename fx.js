@@ -434,25 +434,12 @@
 
   // ========================================================= 🐧
   // Três cliques seguidos na coruja e a sala desliga para o pinguim dançar.
-  // O desenho é montado aqui, inteiro, e não por <use> como a coruja: o <use>
-  // cria uma árvore-sombra, e folha de estilo de fora não alcança o que está
-  // lá dentro — as asas e os pés nunca se mexeriam.
-  const PINGUIM = `
-  <svg class="peng" viewBox="0 0 64 64" aria-hidden="true">
-    <g class="p-asa p-asa-e"><path d="M18 24C11 27 7 34 8 42c1 4 5 4 7 0 2-5 3-12 3-18Z"/></g>
-    <g class="p-asa p-asa-d"><path d="M46 24c7 3 11 10 10 18-1 4-5 4-7 0-2-5-3-12-3-18Z"/></g>
-    <g class="p-pe p-pe-e"><path d="M24 55c-4 1-6 5-2 6h8c2-2 0-6-3-6Z"/></g>
-    <g class="p-pe p-pe-d"><path d="M40 55c4 1 6 5 2 6h-8c-2-2 0-6 3-6Z"/></g>
-    <path class="p-corpo" d="M32 3c-5 4-10 9-13 16-3 8-4 18-2 26 2 7 8 12 15 12s13-5 15-12c2-8 1-18-2-26-3-7-8-12-13-16Z"/>
-    <ellipse class="p-barriga" cx="32" cy="40" rx="10" ry="12"/>
-    <ellipse class="p-olho" cx="26" cy="22" rx="3.6" ry="4.6"/>
-    <ellipse class="p-olho" cx="38" cy="22" rx="3.6" ry="4.6"/>
-    <circle class="p-pupila" cx="26.8" cy="22.6" r="1.9"/>
-    <circle class="p-pupila" cx="38.8" cy="22.6" r="1.9"/>
-    <path class="p-bico" d="M27 29h10l-5 6z"/>
-  </svg>`;
-
-  const DANCA = 5200;        // quanto tempo ele dança, em ms
+  // A dança é o GIF original, não um desenho imitando: passo, tempo e jeito
+  // são dele. O que muda é a cor — um filtro leva o azul para o ciano da casa
+  // e acende o contorno, para ele pertencer a esta tela.
+  // O laço do GIF tem 7,80 s (78 quadros de 10 cs). A tela fecha exatamente
+  // nesse tempo: a dança termina inteira, uma vez, e nada se repete pela metade.
+  const DANCA = 7800;
   let dancando = false;
 
   function pinguim() {
@@ -461,13 +448,17 @@
     const tela = document.createElement('div');
     tela.id = 'egg';
     tela.setAttribute('aria-hidden', 'true');
-    tela.innerHTML = PINGUIM;
+    // o <img> nasce agora, e não fica guardado, para o GIF começar do quadro 1
+    const img = document.createElement('img');
+    img.className = 'peng';
+    img.alt = '';
+    img.src = 'files/pinguim.gif';
+    tela.append(img);
     document.body.append(tela);
     void tela.offsetWidth;                    // deixa o fade de entrada pegar
     tela.classList.add('on');
     SFX.dancinha(DANCA / 1000);
 
-    setTimeout(() => tela.classList.add('fim'), DANCA - 700);   // rodopio final
     setTimeout(() => tela.classList.remove('on'), DANCA);
     setTimeout(() => { tela.remove(); dancando = false; }, DANCA + 450);
   }
