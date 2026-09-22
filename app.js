@@ -1133,7 +1133,8 @@ async function openChannel(key, jumpTo) {
   if (token !== loadToken) return;
 
   if (!data?.length) box.innerHTML = EMPTY_CH;
-  data?.forEach(m => addMsg(m, true));
+  const total = data?.length || 0;
+  data?.forEach((m, i) => addMsg(m, true, total - 1 - i));
   box.scrollTop = box.scrollHeight;
 
   if (jumpTo?.id) {
@@ -1179,15 +1180,29 @@ function buildMsg(m) {
   return wrap;
 }
 
-function addMsg(m, bulk) {
+// Ao abrir um canal chegam até trezentas mensagens de uma vez. Animar todas
+// juntas era o engasgo da troca de canal, mas cortar o fade inteiro tirou o
+// charme. O meio-termo: só as últimas entram — são as que ficam na tela depois
+// da rolagem automática, e animar o que ninguém vê é trabalho jogado fora — e
+// entram em escada, com um atraso curto entre elas. Assim o pico cai de
+// trezentas animações simultâneas para meia dúzia, e ainda lê melhor: o canal
+// se preenche de cima para baixo em vez de piscar inteiro.
+const FADE_BULK = 10;    // quantas das últimas ainda entram com fade
+const FADE_PASSO = 28;   // ms entre uma e a seguinte
+
+function addMsg(m, bulk, daPonta) {
   const box = $('#msgs');
   box.querySelector('.empty')?.remove();
   if (msgEls.has(String(m.id))) return;
   const node = buildMsg(m);
-  // Ao abrir um canal as mensagens entram todas de uma vez; animar as trinta
-  // juntas é justamente o engasgo de quem troca de canal. A entrada em fade
-  // fica para as mensagens que chegam depois, uma a uma.
-  if (bulk) node.classList.add('sem-anim');
+  if (bulk) {
+    if (daPonta != null && daPonta < FADE_BULK) {
+      node.classList.add('escalona');
+      node.style.animationDelay = (FADE_BULK - 1 - daPonta) * FADE_PASSO + 'ms';
+    } else {
+      node.classList.add('sem-anim');
+    }
+  }
   msgEls.set(String(m.id), node);
   const near = box.scrollHeight - box.scrollTop - box.clientHeight < 140 || m.author_id === me.id;
   box.append(node);

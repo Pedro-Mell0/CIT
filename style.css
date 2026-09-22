@@ -119,6 +119,10 @@ header .tools .ghost{padding:.4rem .6rem}
 .m{max-width:80ch;word-break:break-word;animation:in .18s ease-out;border-radius:2px;padding:.1rem .3rem;margin:0 -.3rem}
 @keyframes in{from{opacity:0;transform:translateY(4px)}}
 .m.sem-anim{animation:none}
+/* `backwards` é o que faz a escada funcionar: sem ele a mensagem fica visível
+   durante o próprio atraso e só então some para reaparecer — um piscada feia.
+   Com ele, ela já espera invisível a vez de entrar. */
+.m.escalona{animation-fill-mode:backwards}
 .m .head{display:flex;align-items:baseline;gap:.35rem;flex-wrap:wrap}
 .m .who{font-weight:600}
 .m time{color:var(--dim);font-size:.7rem}
