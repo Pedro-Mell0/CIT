@@ -684,3 +684,47 @@ mark{background:#45e3ff33;color:var(--cyan);padding:0 .1rem}
   #print-root .anexo img{height:auto;object-fit:contain}
   #print-root .anexo-grade{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
 }
+
+/* ---------- 🐧 ---------- */
+/* Três cliques na coruja e a sala apaga para o pinguim dançar.
+   A tela fica acima de tudo, inclusive do CRT e das listras, para o preto
+   ser preto de verdade. */
+#egg{position:fixed;inset:0;z-index:2000;background:#000;display:grid;place-items:center;
+  opacity:0;pointer-events:none;transition:opacity .38s ease-out}
+#egg.on{opacity:1}
+#egg .peng{width:min(44vh,300px);height:min(44vh,300px);color:var(--cyan);
+  fill:none;stroke:currentColor;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round;
+  filter:drop-shadow(0 0 10px var(--cyan)) drop-shadow(0 0 28px #45e3ff55);
+  animation:peng-gingado .52s ease-in-out infinite}
+#egg .p-pupila,#egg .p-bico{fill:currentColor;stroke:none}
+
+/* `view-box` faz o transform-origin ser lido nas coordenadas do desenho, e não
+   na caixa de cada peça — sem isso a asa giraria pelo próprio meio, solta do
+   ombro, em vez de bater a partir dele. */
+#egg .p-asa,#egg .p-pe{transform-box:view-box}
+#egg .p-asa-e{transform-origin:18px 25px;animation:peng-asa-e .52s ease-in-out infinite}
+#egg .p-asa-d{transform-origin:46px 25px;animation:peng-asa-d .52s ease-in-out infinite}
+#egg .p-pe-e{transform-origin:26px 56px;animation:peng-pe-e .52s ease-in-out infinite}
+#egg .p-pe-d{transform-origin:38px 56px;animation:peng-pe-d .52s ease-in-out infinite}
+
+@keyframes peng-gingado{
+  0%,100%{transform:translateY(0) rotate(0)}
+  25%{transform:translateY(-9px) rotate(-7deg)}
+  50%{transform:translateY(0) rotate(0)}
+  75%{transform:translateY(-9px) rotate(7deg)}
+}
+@keyframes peng-asa-e{0%,100%{transform:rotate(4deg)}50%{transform:rotate(-42deg)}}
+@keyframes peng-asa-d{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(42deg)}}
+@keyframes peng-pe-e{0%,100%{transform:translate(0,0)}50%{transform:translate(-3px,-2px)}}
+@keyframes peng-pe-d{0%,100%{transform:translate(0,0)}50%{transform:translate(3px,-2px)}}
+
+/* rodopio de despedida: assume o controle e encerra parado, de frente */
+#egg.fim .peng{animation:peng-rodopio .7s ease-in-out forwards}
+@keyframes peng-rodopio{
+  0%{transform:rotate(0) scale(1)}
+  60%{transform:rotate(360deg) scale(1.12)}
+  100%{transform:rotate(360deg) scale(1)}
+}
+@media(prefers-reduced-motion:reduce){
+  #egg .peng,#egg .p-asa,#egg .p-pe,#egg.fim .peng{animation:none}
+}
