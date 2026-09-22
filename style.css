@@ -241,7 +241,15 @@ body.dragging-v #msg-grip{background:linear-gradient(180deg,transparent 2px,var(
 .op-entry .op-block{border-left-color:var(--blue);background:none;padding:.3rem 0;border-top:0;border-right:0;border-bottom:0;border-left-width:2px;padding-left:.6rem}
 
 /* ---------- janelas ---------- */
-#modal{position:fixed;inset:0;z-index:50;background:#02010988;backdrop-filter:blur(3px);display:grid;place-items:center;padding:1rem}
+/* Sem `backdrop-filter`. Ele estava aqui, e como esta camada é `inset:0` o
+   desfoque valia para a tela inteira — não para a caixa. Refazer um borrão de
+   tela cheia é dos trabalhos mais caros que se pode pedir a um navegador, e
+   ele era refeito a cada repintura da janela: cada ponto digitado no campo de
+   senha, cada quadro do selo entrando, cada piscada do aviso vermelho. Era daí
+   o travamento na janela do código de acesso.
+   O fundo escurece mais para compensar: o que se queria era esconder o que
+   está atrás, e escurecer esconde igual sem custar quadro. */
+#modal{position:fixed;inset:0;z-index:50;background:#020109e0;display:grid;place-items:center;padding:1rem}
 .modal-box{width:min(620px,100%);max-height:88vh;display:flex;flex-direction:column;background:#0a0620;border:1px solid var(--line);box-shadow:0 0 60px #6a3cff44;position:relative}
 .modal-box::before{content:"";position:absolute;inset:-1px;border:1px solid var(--cyan);clip-path:polygon(0 0,22px 0,0 22px);pointer-events:none}
 .modal-box>header{justify-content:space-between}
@@ -324,7 +332,8 @@ body.dragging-v #msg-grip{background:linear-gradient(180deg,transparent 2px,var(
 .badge.r-agent{border-color:var(--violet);color:var(--violet)}
 
 /* ---------- busca ---------- */
-#find{position:fixed;inset:0;z-index:60;background:#02010999;backdrop-filter:blur(3px);padding:6vh 1rem 1rem;display:flex;justify-content:center}
+/* mesmo motivo do #modal: a busca também filtra enquanto se digita */
+#find{position:fixed;inset:0;z-index:60;background:#020109e6;padding:6vh 1rem 1rem;display:flex;justify-content:center}
 .find-box{width:min(760px,100%);max-height:86vh;display:flex;flex-direction:column;background:#0a0620;border:1px solid var(--line);box-shadow:0 0 60px #6a3cff44}
 .find-top{display:flex;align-items:center;gap:.6rem;padding:.7rem .9rem;border-bottom:1px solid var(--line)}
 .find-ico{color:var(--cyan);font-size:1.1rem}
@@ -463,12 +472,9 @@ mark{background:#45e3ff33;color:var(--cyan);padding:0 .1rem}
    site dentro do jogo, onde navegador e jogo dividem a mesma GPU.
    - as listras de tubo saem (camada de tela cheia misturada sobre tudo)
    - a chuva de caracteres para (tela cheia redesenhada 18 vezes por segundo)
-   - o desfoque atrás das janelas sai: `backdrop-filter` é dos efeitos mais
-     caros que existem, porque refaz o borrão de tudo que está atrás sempre
-     que qualquer coisa muda — inclusive a cada tecla digitada na janela. */
+   O desfoque das janelas saiu de vez, para todo mundo: ver o #modal. */
 :root.no-crt body::after{content:none}
 :root.no-crt #rain{display:none}
-:root.no-crt #modal,:root.no-crt #find{backdrop-filter:none}
 @media(prefers-reduced-motion:reduce){body::after{content:none}}
 
 /* ---------- chuva de caracteres ---------- */
