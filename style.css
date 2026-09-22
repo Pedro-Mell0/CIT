@@ -6,7 +6,11 @@
 *{box-sizing:border-box;margin:0}
 html,body{height:100%}
 body{background:radial-gradient(900px 500px at 15% -10%,#2a1a6e55,transparent),radial-gradient(700px 500px at 100% 100%,#0f3a8a44,transparent),var(--void);color:var(--text,#d8d5ff);font:14px/1.5 'JetBrains Mono',monospace}
-body::after{content:"";position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,#0000 0 3px,#0006 3px 4px);opacity:.35;z-index:99}
+/* As listras de tubo cobrem a tela inteira por cima de tudo. `translateZ(0)`
+   promove a camada para a GPU: assim o degradê é rasterizado uma vez e
+   reaproveitado, em vez de ser remisturado a cada repintura embaixo dele —
+   que, com a lista de mensagens rolando, é a toda hora. */
+body::after{content:"";position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,#0000 0 3px,#0006 3px 4px);opacity:.35;z-index:99;will-change:transform;transform:translateZ(0)}
 body.dragging{cursor:col-resize;user-select:none}
 /* barras de rolagem no tom da interface: continuam rolando, só deixam de ser brancas */
 *{scrollbar-width:thin;scrollbar-color:var(--line) transparent}
@@ -114,6 +118,7 @@ header .tools .ghost{padding:.4rem .6rem}
 /* ---------- mensagens ---------- */
 .m{max-width:80ch;word-break:break-word;animation:in .18s ease-out;border-radius:2px;padding:.1rem .3rem;margin:0 -.3rem}
 @keyframes in{from{opacity:0;transform:translateY(4px)}}
+.m.sem-anim{animation:none}
 .m .head{display:flex;align-items:baseline;gap:.35rem;flex-wrap:wrap}
 .m .who{font-weight:600}
 .m time{color:var(--dim);font-size:.7rem}
@@ -399,13 +404,17 @@ mark{background:#45e3ff33;color:var(--cyan);padding:0 .1rem}
 
 /* ---------- ruído de CRT ---------- */
 /* Camada puramente decorativa: fixa, sem captar clique, acima de tudo. */
-#crt{position:fixed;inset:0;pointer-events:none;z-index:100;overflow:hidden}
+/* `contain` prende layout, pintura e estilo aqui dentro: o que acontece nesta
+   camada nunca obriga o resto da página a ser recalculado. */
+#crt{position:fixed;inset:0;pointer-events:none;z-index:100;overflow:hidden;contain:layout paint style}
 :root.no-crt #crt{display:none}
 
-/* varredura lenta e contínua, como o feixe de um tubo antigo */
+/* varredura lenta e contínua, como o feixe de um tubo antigo.
+   É a única animação que roda o tempo todo, então precisa ser só `transform`
+   e ter camada própria — senão o navegador repinta a faixa a cada quadro. */
 .crt-scan{position:absolute;left:0;right:0;height:38vh;
   background:linear-gradient(180deg,transparent,#45e3ff08 35%,#9b5cff12 50%,#45e3ff08 65%,transparent);
-  animation:crt-sweep 9s linear infinite}
+  animation:crt-sweep 9s linear infinite;will-change:transform}
 @keyframes crt-sweep{from{transform:translateY(-40vh)}to{transform:translateY(105vh)}}
 
 /* lavada de luz da "vacilada" */
@@ -443,6 +452,20 @@ mark{background:#45e3ff33;color:var(--cyan);padding:0 .1rem}
 
 @media print{#crt{display:none!important}}
 @media(prefers-reduced-motion:reduce){#crt{display:none!important}}
+
+/* ---------- modo leve ---------- */
+/* O botão ⏹ não desliga só a "vacilada": ele derruba tudo que custa quadro o
+   tempo todo. Serve para máquina fraca e, principalmente, para quem abre o
+   site dentro do jogo, onde navegador e jogo dividem a mesma GPU.
+   - as listras de tubo saem (camada de tela cheia misturada sobre tudo)
+   - a chuva de caracteres para (tela cheia redesenhada 18 vezes por segundo)
+   - o desfoque atrás das janelas sai: `backdrop-filter` é dos efeitos mais
+     caros que existem, porque refaz o borrão de tudo que está atrás sempre
+     que qualquer coisa muda — inclusive a cada tecla digitada na janela. */
+:root.no-crt body::after{content:none}
+:root.no-crt #rain{display:none}
+:root.no-crt #modal,:root.no-crt #find{backdrop-filter:none}
+@media(prefers-reduced-motion:reduce){body::after{content:none}}
 
 /* ---------- chuva de caracteres ---------- */
 /* z-index negativo: fica acima do fundo do body e atrás de todo o conteúdo */

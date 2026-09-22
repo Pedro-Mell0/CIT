@@ -1184,6 +1184,10 @@ function addMsg(m, bulk) {
   box.querySelector('.empty')?.remove();
   if (msgEls.has(String(m.id))) return;
   const node = buildMsg(m);
+  // Ao abrir um canal as mensagens entram todas de uma vez; animar as trinta
+  // juntas é justamente o engasgo de quem troca de canal. A entrada em fade
+  // fica para as mensagens que chegam depois, uma a uma.
+  if (bulk) node.classList.add('sem-anim');
   msgEls.set(String(m.id), node);
   const near = box.scrollHeight - box.scrollTop - box.clientHeight < 140 || m.author_id === me.id;
   box.append(node);
@@ -1265,11 +1269,26 @@ async function send() {
 // usuário arrastar. Duplo clique na alça volta para o automático.
 let msgH = +localStorage.getItem('cit.msgh') || 0;
 
+// Auto-altura do campo de transmissão. Ler `scrollHeight` logo depois de
+// escrever `height:auto` obriga o navegador a refazer o layout ali mesmo,
+// dentro do evento da tecla — e com a lista de mensagens e as camadas fixas
+// por cima, essa conta não é barata. Era daí o atraso ao digitar.
+// A medição passa a acontecer uma vez por quadro: a tecla aparece na tela
+// primeiro, o campo se ajusta logo em seguida, e rajadas de digitação viram
+// uma medição só em vez de uma por caractere.
+let growPend = false;
 function grow() {
   const ta = $('#msg');
   if (msgH) { ta.style.height = msgH + 'px'; return; }
-  ta.style.height = 'auto';
-  ta.style.height = Math.min(180, ta.scrollHeight) + 'px';
+  if (growPend) return;
+  growPend = true;
+  requestAnimationFrame(() => {
+    growPend = false;
+    if (msgH) return;                      // viraram altura manual no meio
+    const t = $('#msg');
+    t.style.height = 'auto';
+    t.style.height = Math.min(180, t.scrollHeight) + 'px';
+  });
 }
 
 (() => {

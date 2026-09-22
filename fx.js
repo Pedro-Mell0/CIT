@@ -339,11 +339,17 @@
     medir();
     addEventListener('resize', medir);
 
-    let ultimo = 0;
+    // O laço para de verdade quando a chuva sai de cena. Antes ele seguia
+    // pedindo quadro para sempre só para desistir dentro do callback: não
+    // desenhava nada, mas mantinha a página "animando" 60 vezes por segundo e
+    // nunca deixava o navegador dormir.
+    const raiz = document.documentElement;
+    let ultimo = 0, rodando = false;
     const quadro = t => {
+      if (!ativa) { rodando = false; return; }
       requestAnimationFrame(quadro);
-      if (!ativa || document.hidden || t - ultimo < 55) return;   // ~18 fps, poupa bateria
-      ultimo = t;
+      if (document.hidden || raiz.classList.contains('no-crt') || t - ultimo < 55) return;
+      ultimo = t;                                          // ~18 fps, poupa bateria
       ctx.fillStyle = 'rgba(4,2,12,.11)';               // rastro que some
       ctx.fillRect(0, 0, w, h);
       ctx.font = corpo + "px 'JetBrains Mono',monospace";
@@ -354,13 +360,14 @@
         if (ys[i] > h && Math.random() > 0.972) ys[i] = 0;
       }
     };
-    requestAnimationFrame(quadro);
+    const liga = () => { if (!rodando) { rodando = true; requestAnimationFrame(quadro); } };
+    liga();
 
     return {
       visivel(v) {
         ativa = !!v;
         cv.classList.toggle('hide', !v);
-        if (v) medir();          // redesenha limpo ao voltar para o acesso
+        if (v) { medir(); liga(); }   // redesenha limpo ao voltar para o acesso
       },
     };
   }
