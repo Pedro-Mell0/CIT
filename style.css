@@ -702,3 +702,27 @@ mark{background:#45e3ff33;color:var(--cyan);padding:0 .1rem}
 #egg .peng{width:min(40vh,268px);height:auto;
   filter:grayscale(1) contrast(1.25) sepia(1) hue-rotate(150deg) saturate(6) brightness(1.06)
          drop-shadow(0 0 7px var(--cyan)) drop-shadow(0 0 22px #45e3ff66)}
+
+/* O palco segura o pinguim e o coração juntos: o coração é posicionado em
+   relação a ele, não à tela, então acompanha o pinguim em qualquer janela. */
+#egg .peng-palco{position:relative;display:grid;place-items:center}
+
+/* Coração em rosa neon, contra o ciano do pinguim. Traço vazado como o da
+   coruja; o brilho vem de fora, por drop-shadow, e fica parado — quem pulsa é
+   só o `transform`, que a GPU resolve sem repintar nada. Animar o brilho
+   custaria repintura a cada quadro, e por um ganho que ninguém veria. */
+#egg .coracao{position:absolute;top:-4%;right:-16%;width:19%;height:auto;
+  color:var(--danger);fill:none;stroke:currentColor;stroke-width:2.2;
+  stroke-linejoin:round;stroke-linecap:round;
+  filter:drop-shadow(0 0 6px var(--danger)) drop-shadow(0 0 18px #ff5c8a77);
+  animation:coracao-bate .52s ease-out infinite}
+
+/* dois baques, como batida de coração de verdade — não um pulso só */
+@keyframes coracao-bate{
+  0%{transform:scale(1);opacity:.9}
+  13%{transform:scale(1.24);opacity:1}
+  26%{transform:scale(1.03);opacity:.95}
+  40%{transform:scale(1.15);opacity:1}
+  68%,100%{transform:scale(1);opacity:.9}
+}
+@media(prefers-reduced-motion:reduce){#egg .coracao{animation:none}}

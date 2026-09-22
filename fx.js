@@ -442,18 +442,29 @@
   const DANCA = 7800;
   let dancando = false;
 
+  const CORACAO = `
+  <svg class="coracao" viewBox="0 0 32 30" aria-hidden="true">
+    <path d="M16 28C6 20 1 15 1 10 1 5 5 2 9 2c3 0 6 2 7 5 1-3 4-5 7-5 4 0 8 3 8 8 0 5-5 10-15 18Z"/>
+  </svg>`;
+
   function pinguim() {
     if (dancando) return;
     dancando = true;
     const tela = document.createElement('div');
     tela.id = 'egg';
     tela.setAttribute('aria-hidden', 'true');
+    // O coração fica preso ao palco, e não à tela: assim ele acompanha o
+    // pinguim em qualquer tamanho de janela, em vez de flutuar solto num canto.
+    const palco = document.createElement('div');
+    palco.className = 'peng-palco';
     // o <img> nasce agora, e não fica guardado, para o GIF começar do quadro 1
     const img = document.createElement('img');
     img.className = 'peng';
     img.alt = '';
     img.src = 'files/pinguim.gif';
-    tela.append(img);
+    palco.append(img);
+    palco.insertAdjacentHTML('beforeend', CORACAO);
+    tela.append(palco);
     document.body.append(tela);
     void tela.offsetWidth;                    // deixa o fade de entrada pegar
     tela.classList.add('on');
