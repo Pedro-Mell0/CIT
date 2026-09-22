@@ -80,11 +80,25 @@ alter table public.profiles add constraint profiles_role_check
 alter table public.invite_codes add constraint invite_codes_role_check
   check (role in ('agent','command','admin'));
 
-insert into public.invite_codes (code, role) values
-  ('AGENTE',     'agent'),
-  ('COMANDOCIT', 'command'),
-  ('ADMIN!@#',   'admin')
-on conflict (code) do nothing;
+-- Os códigos de acesso NÃO ficam neste arquivo. Ele é versionado, e um código
+-- escrito aqui é um código publicado: quem lê o repositório cria conta com o
+-- cargo que quiser. Eles vivem só no banco, que é privado.
+--
+-- Definir ou trocar, no SQL Editor do Supabase:
+--   insert into public.invite_codes (code, role) values ('...', 'agent')
+--     on conflict (code) do update set role = excluded.role;
+--   update public.invite_codes set code = '...' where role = 'command';
+--   delete from public.invite_codes where code = '...';   -- aposenta o antigo
+--
+-- Rodar este arquivo de novo não mexe em nada que já esteja gravado.
+
+-- Só numa instalação nova, com a tabela ainda vazia: nasce um código de ADMIN
+-- aleatório para dar a primeira conta, já que sem ADMIN ninguém cria as outras.
+-- Leia-o uma vez e troque por um seu:
+--   select code from public.invite_codes where role = 'admin';
+insert into public.invite_codes (code, role)
+select upper(encode(extensions.gen_random_bytes(6), 'hex')), 'admin'
+ where not exists (select 1 from public.invite_codes);
 
 -- ---------- categorias ----------
 create table if not exists public.categories (

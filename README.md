@@ -29,22 +29,44 @@ schema.sql   banco de dados completo
 
 Digitados uma única vez, no cadastro. Definem o cargo da conta.
 
-| Código       | Cargo   | Pode                                                                 |
-|--------------|---------|----------------------------------------------------------------------|
-| `AGENTE`     | AGENTE  | ler/escrever nos canais liberados, criar e editar dossiês e relatos  |
-| `COMANDOCIT` | COMANDO | tudo do agente + criar categorias e canais, editar mensagens alheias, remover agentes |
-| `ADMIN!@#`   | ADMIN   | tudo do comando + criar/excluir contas, dar e tirar privilégios, trocar codinomes, redefinir senhas |
+Há um código por cargo. **Eles não estão neste repositório** — vivem só na
+tabela `invite_codes`, no banco. Ver os que estão valendo:
+
+```sql
+select role, code from invite_codes order by role;
+```
+
+| Cargo   | Pode                                                                 |
+|---------|----------------------------------------------------------------------|
+| AGENTE  | ler/escrever nos canais liberados, criar e editar dossiês e relatos  |
+| COMANDO | tudo do agente + criar categorias e canais, editar mensagens alheias, remover agentes |
+| ADMIN   | tudo do comando + criar/excluir contas, dar e tirar privilégios, trocar codinomes, redefinir senhas |
 
 O cargo **não aparece no chat**: nada indica quais codinomes são de comando ou
 admin. Só o painel ⚙ mostra isso, e só para o ADMIN.
 
-Trocar um código:
+Trocar um código, no SQL Editor do Supabase:
 
 ```sql
 update invite_codes set code = 'NOVO' where role = 'command';
 ```
 
-A primeira conta ADMIN precisa ser criada pelo cadastro normal, usando `ADMIN!@#`.
+O `schema.sql` não mexe em código nenhum que já esteja gravado, então pode ser
+rodado de novo à vontade depois de uma troca.
+
+> Nunca escreva um código dentro de arquivo versionado. Este repositório é
+> público: um código no `schema.sql` ou aqui é um código entregue a quem
+> abrir o repositório — e o histórico do git não esquece.
+
+Numa instalação nova, o `schema.sql` cria sozinho um código de ADMIN aleatório,
+já que sem ADMIN ninguém cria as demais contas. Leia-o uma vez e troque:
+
+```sql
+select code from invite_codes where role = 'admin';
+```
+
+Com a primeira conta ADMIN de pé, as demais saem pelo painel ⚙, sem distribuir
+código nenhum.
 Depois disso o ADMIN cria as demais contas pelo painel, sem distribuir códigos.
 
 ## Layout
