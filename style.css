@@ -1,7 +1,11 @@
 :root{--side-w:270px;--dos-w:380px;--chat-w:380px;--gap:.5rem;--void:#04020c;--ink:#09061d;--panel:#0f0a2b;--line:#2a2170;--blue:#3d8bff;--cyan:#45e3ff;--violet:#9b5cff;--text:#d8d5ff;--dim:#7d76b9;--danger:#ff5c8a;--gold:#ffc74d;--live:#37ff8b;--dead:#ff2e5f;--ops-w:380px}
+/* Declara que o tema escuro é nosso. Sem isto, navegador embutido que force o
+   próprio tema (o do FiveM, por exemplo) reescreve as cores da página e vira o
+   texto claro em escuro — preto no preto, com só os nomes coloridos sobrando. */
+:root{color-scheme:dark}
 *{box-sizing:border-box;margin:0}
 html,body{height:100%}
-body{background:radial-gradient(900px 500px at 15% -10%,#2a1a6e55,transparent),radial-gradient(700px 500px at 100% 100%,#0f3a8a44,transparent),var(--void);color:var(--text);font:14px/1.5 'JetBrains Mono',monospace}
+body{background:radial-gradient(900px 500px at 15% -10%,#2a1a6e55,transparent),radial-gradient(700px 500px at 100% 100%,#0f3a8a44,transparent),var(--void);color:var(--text,#d8d5ff);font:14px/1.5 'JetBrains Mono',monospace}
 body::after{content:"";position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,#0000 0 3px,#0006 3px 4px);opacity:.35;z-index:99}
 body.dragging{cursor:col-resize;user-select:none}
 /* barras de rolagem no tom da interface: continuam rolando, só deixam de ser brancas */
@@ -19,7 +23,8 @@ h1,h2,.tabs button,.primary,.op-title,.mg-head h3{font-family:'Chakra Petch',san
 input,textarea,select{width:100%;background:var(--void);border:1px solid var(--line);color:var(--text);padding:.7rem .8rem;font:inherit;border-radius:2px}
 textarea{resize:vertical;min-height:2.6rem}
 input:focus,textarea:focus,select:focus{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan),0 0 16px #45e3ff33;outline:0}
-button{font:inherit;cursor:pointer;border-radius:2px}
+/* botão não herda cor sozinho: sem isto cai no padrão do navegador */
+button{font:inherit;color:inherit;cursor:pointer;border-radius:2px}
 .primary{background:linear-gradient(90deg,var(--blue),var(--violet));border:0;color:#fff;padding:.7rem 1.2rem;font-weight:700;letter-spacing:.04em}
 .primary:hover{filter:brightness(1.15)}
 .primary.sm{padding:.45rem .8rem;font-size:.78rem}
@@ -120,6 +125,10 @@ header .tools .ghost{padding:.4rem .6rem}
 .m .act:hover{color:var(--cyan)}
 .m .act.del{font-size:.72rem}
 .m .act.del:hover{color:var(--danger)}
+/* A cor do corpo da mensagem fica escrita aqui em vez de herdada do <body>:
+   num navegador que imponha o próprio tema, o que não está declarado é o
+   primeiro a ser reescrito. Vale para os dossiês e relatos, que usam .md. */
+.m .txt,.md{color:var(--text,#d8d5ff)}
 .m.mine .txt{border-left:2px solid var(--blue);padding-left:.6rem}
 .m.hit{background:#45e3ff1f;box-shadow:inset 0 0 0 1px var(--cyan)}
 .empty{color:var(--dim);margin:auto;text-align:center}
