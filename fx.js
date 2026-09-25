@@ -178,13 +178,17 @@
        */
       dancinha(dur) {
         if (!on || !pronto()) return;
-        const t = ctx.currentTime, passo = 0.26;
-        const notas = [523.25, 659.25, 783.99, 659.25, 587.33, 783.99, 880, 659.25];
+        const t = ctx.currentTime, passo = 0.26;     // ~115 bpm em colcheias
+        // melodia de dezesseis passos, em dó maior
+        const MEL = [523.25, 659.25, 783.99, 659.25, 880.00, 783.99, 659.25, 523.25,
+                     587.33, 698.46, 880.00, 698.46, 783.99, 659.25, 587.33, 523.25];
+        // o baixo troca a cada dois passos: dó, lá, fá, sol
+        const BX = [130.81, 110.00, 87.31, 98.00];
         for (let i = 0; i * passo < dur; i++) {
           const ini = t + i * passo;
-          tom(98, ini, 0.11, 'square', 0.06);                       // baixo
-          if (i % 2) estalo(ini, 0.05, 4200, 0.02);                 // contratempo
-          tom(notas[i % notas.length], ini, 0.17, 'triangle', 0.04);
+          tom(BX[(i >> 1) % BX.length], ini, 0.2, 'square', 0.055);
+          tom(MEL[i % MEL.length], ini, 0.17, 'triangle', 0.042);
+          if (i % 2) estalo(ini, 0.045, 4200, 0.02);      // chimbau no contratempo
         }
       },
 
@@ -442,6 +446,38 @@
   const DANCA = 7800;
   let dancando = false;
 
+  // Trilha da dança. Vazio = toca a batida sintetizada aqui mesmo, sem baixar
+  // nada. Pondo o caminho de um arquivo de áudio (ex.: 'files/dancinha.mp3'),
+  // é ele que toca — e se faltar ou não carregar, a batida entra no lugar,
+  // para o easter egg nunca ficar mudo.
+  const TRILHA = '';
+  const TRILHA_VOL = 0.55;
+
+  function tocaTrilha() {
+    if (!SFX.on) return null;
+    if (!TRILHA) { SFX.dancinha(DANCA / 1000); return null; }
+
+    let a;
+    try { a = new Audio(TRILHA); } catch { SFX.dancinha(DANCA / 1000); return null; }
+    a.volume = TRILHA_VOL;
+
+    let caiu = false;
+    const planoB = () => { if (!caiu) { caiu = true; SFX.dancinha(DANCA / 1000); } };
+    a.addEventListener('error', planoB);
+    a.play().catch(planoB);                 // arquivo ausente, formato recusado
+
+    // some aos poucos no fim, para a música não ser cortada a machado
+    let fade;
+    const agenda = setTimeout(() => {
+      fade = setInterval(() => {
+        a.volume = Math.max(0, a.volume - TRILHA_VOL / 12);
+        if (a.volume <= 0.001) clearInterval(fade);
+      }, 40);
+    }, Math.max(0, DANCA - 520));
+
+    return { para() { clearTimeout(agenda); clearInterval(fade); a.pause(); a.src = ''; } };
+  }
+
   const CORACAO = `
   <svg class="coracao" viewBox="0 0 32 30" aria-hidden="true">
     <path d="M16 28C6 20 1 15 1 10 1 5 5 2 9 2c3 0 6 2 7 5 1-3 4-5 7-5 4 0 8 3 8 8 0 5-5 10-15 18Z"/>
@@ -468,10 +504,10 @@
     document.body.append(tela);
     void tela.offsetWidth;                    // deixa o fade de entrada pegar
     tela.classList.add('on');
-    SFX.dancinha(DANCA / 1000);
+    const trilha = tocaTrilha();
 
     setTimeout(() => tela.classList.remove('on'), DANCA);
-    setTimeout(() => { tela.remove(); dancando = false; }, DANCA + 450);
+    setTimeout(() => { tela.remove(); trilha?.para(); dancando = false; }, DANCA + 450);
   }
 
   (() => {
