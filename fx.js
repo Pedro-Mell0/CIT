@@ -474,8 +474,15 @@
     try { a = new Audio(TRILHA); } catch { SFX.dancinha(DANCA / 1000); return null; }
     a.volume = TRILHA_VOL;
 
-    let caiu = false;
-    const planoB = () => { if (!caiu) { caiu = true; SFX.dancinha(DANCA / 1000); } };
+    // `encerrado` quer dizer "não quero mais saber deste áudio". Ele existe
+    // porque o próprio desligamento disparava o plano B: soltar o `src` no fim
+    // faz o navegador tentar carregar um endereço vazio, falhar e emitir
+    // `error` — o mesmo evento que aqui significa "o arquivo não existe". A
+    // batida de reserva então entrava logo depois da música, com a tela já
+    // fechada. Agora o fim marca a bandeira e tira o ouvinte antes de encostar
+    // no elemento, e o `src` não é mais mexido.
+    let encerrado = false;
+    const planoB = () => { if (!encerrado) { encerrado = true; SFX.dancinha(DANCA / 1000); } };
     a.addEventListener('error', planoB);
     a.play().catch(planoB);                 // arquivo ausente, formato recusado
 
@@ -488,7 +495,14 @@
       }, 40);
     }, Math.max(0, DANCA - 520));
 
-    return { para() { clearTimeout(agenda); clearInterval(fade); a.pause(); a.src = ''; } };
+    return {
+      para() {
+        encerrado = true;
+        a.removeEventListener('error', planoB);
+        clearTimeout(agenda); clearInterval(fade);
+        a.pause();                          // e nada de mexer no `src`
+      },
+    };
   }
 
   const CORACAO = `
