@@ -441,17 +441,30 @@
   // A dança é o GIF original, não um desenho imitando: passo, tempo e jeito
   // são dele. O que muda é a cor — um filtro leva o azul para o ciano da casa
   // e acende o contorno, para ele pertencer a esta tela.
-  // O laço do GIF tem 7,80 s (78 quadros de 10 cs). A tela fecha exatamente
-  // nesse tempo: a dança termina inteira, uma vez, e nada se repete pela metade.
-  const DANCA = 7800;
+  // O laço do GIF tem 7,80 s (78 quadros de 10 cs) e a trilha, 15,49 s —
+  // quase exatamente dois laços.
+  // A tela fica no ar por esses dois laços: a música toca inteira e a dança
+  // termina no passo certo, sem cortar no meio de um movimento.
+  const DANCA = 15600;
   let dancando = false;
 
   // Trilha da dança. Vazio = toca a batida sintetizada aqui mesmo, sem baixar
   // nada. Pondo o caminho de um arquivo de áudio (ex.: 'files/dancinha.mp3'),
   // é ele que toca — e se faltar ou não carregar, a batida entra no lugar,
   // para o easter egg nunca ficar mudo.
-  const TRILHA = '';
+  const TRILHA = 'files/dancinha.mp3';
   const TRILHA_VOL = 0.55;
+
+  // O arquivo só é buscado no primeiro dos três cliques, e não no carregamento
+  // da página: quem nunca achar o segredo nunca baixa 240 KB à toa, e quem
+  // achar já tem o áudio em cache quando o terceiro clique chega — senão a
+  // música entraria depois da dança ter começado.
+  let aquecido = false;
+  function aquece() {
+    if (aquecido || !TRILHA) return;
+    aquecido = true;
+    try { new Audio(TRILHA).load(); } catch {}
+  }
 
   function tocaTrilha() {
     if (!SFX.on) return null;
@@ -516,6 +529,7 @@
       const agora = performance.now();
       n = agora - ultimo < 600 ? n + 1 : 1;   // tem de ser rápido, senão reinicia
       ultimo = agora;
+      if (n === 1) aquece();                  // busca o áudio enquanto ele clica
       if (n >= 3) { n = 0; pinguim(); }
     };
     document.querySelectorAll('.logo').forEach(l => l.addEventListener('click', bateu));
