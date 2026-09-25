@@ -31,6 +31,61 @@ const msgEls = new Map(); // id da mensagem -> elemento
 const order  = {};        // chave da barra lateral -> posição
 const unread = new Set(); // canais com mensagem nova ainda não vista
 
+// ---------- o que já foi lido ----------
+// Um Set em memória não dá conta: ele nasce vazio a cada F5 e só enxerga o que
+// chega com a aba aberta, então mensagem recebida enquanto o agente estava fora
+// nunca acendia aviso nenhum. O que guardamos é a data da última visita a cada
+// canal; o não lido sai da comparação com a data da mensagem mais recente.
+// Fica no localStorage — precisa sobreviver ao fechar do navegador, ao
+// contrário da sessão — e separado por conta, para dois agentes no mesmo
+// computador não herdarem a leitura um do outro.
+let lido = {};
+const chaveLido = () => 'cit.lido.' + (me?.id || 'anon');
+
+function carregaLido() {
+  try { lido = JSON.parse(localStorage.getItem(chaveLido()) || '{}'); } catch { lido = {}; }
+}
+
+/**
+ * Marca o canal como visto até `quando`. A data vem do servidor sempre que
+ * possível — a mensagem mais recente já carregada — e não do relógio local:
+ * relógio adiantado esconderia mensagem nova, atrasado deixaria aviso preso.
+ * Nunca anda para trás.
+ */
+function marcaLido(key, quando) {
+  unread.delete(key);
+  if (!key || key === 'manage') return;
+  const novo = quando || new Date().toISOString();
+  if (lido[key] && Date.parse(lido[key]) >= Date.parse(novo)) return;
+  lido[key] = novo;
+  try { localStorage.setItem(chaveLido(), JSON.stringify(lido)); } catch {}
+}
+
+/**
+ * Descobre o que chegou enquanto o agente esteve fora: pede a data da mensagem
+ * mais recente de cada canal e compara com a última visita.
+ * O agrupamento pertence ao banco, por isso o RPC. Se ele ainda não existir lá,
+ * caímos na leitura direta das mensagens recentes, que chega ao mesmo resultado
+ * enquanto o volume for pequeno — o aviso funciona de um jeito ou de outro.
+ * Em ambos os caminhos o RLS continua valendo: só voltam canais que o agente
+ * já podia ler.
+ */
+async function varreNaoLidas() {
+  const ultimas = {};
+  const { data, error } = await sb.rpc('ultimas_por_canal');
+  if (!error && Array.isArray(data)) {
+    data.forEach(r => { if (r?.channel) ultimas[r.channel] = r.ultima; });
+  } else {
+    const { data: msgs } = await sb.from('messages')
+      .select('channel, created_at').order('created_at', { ascending: false }).limit(400);
+    (msgs || []).forEach(m => { ultimas[m.channel] ??= m.created_at; });
+  }
+  Object.entries(ultimas).forEach(([key, quando]) => {
+    const visto = lido[key] ? Date.parse(lido[key]) : 0;
+    if (Date.parse(quando) > visto) unread.add(key);
+  });
+}
+
 const isStaff = () => me && (me.role === 'command' || me.role === 'admin');
 const isAdmin = () => me && me.role === 'admin';
 
@@ -151,6 +206,8 @@ async function start() {
   me = people[session.user.id];
   if (!me) return $('#err').textContent = 'Perfil não encontrado. Fale com o comando.';
   await loadTree();
+  carregaLido();
+  await varreNaoLidas();   // acende o que chegou enquanto ele esteve fora
 
   $('#auth').classList.add('hide'); $('#app').classList.remove('hide');
   window.FX?.rain?.visivel(false);   // a chuva fica só na tela de acesso
@@ -182,7 +239,11 @@ function listen() {
       const m = p.new || p.old;
       if (!m) return;
       if (p.eventType === 'INSERT') {
-        if (m.channel === chan) { addMsg(m); if (m.author_id !== me.id) window.FX?.som.recebida(); }
+        if (m.channel === chan) {
+          addMsg(m);
+          marcaLido(m.channel, m.created_at);   // está à vista: nasce lida
+          if (m.author_id !== me.id) window.FX?.som.recebida();
+        }
         else {
           if (!unread.has(m.channel)) { unread.add(m.channel); drawChannels(); }
           window.FX?.som.recebida();
@@ -1112,6 +1173,9 @@ async function openChannel(key, jumpTo) {
   window.OPS?.setChannel?.(key);
   if (manageView) return window.MANAGE?.open?.();
 
+  // só apaga a bolinha; quem carimba a data é o carregamento, com hora do
+  // servidor. Carimbar aqui, com o relógio local adiantado, faria o carimbo
+  // de verdade ser descartado por parecer velho.
   unread.delete(key);
   window.FX?.bootLine(info.label);
 
@@ -1135,6 +1199,9 @@ async function openChannel(key, jumpTo) {
   if (!data?.length) box.innerHTML = EMPTY_CH;
   const total = data?.length || 0;
   data?.forEach((m, i) => addMsg(m, true, total - 1 - i));
+  // data do servidor, agora que ela é conhecida: é este carimbo que impede o
+  // aviso de voltar a acender no próximo carregamento
+  marcaLido(key, total ? data[total - 1].created_at : undefined);
   box.scrollTop = box.scrollHeight;
 
   if (jumpTo?.id) {

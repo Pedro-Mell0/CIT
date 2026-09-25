@@ -71,7 +71,8 @@ small{color:var(--dim);font-size:.7rem}
 #chans button.on{color:var(--cyan);background:var(--panel);border-left:2px solid var(--cyan)}
 #chans button.sub{padding-left:1.2rem}
 #chans button.gear .ic{color:var(--gold)}
-#chans button.new::after{content:"●";color:var(--violet);text-shadow:0 0 8px var(--violet);margin-left:auto}
+/* bolinha amarela: o canal tem mensagem que este agente ainda não viu */
+#chans button.new::after{content:"●";color:var(--gold);text-shadow:0 0 8px var(--gold);margin-left:auto}
 #chans h3{font-size:.68rem;color:var(--dim);font-weight:400;margin:.9rem 0 .2rem;letter-spacing:.1em;text-transform:uppercase}
 #chans h3.cat{display:flex;align-items:center;margin:.9rem 0 .1rem}
 .cat-tw{background:none;border:0;color:var(--dim);font:inherit;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;display:flex;gap:.35rem;align-items:center;padding:.2rem .2rem;flex:1;text-align:left;border-radius:2px}
@@ -85,8 +86,8 @@ small{color:var(--dim);font-size:.7rem}
 /* recolhido, o grupo avisa o que está escondido lá dentro */
 .cat-tw.dentro{color:var(--cyan)}
 .cat-tw.dentro .arw{color:var(--cyan)}
-.cat-tw.new .cat-n{border-color:var(--violet);color:var(--violet);
-  box-shadow:0 0 8px #9b5cff55}
+.cat-tw.new .cat-n{border-color:var(--gold);color:var(--gold);
+  box-shadow:0 0 8px #ffc74d55}
 .cat-tw.new .cat-n::after{content:" ●";font-size:.5rem;vertical-align:middle}
 h3.cat.fechada{opacity:.85}
 .cat-ed{background:none;border:0;color:var(--dim);opacity:.45;padding:0 .2rem}

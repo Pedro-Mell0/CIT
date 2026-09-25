@@ -402,6 +402,19 @@ drop trigger if exists messages_touch on public.messages;
 create trigger messages_touch before update on public.messages
   for each row execute function public.touch_message();
 
+-- Data da mensagem mais recente de cada canal. Serve ao aviso de não lida: o
+-- site compara estas datas com a da última visita que ele guarda por conta.
+-- O agrupamento pertence ao banco — trazer as mensagens só para achar o máximo
+-- de cada canal seria carregar o que não se vai usar.
+-- `security invoker` é o essencial: a função roda com o RLS de quem chamou,
+-- então cada agente recebe apenas os canais que já podia ler. Com
+-- `security definer` ela vazaria a existência e o movimento de canal fechado.
+create or replace function public.ultimas_por_canal()
+returns table (channel text, ultima timestamptz)
+language sql stable security invoker set search_path = public as $fn$
+  select m.channel, max(m.created_at) from public.messages m group by m.channel
+$fn$;
+
 -- ============================================================================
 -- 3. CADASTRO DE NOVOS AGENTES
 -- ============================================================================
