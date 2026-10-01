@@ -200,6 +200,14 @@
         tom(52, t + 0.08, 0.34, 'sine', 0.11);      // sub grave fechando
       },
 
+      /** a aranha chegando: dois plins curtos, descendo de tom */
+      teia() {
+        if (!on || !pronto()) return;
+        const t = ctx.currentTime;
+        tom(1760, t, 0.08, 'sine', 0.035);
+        tom(1174, t + 0.1, 0.12, 'sine', 0.03);
+      },
+
       /** raspão num cone: uma batida seca e o pneu reclamando de leve */
       raspada() {
         if (!on || !pronto()) return;
@@ -439,7 +447,7 @@
     // o visitante. Clicar de volta no cartão devolve o volante ao piloto
     // automático, para a página não ficar engolindo teclas de quem só quer
     // digitar a senha.
-    let manual = false, impulso = 0, batida = 0;
+    let manual = false, impulso = 0, batida = 0, derrubados = 0;
     const teclas = new Set();
     const LATERAL = 2.4;                   // faixas por segundo, no volante
     const DIGITANDO = n => n && (n.tagName === 'INPUT' || n.tagName === 'TEXTAREA' || n.isContentEditable);
@@ -504,7 +512,15 @@
         const perto = o.z < Z_CARRO + 0.3 && o.z > Z_CARRO - 0.25;
         if (!perto || Math.abs(o.faixa - faixaCarro) > 0.5) return true;
         batida = 0.5;
+        derrubados++;
         SFX.raspada();
+        // A aranha só desce se não houver uma na tela. É o que segura o
+        // tranco de quem atravessa cinco cones seguidos: a conta sobe, mas a
+        // visita continua sendo uma de cada vez.
+        if (!aranhaNaTela) {
+          aranha(FALAS[falaAtual % FALAS.length](derrubados));
+          falaAtual++;
+        }
         return false;
       });
     }
@@ -840,6 +856,55 @@
       desenha(x, y, ang);
     };
     requestAnimationFrame(quadro);
+  }
+
+  // ========================================================= 🕷 a aranha
+  // Quem pega o volante e sai derrubando cone recebe visita. A aranha desce do
+  // alto num fio de teia, de cabeça para baixo, solta uma frase e volta.
+  // As frases alternam em ciclo a cada cone derrubado — a primeira conta
+  // quantos já foram, e a conta não zera enquanto a página estiver aberta.
+  const FALAS = [
+    n => `Parabéns, você acertou ${n} ${n === 1 ? 'cone' : 'cones'}, mas a ideia aqui é desviar deles.`,
+    () => 'Meu deus... você não está nem tentando.',
+    () => 'Sai da Vanguarda imediatamente.',
+  ];
+  const ARANHA_FICA = 4200;
+  let falaAtual = 0, aranhaNaTela = false;
+
+  const ARANHA_SVG = `
+  <svg class="corpo" viewBox="0 0 64 64" aria-hidden="true">
+    <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M26 28C16 24 8 28 5 38"/><path d="M38 28C48 24 56 28 59 38"/>
+      <path d="M26 31C16 30 9 36 7 46"/><path d="M38 31C48 30 55 36 57 46"/>
+      <path d="M27 34C18 36 12 42 11 52"/><path d="M37 34C46 36 52 42 53 52"/>
+      <path d="M28 37C21 42 17 48 17 57"/><path d="M36 37C43 42 47 48 47 57"/>
+    </g>
+    <ellipse cx="32" cy="15" rx="10" ry="11" fill="#1d1309" stroke="currentColor" stroke-width="2"/>
+    <circle cx="32" cy="30" r="7.5" fill="#1d1309" stroke="currentColor" stroke-width="2"/>
+    <circle class="olho" cx="29" cy="33" r="1.9"/><circle class="olho" cx="35" cy="33" r="1.9"/>
+  </svg>`;
+
+  /**
+   * A descida é só a altura do fio crescendo: a aranha vem logo abaixo dele,
+   * numa coluna, então empurrar o fio empurra o bicho junto. A curva de
+   * aceleração passa de 1 no fim, o que dá o repuxo de quem chegou ao fim da
+   * corda — é esse exagero que faz parecer peso, e não uma caixa deslizando.
+   */
+  function aranha(texto) {
+    if (aranhaNaTela || calmo()) return;
+    aranhaNaTela = true;
+    const tela = document.createElement('div');
+    tela.id = 'aranha';
+    tela.setAttribute('aria-hidden', 'true');
+    tela.innerHTML = `<div class="fio"></div><div class="bicho">${ARANHA_SVG}<div class="balao"></div></div>`;
+    tela.querySelector('.balao').textContent = texto;
+    document.body.append(tela);
+    void tela.offsetWidth;
+    tela.classList.add('on');
+    SFX.teia();
+
+    setTimeout(() => tela.classList.remove('on'), ARANHA_FICA);
+    setTimeout(() => { tela.remove(); aranhaNaTela = false; }, ARANHA_FICA + 900);
   }
 
   function nitro() {
