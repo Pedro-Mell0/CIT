@@ -2,6 +2,11 @@
 
 Site estático (sem build). Backend: Supabase. Hospedagem: Vercel.
 
+> Este repositório abriga dois sites irmãos: o **CIT**, aqui na raiz, e a
+> **VGD · Vanguarda**, em [`vgd/`](vgd/). Bancos Supabase separados e projetos
+> separados na Vercel — o da VGD aponta para o mesmo repositório com
+> *Root Directory* `vgd`. Nada é compartilhado entre os dois.
+
 ```
 index.html   estrutura
 style.css    visual

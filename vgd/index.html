@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- O site já é escuro. Sem este aviso, navegador embutido com tema escuro
+     forçado (FiveM e afins) reescreve as cores por conta própria e escurece
+     justamente o texto, deixando preto no preto. -->
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="noindex, nofollow">
+<title>VGD · Vanguarda</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐯</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=JetBrains+Mono:wght@400;600&family=Orbitron:wght@600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute"><symbol id="tigre" viewBox="0 0 64 64">
+  <g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
+    <!-- orelhas grandes e pontudas: é o que separa tigre de gato de desenho -->
+    <path d="M10 26 L6 2 L27 12"/><path d="M54 26 L58 2 L37 12"/>
+    <!-- cabeça angulosa, com o maxilar fechando em ponta -->
+    <path d="M9 25c0-9 10-14 23-14s23 5 23 14c0 10-4 17-9 22-4 4-9 7-14 7s-10-3-14-7c-5-5-9-12-9-22z"/>
+    <!-- sobrancelha pesada por cima de cada olho -->
+    <path d="M13 25 L26 28"/><path d="M51 25 L38 28"/>
+    <!-- listras da testa -->
+    <path d="M24 13 L22 21"/><path d="M32 11 L32 20"/><path d="M40 13 L42 21"/>
+    <!-- listras da face: curtas e na borda, senão viram bigode -->
+    <path d="M10 33 L15 35"/><path d="M12 40 L17 41"/>
+    <path d="M54 33 L49 35"/><path d="M52 40 L47 41"/>
+    <path d="M32 45c0 4-4 6-8 4"/><path d="M32 45c0 4 4 6 8 4"/>
+  </g>
+  <path d="M10 25 L12 10 L21 15z" fill="currentColor" opacity=".35"/>
+  <path d="M54 25 L52 10 L43 15z" fill="currentColor" opacity=".35"/>
+  <path class="eye" d="M16 29 l12 2 -12 4z" fill="currentColor"/>
+  <path class="eye" d="M48 29 l-12 2 12 4z" fill="currentColor"/>
+  <path d="M27 39 h10 l-5 6z" fill="currentColor"/>
+</symbol></svg>
+
+<canvas id="road" aria-hidden="true"></canvas>
+
+<main id="auth">
+  <section class="card">
+    <svg class="logo"><use href="#tigre"/></svg>
+    <h1>VGD</h1>
+    <p class="sub">Unidade Vanguarda · Alta Performance e Perseguição</p>
+    <pre id="boot"></pre>
+    <div class="tabs"><button id="t-in" class="on">Entrar</button><button id="t-up">Cadastrar</button></div>
+    <input id="u" placeholder="nome do personagem" autocomplete="username" maxlength="40" spellcheck="false">
+    <input id="p" type="password" placeholder="senha" autocomplete="current-password">
+    <input id="c" placeholder="código de acesso" class="hide" spellcheck="false">
+    <button id="go" class="primary">Entrar</button>
+    <p id="err" role="alert"></p>
+    <small id="auth-tip">Use o nome do seu personagem no RP, igual ao da ficha. É por ele que o comando vai te reconhecer.</small>
+  </section>
+</main>
+
+<div id="app" class="hide">
+  <aside id="side">
+    <div class="me"><svg class="logo sm"><use href="#tigre"/></svg>
+      <div><b id="me-name"></b><span id="me-role"></span></div>
+      <button id="me-cfg" class="ghost" title="Minhas configurações" aria-label="Minhas configurações">⚙</button></div>
+
+    <div id="hud" aria-hidden="true">
+      <div id="hud-clock"></div>
+      <div id="hud-tacho"><span id="hud-bar"></span></div>
+      <div id="hud-stat"></div>
+    </div>
+
+    <nav id="chans"></nav>
+
+    <div class="side-foot">
+      <button id="new-ch" class="ghost hide">+ Canal / categoria</button>
+      <div class="fx-row">
+        <button id="fx-sfx" class="ghost" title="Som" aria-label="Som">♪</button>
+        <button id="fx-crt" class="ghost" title="Efeitos de vídeo — desligue para ganhar desempenho em máquina fraca ou dentro do jogo" aria-label="Efeitos de vídeo">▩</button>
+        <button id="out" class="ghost">Sair</button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="grip" data-grip="side" role="separator" aria-label="Redimensionar a barra lateral"></div>
+
+  <section id="room">
+    <header id="room-head">
+      <button id="menu" class="ghost" aria-label="Canais">☰</button>
+      <h2 id="ch-title"></h2>
+      <span id="ch-hint"></span>
+      <div class="tools">
+        <button id="find-btn" class="ghost" title="Buscar (Ctrl+F)" aria-label="Buscar">⌕</button>
+        <button id="members" class="ghost" title="Quem tem acesso a este canal">ACESSO</button>
+        <button id="ch-edit" class="ghost hide" title="Configurar canal: nome, acesso e trava" aria-label="Configurar canal">✎</button>
+      </div>
+    </header>
+
+    <div id="room-body">
+      <section id="chat" class="pane">
+        <div id="boot-line" class="hide" aria-hidden="true"></div>
+        <div id="msgs" aria-live="polite"></div>
+        <div class="composer">
+          <div id="msg-grip" role="separator" aria-label="Redimensionar a caixa de texto"
+               title="Arraste para redimensionar · duplo clique volta ao automático"></div>
+          <div class="fmt-hint">
+            <b>**negrito**</b> · <i>'itálico'</i> · <u>__sublinhado__</u> · <s>~~riscado~~</s> · <code>`código`</code> · <span class="k">- tópico</span> · <span class="k">&gt; citação</span> · <span class="k">||spoiler||</span> · <span class="k">[[censurado]]</span>
+          </div>
+          <div class="composer-row">
+            <textarea id="msg" rows="1" maxlength="4000" autocomplete="off" aria-label="Informe"></textarea>
+            <span id="caret-hint" aria-hidden="true"><span class="blk">&#9608;</span> Publicar informe...</span>
+            <button id="send" class="primary">Publicar</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="prova"   class="pane hide" aria-label="Prova da Vanguarda"></section>
+      <section id="correcao" class="pane hide" aria-label="Correção de provas"></section>
+      <section id="exame"   class="pane hide" aria-label="Banco de questões"></section>
+      <section id="manage"  class="pane hide" aria-label="Gerenciar contas"></section>
+    </div>
+  </section>
+</div>
+
+<div id="crt" aria-hidden="true">
+  <div class="crt-scan"></div>
+  <div class="crt-flick"></div>
+  <div class="crt-tear"></div>
+</div>
+
+<div id="modal" class="hide" role="dialog" aria-modal="true"></div>
+
+<div id="find" class="hide" role="dialog" aria-modal="true" aria-label="Busca">
+  <div class="find-box">
+    <div class="find-top">
+      <span class="find-ico">⌕</span>
+      <input id="find-q" placeholder="varrer informes e canais..." autocomplete="off" spellcheck="false">
+      <span id="find-stat"></span>
+      <button id="find-x" class="ghost" aria-label="Fechar">ESC</button>
+    </div>
+    <div id="find-res"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="format.js"></script>
+<script src="fx.js"></script>
+<script src="app.js"></script>
+<script src="prova.js"></script>
+<script src="manage.js"></script>
+<script src="search.js"></script>
+</body>
+</html>

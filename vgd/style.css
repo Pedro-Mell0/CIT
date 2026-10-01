@@ -1,0 +1,568 @@
+/* ===========================================================================
+   VGD · Vanguarda — folha de estilo.
+   A paleta é de garagem noturna: asfalto, âmbar de painel, brasa de freio e
+   o azul-xênon do farol. Nada de ciano e violeta — aquilo é do CIT.
+   =========================================================================== */
+:root{
+  --side-w:272px;--gap:.5rem;
+  --void:#0a0704;--ink:#150d06;--panel:#1f1409;--line:#54300f;
+  --amber:#ff9d2e;--ember:#ff5c1a;--xenon:#4ad9ff;--lime:#b6ff3a;
+  --text:#ffe6cc;--dim:#a8835f;--danger:#ff3b5c;--gold:#ffd166;
+  --live:#b6ff3a;--dead:#ff3b5c;
+}
+/* Declara que o tema escuro é nosso. Sem isto, navegador embutido que force o
+   próprio tema (o do FiveM, por exemplo) reescreve as cores da página e vira o
+   texto claro em escuro — preto no preto, com só os nomes coloridos sobrando. */
+:root{color-scheme:dark}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{
+  background:
+    radial-gradient(900px 500px at 12% -10%,#7a360855,transparent),
+    radial-gradient(760px 520px at 100% 100%,#0b3f5a44,transparent),
+    var(--void);
+  color:var(--text,#ffe6cc);font:14px/1.5 'JetBrains Mono',monospace}
+/* Listras de tubo por cima de tudo. `translateZ(0)` promove a camada para a
+   GPU: o degradê é rasterizado uma vez e reaproveitado, em vez de ser
+   remisturado a cada repintura embaixo dele. */
+body::after{content:"";position:fixed;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,#0000 0 3px,#0006 3px 4px);opacity:.33;
+  z-index:99;will-change:transform;transform:translateZ(0)}
+body.dragging{cursor:col-resize;user-select:none}
+*{scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--line);border:2px solid transparent;background-clip:padding-box;border-radius:8px}
+::-webkit-scrollbar-thumb:hover{background:var(--amber);background-clip:padding-box}
+::-webkit-scrollbar-button{display:none}
+::-webkit-scrollbar-corner{background:transparent}
+.hide{display:none!important}
+h1,h2,.tabs button,.primary,.pane-head h3{font-family:'Chakra Petch',sans-serif}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+
+input,textarea,select{width:100%;background:var(--void);border:1px solid var(--line);color:var(--text);padding:.7rem .8rem;font:inherit;border-radius:2px}
+textarea{resize:vertical;min-height:2.6rem}
+input:focus,textarea:focus,select:focus{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber),0 0 16px #ff9d2e33;outline:0}
+button{font:inherit;color:inherit;cursor:pointer;border-radius:2px}
+.primary{background:linear-gradient(90deg,var(--ember),var(--amber));border:0;color:#1a0d02;padding:.7rem 1.2rem;font-weight:700;letter-spacing:.04em}
+.primary:hover{filter:brightness(1.12)}
+.primary.sm{padding:.45rem .8rem;font-size:.78rem}
+.ghost{background:none;border:1px solid var(--line);color:var(--dim);padding:.5rem .8rem}
+.ghost:hover{color:var(--amber);border-color:var(--amber)}
+.ghost.danger:hover{color:var(--danger);border-color:var(--danger)}
+.ghost.ok:hover{color:var(--lime);border-color:var(--lime)}
+button:disabled{opacity:.45;cursor:progress}
+
+/* ---------- acesso ---------- */
+#auth{min-height:100%;display:grid;place-items:center;padding:1rem}
+.card{width:min(410px,100%);background:#120b05ee;border:1px solid var(--line);padding:2rem 1.6rem;
+  display:grid;gap:.8rem;box-shadow:0 0 60px #ff5c1a2e;position:relative}
+/* canto chanfrado, como adesivo de carenagem */
+.card::before{content:"";position:absolute;inset:-1px;border:1px solid var(--amber);
+  clip-path:polygon(0 0,28px 0,0 28px);pointer-events:none}
+.logo{width:78px;height:78px;color:var(--amber);justify-self:center;filter:drop-shadow(0 0 10px var(--amber))}
+.logo.sm{width:38px;height:38px;flex:none}
+/* o tigre pisca devagar, como farol de milha em espera */
+.eye{animation:pisca-olho 6s infinite;transform-origin:center;transform-box:fill-box;fill:var(--lime)}
+@keyframes pisca-olho{0%,93%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+h1{text-align:center;font-family:'Orbitron',sans-serif;font-weight:800;font-size:2.7rem;
+  letter-spacing:.3em;text-indent:.3em;line-height:1;
+  background:linear-gradient(90deg,var(--ember),var(--amber) 55%,var(--gold));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{text-align:center;color:var(--dim);font-size:.76rem}
+#boot{color:var(--amber);font-size:.72rem;min-height:3.4em;white-space:pre-wrap;opacity:.85}
+.tabs{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--line)}
+.tabs button{background:none;border:0;border-bottom:2px solid transparent;color:var(--dim);padding:.5rem}
+.tabs .on{color:var(--amber);border-color:var(--amber)}
+#err{color:var(--danger);min-height:1.2em;font-size:.8rem}
+small{color:var(--dim);font-size:.7rem}
+
+/* ---------- estrutura ---------- */
+#app{display:flex;height:100%;position:relative;z-index:1}
+#side{width:var(--side-w);flex:none;background:var(--ink);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;padding:1rem;gap:.9rem;min-height:0}
+.me{display:flex;gap:.7rem;align-items:center}
+.me b{display:block;color:var(--amber);font-family:'Chakra Petch',sans-serif;font-size:1.02rem;word-break:break-word}
+.me span{font-size:.7rem}
+.me .role-candidato{color:var(--dim)}
+.me .role-oficial{color:var(--xenon)}
+.me .role-comando{color:var(--amber)}
+.me .role-admin{color:var(--gold)}
+.side-foot{display:grid;gap:.4rem}
+
+#chans{flex:1;overflow:auto;display:grid;gap:.15rem;align-content:start}
+#chans button{text-align:left;background:none;border:1px solid transparent;color:var(--dim);
+  padding:.5rem .6rem;display:flex;gap:.45rem;align-items:center;width:100%}
+#chans button .ic{flex:none;opacity:.85}
+#chans button .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#chans button:hover{color:var(--text);background:var(--panel)}
+#chans button.on{color:var(--amber);background:var(--panel);border-left:2px solid var(--amber)}
+#chans button.sub{padding-left:1.2rem}
+#chans button.gear .ic{color:var(--gold)}
+#chans button.prova .ic{color:var(--lime)}
+/* bolinha: o canal tem informe que este oficial ainda não viu */
+#chans button.new::after{content:"●";color:var(--gold);text-shadow:0 0 8px var(--gold);margin-left:auto}
+#chans h3{font-size:.68rem;color:var(--dim);font-weight:400;margin:.9rem 0 .2rem;letter-spacing:.1em;text-transform:uppercase}
+#chans h3.cat{display:flex;align-items:center;margin:.9rem 0 .1rem}
+.cat-tw{background:none;border:0;color:var(--dim);font:inherit;font-size:.68rem;letter-spacing:.1em;
+  text-transform:uppercase;display:flex;gap:.35rem;align-items:center;padding:.2rem;flex:1;text-align:left;border-radius:2px}
+.cat-tw:hover{color:var(--amber);background:var(--panel)}
+.cat-tw .arw{font-size:.62rem;width:.7em;flex:none}
+.cat-tw .cat-nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cat-tw .cat-n{margin-left:auto;font-size:.6rem;color:var(--dim);border:1px solid var(--line);
+  border-radius:8px;padding:0 .35rem;letter-spacing:0}
+.cat-tw:hover .cat-n{border-color:var(--amber)}
+.cat-tw.dentro,.cat-tw.dentro .arw{color:var(--amber)}
+.cat-tw.new .cat-n{border-color:var(--gold);color:var(--gold);box-shadow:0 0 8px #ffd16655}
+.cat-tw.new .cat-n::after{content:" ●";font-size:.5rem;vertical-align:middle}
+h3.cat.fechada{opacity:.85}
+.cat-ed{background:none;border:0;color:var(--dim);opacity:.45;padding:0 .2rem}
+h3.cat:hover .cat-ed{opacity:1}
+.cat-ed:hover{color:var(--amber)}
+#chans .ch-row{display:flex;align-items:center}
+#chans .ch-row>button.ch-nav{flex:1;min-width:0;width:auto}
+#chans button.ch-ed{width:auto;flex:none;border:0;color:var(--dim);opacity:.25;padding:.5rem .3rem}
+#chans .ch-row:hover button.ch-ed{opacity:.85}
+#chans button.ch-ed:hover{color:var(--amber);background:none;opacity:1}
+#chans button .ic.trava{color:var(--gold);opacity:1}
+.cat-tw .trava{color:var(--gold);font-size:.72rem;flex:none}
+/* contador de provas esperando correção, ao lado do item */
+#chans .pend{margin-left:auto;font-size:.6rem;border:1px solid var(--lime);color:var(--lime);
+  border-radius:8px;padding:0 .35rem;box-shadow:0 0 8px #b6ff3a44}
+
+#room{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}
+header{display:flex;align-items:center;gap:.8rem;padding:.8rem 1.1rem;border-bottom:1px solid var(--line);background:var(--ink)}
+header h2{font-size:1.15rem;letter-spacing:.06em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#ch-hint{color:var(--dim);font-size:.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+header .tools{margin-left:auto;display:flex;gap:.4rem;align-items:center;flex:none}
+header .tools .ghost{padding:.4rem .6rem}
+#menu{display:none}
+
+#room-body{flex:1;display:flex;min-height:0;padding:var(--gap)}
+.pane{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;
+  background:var(--ink);border:1px solid var(--line);position:relative;overflow:hidden}
+#msgs{flex:1;overflow:auto;padding:.9rem 1rem;display:flex;flex-direction:column;gap:.5rem;position:relative;z-index:1}
+
+/* grade de dados atrás dos informes — só CSS, nada de canvas nem timer */
+#chat::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
+  background:
+    repeating-linear-gradient(90deg,#ff9d2e0d 0 1px,transparent 1px 72px),
+    repeating-linear-gradient(0deg,#4ad9ff0b 0 1px,transparent 1px 72px);
+  -webkit-mask-image:linear-gradient(180deg,transparent 12%,#000 85%);
+  mask-image:linear-gradient(180deg,transparent 12%,#000 85%);
+  animation:grade 22s linear infinite}
+@keyframes grade{from{background-position:0 0,0 0}to{background-position:0 72px,-72px 0}}
+@media(prefers-reduced-motion:reduce){#chat::before{animation:none!important}}
+
+/* ---------- mensagens ---------- */
+.m{max-width:80ch;word-break:break-word;animation:in .18s ease-out;border-radius:2px;padding:.1rem .3rem;margin:0 -.3rem}
+@keyframes in{from{opacity:0;transform:translateY(4px)}}
+.m.sem-anim{animation:none}
+/* `backwards` é o que faz a escada funcionar: sem ele a mensagem fica visível
+   durante o próprio atraso e só então some para reaparecer — uma piscada feia. */
+.m.escalona{animation-fill-mode:backwards}
+.m .head{display:flex;align-items:baseline;gap:.35rem;flex-wrap:wrap}
+.m .who{font-weight:600}
+.m time{color:var(--dim);font-size:.7rem}
+.m .ed{color:var(--dim);font-size:.65rem;font-style:italic}
+.m .act{background:none;border:0;color:var(--dim);opacity:0;padding:0 .25rem;font-size:.8rem}
+.m:hover .act,.m .act:focus-visible{opacity:1}
+.m .act:hover{color:var(--amber)}
+.m .act.del{font-size:.72rem}
+.m .act.del:hover{color:var(--danger)}
+/* A cor do corpo fica escrita aqui em vez de herdada do <body>: num navegador
+   que imponha o próprio tema, o que não está declarado é o primeiro a cair. */
+.m .txt,.md{color:var(--text,#ffe6cc)}
+.m.mine .txt{border-left:2px solid var(--ember);padding-left:.6rem}
+.m.hit{background:#ff9d2e1f;box-shadow:inset 0 0 0 1px var(--amber)}
+.empty{color:var(--dim);margin:auto;text-align:center}
+.edit-box{display:grid;gap:.4rem;margin:.3rem 0 .6rem}
+.edit-row{display:flex;gap:.5rem;align-items:center}
+.edit-row .tip{color:var(--dim);font-size:.66rem}
+
+/* ---------- texto formatado ---------- */
+.md p{margin:0}
+.md p+p,.md ul,.md ol,.md blockquote,.md pre,.md .md-h{margin-top:.35rem}
+.md ul,.md ol{padding-left:1.25rem}
+.md li{margin:.1rem 0}
+.md ul li::marker{color:var(--ember)}
+.md ol li::marker{color:var(--amber)}
+.md blockquote{border-left:2px solid var(--ember);padding-left:.7rem;color:#e8c9a6}
+.md code{background:#00000066;border:1px solid var(--line);padding:0 .25rem;font-size:.88em;color:var(--amber)}
+.md pre{background:#00000066;border:1px solid var(--line);padding:.6rem .7rem;overflow:auto}
+.md pre code{border:0;background:none;padding:0;color:var(--text)}
+.md .md-h{font-family:'Chakra Petch',sans-serif;color:var(--amber);letter-spacing:.04em;font-size:1.02em}
+.md hr{border:0;border-top:1px dashed var(--line);margin:.5rem 0}
+.md a{color:var(--xenon)}
+.md s{opacity:.6}
+.md u{text-decoration-color:var(--ember)}
+.spoiler{background:var(--line);color:transparent;border-radius:2px;cursor:pointer;transition:color .15s}
+.spoiler.open{background:#00000055;color:inherit}
+.redact{background:#000;color:transparent;box-shadow:inset 0 0 0 1px #ffffff14;padding:0 .2rem;
+  cursor:pointer;border-radius:1px;transition:color .15s}
+.redact:hover{box-shadow:inset 0 0 0 1px var(--danger)}
+.redact.open{background:#00000055;color:var(--danger);box-shadow:inset 0 0 0 1px var(--danger)}
+
+/* ---------- caixa de publicação ---------- */
+.composer{padding:.7rem 1.2rem .9rem;border-top:1px solid var(--line);background:var(--ink);display:grid;gap:.4rem;position:relative;z-index:1}
+#msg-grip{height:9px;margin:-.7rem -1.2rem -.1rem;cursor:row-resize;
+  background:linear-gradient(180deg,transparent 3px,var(--line) 4px,var(--line) 5px,transparent 6px)}
+#msg-grip:hover{background:linear-gradient(180deg,transparent 2px,var(--amber) 4px,var(--amber) 5px,transparent 7px)}
+body.dragging-v{cursor:row-resize;user-select:none}
+body.dragging-v #msg-grip{background:linear-gradient(180deg,transparent 2px,var(--amber) 4px,var(--amber) 5px,transparent 7px)}
+.fmt-hint{color:var(--dim);font-size:.65rem;display:flex;gap:.5rem;flex-wrap:wrap;opacity:.65}
+.fmt-hint code{background:none;color:inherit}
+.composer-row{display:flex;gap:.6rem;align-items:flex-end;position:relative}
+.composer-row textarea{flex:1;overflow-y:auto;resize:none}
+#caret-hint{position:absolute;left:.8rem;top:.72rem;pointer-events:none;color:var(--dim);font-size:.92em;opacity:.7}
+#caret-hint .blk{color:var(--amber);animation:pisca-blk 1.1s step-end infinite}
+@keyframes pisca-blk{0%,49%{opacity:1}50%,100%{opacity:0}}
+
+/* ---------- painéis (prova, correção, questões, contas) ---------- */
+.pane-scroll{flex:1;overflow:auto;padding:1.2rem}
+.pane-head{border:0;background:none;padding:0 0 1rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap}
+.pane-head h3{color:var(--amber);letter-spacing:.16em;font-size:1rem}
+.pane-head .primary,.pane-head .ghost.right{margin-left:auto}
+.pane-note{color:var(--dim);font-size:.74rem;max-width:72ch}
+
+/* ---------- prova ---------- */
+.prova-capa{display:grid;gap:1rem;justify-items:center;text-align:center;padding:2.4rem 1rem;max-width:62ch;margin:auto}
+.prova-capa .selo{font-family:'Orbitron',sans-serif;font-weight:800;font-size:clamp(1.6rem,6vw,2.6rem);
+  letter-spacing:.18em;background:linear-gradient(90deg,var(--ember),var(--amber) 60%,var(--gold));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.prova-capa p{color:var(--dim)}
+.prova-regras{display:grid;gap:.4rem;text-align:left;border:1px solid var(--line);border-left:2px solid var(--ember);
+  background:#1b1108aa;padding:.8rem 1rem;width:100%}
+.prova-regras b{color:var(--amber);font-size:.72rem;letter-spacing:.14em;font-family:'Chakra Petch',sans-serif}
+.prova-regras li{font-size:.8rem;margin-left:1rem}
+
+/* barra de progresso da prova, com cara de conta-giros */
+.prova-top{position:sticky;top:0;z-index:2;background:var(--ink);border-bottom:1px solid var(--line);
+  padding:.6rem 1.2rem;display:flex;gap:.8rem;align-items:center;flex-wrap:wrap}
+.prova-top b{font-family:'Chakra Petch',sans-serif;color:var(--amber);letter-spacing:.12em;font-size:.78rem}
+.prova-prog{flex:1;min-width:120px;height:8px;background:#00000066;border:1px solid var(--line);overflow:hidden}
+.prova-prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--lime),var(--amber) 70%,var(--ember));
+  transition:width .25s ease-out}
+.prova-top .conta{color:var(--dim);font-size:.72rem}
+
+.q-card{border:1px solid var(--line);border-left:2px solid var(--ember);background:#180f07;
+  padding:.9rem 1rem;display:grid;gap:.6rem;margin-bottom:.9rem}
+.q-card.resp{border-left-color:var(--lime)}
+.q-head{display:flex;gap:.6rem;align-items:baseline;flex-wrap:wrap}
+.q-num{font-family:'Orbitron',sans-serif;font-weight:800;color:var(--amber);font-size:.9rem;letter-spacing:.08em}
+.q-kind{font-size:.6rem;border:1px solid var(--line);color:var(--dim);padding:0 .35rem;letter-spacing:.08em}
+.q-kind.dis{border-color:var(--xenon);color:var(--xenon)}
+.q-pts{margin-left:auto;color:var(--dim);font-size:.68rem}
+.q-prompt{font-size:.92rem;white-space:pre-wrap;word-break:break-word}
+.q-opts{display:grid;gap:.35rem}
+.opt{display:flex;gap:.6rem;align-items:flex-start;padding:.5rem .6rem;border:1px solid var(--line);
+  background:#0e0904;cursor:pointer}
+.opt:hover{border-color:var(--amber);background:var(--panel)}
+.opt input{width:auto;padding:0;margin-top:.2rem;flex:none;accent-color:var(--amber)}
+.opt .letra{font-family:'Orbitron',sans-serif;font-weight:600;color:var(--amber);flex:none;font-size:.78rem}
+.opt.marcada{border-color:var(--amber);background:#ff9d2e14;box-shadow:inset 0 0 0 1px var(--amber)}
+.opt.certa{border-color:var(--lime);background:#b6ff3a14}
+.opt.errada{border-color:var(--danger);background:#ff3b5c14}
+.opt .marca{margin-left:auto;font-size:.68rem;flex:none}
+.opt.certa .marca{color:var(--lime)}
+.opt.errada .marca{color:var(--danger)}
+.prova-foot{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;padding:1rem 0 2rem}
+.prova-foot .form-note{margin-right:auto}
+
+/* resultado */
+.res-card{display:grid;gap:.9rem;justify-items:center;text-align:center;padding:2.4rem 1rem;max-width:60ch;margin:auto}
+.res-selo{font-family:'Orbitron',sans-serif;font-weight:800;font-size:clamp(1.5rem,6vw,2.4rem);
+  letter-spacing:.18em;padding:.4rem 1.2rem;border:2px solid currentColor}
+.res-selo.aprovado{color:var(--lime);text-shadow:0 0 18px #b6ff3a77;box-shadow:inset 0 0 40px #b6ff3a14}
+.res-selo.reprovado{color:var(--dead);text-shadow:0 0 18px #ff3b5c77;box-shadow:inset 0 0 40px #ff3b5c14}
+.res-selo.aguardando{color:var(--amber);text-shadow:0 0 18px #ff9d2e77;box-shadow:inset 0 0 40px #ff9d2e14}
+.res-nota{font-family:'Orbitron',sans-serif;font-size:2.6rem;font-weight:800;color:var(--amber)}
+.res-nota small{display:block;font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--dim);letter-spacing:.14em}
+.res-parecer{border:1px solid var(--line);border-left:2px solid var(--xenon);background:#140d06;
+  padding:.7rem .9rem;text-align:left;width:100%;font-size:.84rem}
+
+/* ---------- correção ---------- */
+.cor-lista{display:grid;gap:.4rem}
+.cor-row{display:grid;grid-template-columns:minmax(140px,1.6fr) 110px 110px 130px auto;gap:.6rem;align-items:center;
+  padding:.55rem .7rem;border:1px solid var(--line);background:#180f07;text-align:left;color:var(--text);width:100%}
+.cor-row:hover{border-color:var(--amber);background:var(--panel)}
+.cor-nome{font-weight:600;word-break:break-word}
+.cor-data{color:var(--dim);font-size:.7rem}
+.st{font-size:.62rem;border:1px solid var(--dim);color:var(--dim);padding:0 .35rem;justify-self:start;letter-spacing:.06em}
+.st.aguardando{border-color:var(--amber);color:var(--amber)}
+.st.aprovado{border-color:var(--lime);color:var(--lime)}
+.st.reprovado{border-color:var(--dead);color:var(--dead)}
+.st.em_andamento{border-color:var(--xenon);color:var(--xenon)}
+.cor-nota{font-family:'Orbitron',sans-serif;color:var(--amber);font-size:.9rem}
+.nota-box{display:flex;gap:.5rem;align-items:center;border:1px solid var(--line);background:#0e0904;padding:.45rem .6rem}
+.nota-box input{width:5rem;text-align:center;padding:.35rem}
+.nota-box span{color:var(--dim);font-size:.72rem}
+.resposta{border:1px solid var(--line);background:#0e0904;padding:.6rem .7rem;white-space:pre-wrap;
+  word-break:break-word;font-size:.86rem;min-height:2.4rem}
+.resposta.vazia{color:var(--dim);font-style:italic}
+.cor-sum{display:flex;gap:1.2rem;flex-wrap:wrap;border:1px solid var(--line);border-left:2px solid var(--amber);
+  background:#1b1108;padding:.7rem .9rem;align-items:center}
+.cor-sum .v{font-family:'Orbitron',sans-serif;color:var(--amber)}
+.cor-sum .k{color:var(--dim);font-size:.68rem;letter-spacing:.1em;display:block}
+
+/* ---------- banco de questões ---------- */
+.q-lista{display:grid;gap:.4rem}
+.q-row{display:grid;grid-template-columns:40px minmax(160px,3fr) 110px 70px auto;gap:.6rem;align-items:center;
+  padding:.55rem .7rem;border:1px solid var(--line);background:#180f07}
+.q-row.off{opacity:.5}
+.q-row .txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.q-acts{display:flex;gap:.3rem;flex-wrap:wrap;justify-content:flex-end}
+.q-acts .ghost{padding:.25rem .5rem;font-size:.7rem}
+.alt-row{display:flex;gap:.5rem;align-items:center}
+.alt-row .letra{font-family:'Orbitron',sans-serif;color:var(--amber);flex:none;width:1.4rem}
+.alt-row input[type=text]{flex:1}
+.alt-row input[type=radio]{width:auto;flex:none;accent-color:var(--lime)}
+.alt-row .ghost{flex:none;padding:.35rem .5rem}
+
+/* ---------- contas ---------- */
+.mg-table{display:grid;gap:.25rem;min-width:0}
+.mg-row{display:grid;grid-template-columns:minmax(130px,1.5fr) 100px 100px minmax(200px,2fr);gap:.6rem;
+  align-items:center;padding:.5rem .6rem;border:1px solid var(--line);background:#180f07}
+.mg-hr{border:0;background:none;color:var(--dim);font-size:.65rem;letter-spacing:.14em;padding-bottom:0}
+.mg-name{font-weight:600;word-break:break-word}
+.mg-name em{color:var(--dim);font-size:.7rem;font-style:normal}
+.mg-date{color:var(--dim);font-size:.7rem}
+.mg-acts{display:flex;gap:.3rem;flex-wrap:wrap;justify-content:flex-end}
+.mg-acts .ghost{padding:.25rem .5rem;font-size:.7rem}
+.badge{font-size:.62rem;border:1px solid var(--dim);color:var(--dim);padding:0 .35rem;justify-self:start;letter-spacing:.06em}
+.badge.r-candidato{border-color:var(--dim);color:var(--dim)}
+.badge.r-oficial{border-color:var(--xenon);color:var(--xenon)}
+.badge.r-comando{border-color:var(--amber);color:var(--amber)}
+.badge.r-admin{border-color:var(--gold);color:var(--gold)}
+
+/* ---------- janelas ---------- */
+/* Sem `backdrop-filter`: desfocar a tela inteira a cada repintura da janela é
+   dos trabalhos mais caros que se pode pedir ao navegador, e ele seria refeito
+   a cada letra digitada no campo de código. Escurecer esconde igual e é de
+   graça. */
+#modal{position:fixed;inset:0;z-index:50;background:#050302e8;display:grid;place-items:center;padding:1rem}
+.modal-box{width:min(640px,100%);max-height:88vh;display:flex;flex-direction:column;background:#120b05;
+  border:1px solid var(--line);box-shadow:0 0 60px #ff5c1a3a;position:relative}
+.modal-box::before{content:"";position:absolute;inset:-1px;border:1px solid var(--amber);
+  clip-path:polygon(0 0,22px 0,0 22px);pointer-events:none}
+.modal-box>header{justify-content:space-between}
+.modal-box>header b{color:var(--amber);letter-spacing:.14em;font-size:.85rem}
+.modal-box>header .ghost{border:0;padding:.2rem .5rem}
+.modal-body{padding:1rem;overflow:auto;display:grid;gap:.7rem}
+.modal-foot{padding:.8rem 1rem;border-top:1px solid var(--line);display:flex;gap:.5rem;justify-content:flex-end;flex-wrap:wrap}
+.fld{display:grid;gap:.25rem}
+.fld>span{color:var(--dim);font-size:.7rem;letter-spacing:.06em}
+.form-block{font-family:'Chakra Petch',sans-serif;font-size:.72rem;letter-spacing:.16em;color:var(--ember);
+  margin-top:.5rem;border-bottom:1px solid var(--line);padding-bottom:.25rem}
+.form-note{color:var(--dim);font-size:.72rem}
+.pick-row{display:flex;gap:.6rem;flex-wrap:wrap}
+.pick-row .primary{flex:1}
+
+.access{display:grid;gap:.5rem}
+.access-mode{display:flex;gap:.4rem;flex-wrap:wrap}
+.chip{background:none;border:1px solid var(--line);color:var(--dim);padding:.3rem .6rem;font-size:.72rem}
+.chip.on{color:var(--amber);border-color:var(--amber);background:var(--panel)}
+.access-list{max-height:200px;overflow:auto;border:1px solid var(--line);padding:.4rem;display:grid;gap:.15rem}
+.access-item{display:flex;gap:.5rem;align-items:center;padding:.2rem .3rem;cursor:pointer}
+.access-item:hover{background:var(--panel)}
+.access-item input{width:auto;padding:0;accent-color:var(--amber)}
+.access-item .badge{margin-left:auto}
+
+/* ---------- trava de acesso por código ---------- */
+.lock-row{display:flex;gap:.5rem;align-items:center}
+.lock-row input{flex:1}
+.lock-row .ghost.sm{flex:none;padding:.45rem .7rem;font-size:.75rem;white-space:nowrap}
+.lock-row.tirando input{opacity:.4;text-decoration:line-through}
+.lock-err{color:var(--danger);font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:.9rem;
+  letter-spacing:.14em;text-align:center;padding:.6rem;border:1px solid var(--danger);
+  background:#ff3b5c12;text-shadow:0 0 14px #ff3b5c99;box-shadow:inset 0 0 26px #ff3b5c22}
+.lock-err.nega{animation:nega-pisca .14s steps(1) 3}
+@keyframes nega-pisca{0%,100%{opacity:1}50%{opacity:.2}}
+/* o selo verde do acerto: as letras chegam espalhadas e se juntam, como um
+   painel travando o registro antes de soltar a cancela */
+.lock-ok{color:var(--lime);font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:.9rem;
+  letter-spacing:.14em;text-align:center;padding:.6rem;border:1px solid var(--lime);
+  background:#b6ff3a12;text-shadow:0 0 14px #b6ff3a99;box-shadow:inset 0 0 26px #b6ff3a22;
+  animation:ok-entra .34s ease-out}
+@keyframes ok-entra{0%{opacity:0;letter-spacing:.55em}40%{opacity:1}100%{opacity:1;letter-spacing:.14em}}
+/* Glitch vermelho quando o código sai errado. A camada fica na tela o tempo
+   todo, invisível e promovida para a GPU: a animação mexe só em `opacity`, que
+   o compositor resolve sozinho, sem repintar nada. */
+#nega-flash{position:fixed;inset:0;z-index:998;pointer-events:none;opacity:0;
+  background:radial-gradient(ellipse at center,#ff174433 0%,#ff3b5c66 55%,#ff0033b3 100%);
+  will-change:opacity;transform:translateZ(0)}
+#nega-flash.on{animation:nega-flash .42s steps(1)}
+@keyframes nega-flash{
+  0%{opacity:.95} 9%{opacity:0}   16%{opacity:.8} 23%{opacity:.04}
+  34%{opacity:.9} 45%{opacity:0}  56%{opacity:.5} 68%{opacity:.06}
+  79%{opacity:.3} 90%{opacity:0}  100%{opacity:0}
+}
+
+/* ---------- membros do canal ---------- */
+.membros{display:grid;gap:.2rem;max-height:46vh;overflow:auto;border:1px solid var(--line);padding:.5rem}
+.membro{display:flex;align-items:center;gap:.55rem;padding:.25rem .3rem}
+.membro:hover{background:var(--panel)}
+.mb-dot{width:8px;height:8px;border-radius:50%;flex:none}
+.mb-dot.vazio{background:none;border:1px solid var(--dim)}
+.mb-nome{word-break:break-word}
+.mb-voce{color:var(--dim);font-size:.7rem;font-style:normal;margin-left:auto}
+.membro.extra .mb-nome{color:var(--dim);font-style:italic}
+.modal-foot .form-note{margin-right:auto}
+#members{letter-spacing:.06em;font-size:.72rem}
+
+/* ---------- cor do oficial ---------- */
+#me-cfg{margin-left:auto;flex:none;padding:.3rem .45rem;font-size:.9rem}
+#me-cfg:hover{color:var(--amber)}
+.paleta{display:grid;grid-template-columns:repeat(8,1fr);gap:.4rem}
+.swatch{height:1.9rem;border:1px solid var(--line);border-radius:2px;padding:0;position:relative;transition:transform .1s}
+.swatch:hover{transform:scale(1.12)}
+.swatch.on{border-color:#fff;box-shadow:0 0 0 2px var(--void),0 0 0 3px currentColor,0 0 14px}
+.swatch.on::after{content:"✓";position:absolute;inset:0;display:grid;place-items:center;
+  color:#0a0704;font-size:.9rem;font-weight:700;text-shadow:0 0 4px #fff8}
+.prova-cor{font-family:'Chakra Petch',sans-serif;font-size:1.3rem;letter-spacing:.06em;
+  text-shadow:0 0 12px currentColor;word-break:break-word;min-height:1.4em}
+
+/* ---------- busca ---------- */
+#find{position:fixed;inset:0;z-index:60;background:#050302ee;padding:6vh 1rem 1rem;display:flex;justify-content:center}
+.find-box{width:min(760px,100%);max-height:86vh;display:flex;flex-direction:column;background:#120b05;
+  border:1px solid var(--line);box-shadow:0 0 60px #ff5c1a3a}
+.find-top{display:flex;align-items:center;gap:.6rem;padding:.7rem .9rem;border-bottom:1px solid var(--line)}
+.find-ico{color:var(--amber);font-size:1.1rem}
+#find-q{border:0;background:none;padding:.3rem 0}
+#find-q:focus{box-shadow:none}
+#find-stat{color:var(--dim);font-size:.68rem;white-space:nowrap;flex:none}
+#find-x{padding:.2rem .5rem;font-size:.65rem;flex:none}
+#find-res{overflow:auto;padding:.6rem .9rem 1rem;display:grid;gap:.35rem;align-content:start}
+.r-group{color:var(--ember);font-size:.66rem;letter-spacing:.16em;margin-top:.6rem;font-family:'Chakra Petch',sans-serif}
+.r-card{text-align:left;background:#180f07;border:1px solid var(--line);color:var(--text);padding:.5rem .6rem;display:grid;gap:.2rem}
+.r-card:hover{border-color:var(--amber);background:var(--panel)}
+.r-head{display:flex;gap:.5rem;align-items:baseline;flex-wrap:wrap;font-size:.7rem}
+.r-ch{color:var(--amber)}
+.r-who{color:var(--dim)}
+.r-head time{color:var(--dim);margin-left:auto}
+.r-snip{font-size:.78rem;color:#e3c5a4;word-break:break-word}
+mark{background:#ff9d2e33;color:var(--amber);padding:0 .1rem}
+
+/* ---------- avisos ---------- */
+.toast{position:fixed;left:50%;bottom:1.4rem;transform:translateX(-50%);z-index:80;background:#120b05;
+  border:1px solid var(--amber);color:var(--text);padding:.6rem 1rem;font-size:.8rem;
+  box-shadow:0 0 30px #ff9d2e33;animation:in .2s ease-out;max-width:90vw}
+.toast.bad{border-color:var(--danger);box-shadow:0 0 30px #ff3b5c33}
+
+/* ---------- estrada de fundo ---------- */
+/* z-index negativo: fica acima do fundo do body e atrás de todo o conteúdo */
+#road{position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none;opacity:.5}
+:root.no-crt #road{display:none}
+
+/* ---------- painel lateral: relógio e conta-giros ---------- */
+#hud{border:1px solid var(--line);border-left:2px solid var(--ember);background:#1b110888;
+  padding:.45rem .55rem;display:grid;gap:.3rem}
+#hud-clock{font-family:'Orbitron',sans-serif;font-size:1.28rem;letter-spacing:.08em;color:var(--amber);
+  line-height:1;text-shadow:0 0 10px #ff9d2e55}
+#hud-clock .pisca{animation:pisca-dp 1s step-end infinite}
+@keyframes pisca-dp{0%,49%{opacity:1}50%,100%{opacity:.15}}
+/* conta-giros: as barras acendem da esquerda para a direita e as últimas
+   entram na faixa vermelha, como o shift light do painel */
+#hud-tacho{height:7px;background:#00000066;border:1px solid var(--line);overflow:hidden}
+#hud-bar{display:block;height:100%;width:30%;
+  background:linear-gradient(90deg,var(--lime) 0 55%,var(--amber) 55% 80%,var(--dead) 80%);
+  transition:width .6s cubic-bezier(.3,.9,.4,1)}
+#hud-stat{display:grid;grid-template-columns:1fr 1fr;gap:.1rem .5rem;font-size:.6rem;color:var(--dim);letter-spacing:.06em}
+#hud-stat .v{color:var(--text)}
+#hud-stat .v.ok{color:var(--lime)}
+#hud-stat .v.alerta{color:var(--gold)}
+
+/* ---------- botões de ambientação ---------- */
+.fx-row{display:flex;gap:.4rem}
+.fx-row #out{flex:1}
+.fx-row #fx-sfx,.fx-row #fx-crt{flex:none;width:2.2rem;padding:.5rem 0;text-align:center;color:var(--amber);border-color:var(--line)}
+.fx-row .off{color:var(--dim);opacity:.55;text-decoration:line-through}
+
+/* ---------- linha de rádio ao abrir canal ---------- */
+#boot-line{padding:.45rem 1.2rem;color:var(--amber);font-size:.68rem;letter-spacing:.04em;
+  border-bottom:1px solid var(--line);background:#1b110855;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;transition:opacity .5s,max-height .5s;max-height:2rem;position:relative;z-index:1}
+#boot-line.fade{opacity:0;max-height:0;padding-top:0;padding-bottom:0;border-bottom-color:transparent}
+
+/* ---------- alça da barra lateral ---------- */
+.grip{flex:none;width:8px;cursor:col-resize;border-radius:2px;
+  background:linear-gradient(90deg,transparent 3px,var(--line) 3px 5px,transparent 5px)}
+.grip:hover,body.dragging .grip{background:linear-gradient(90deg,transparent 2px,var(--amber) 2px 6px,transparent 6px)}
+
+/* ---------- reordenar a barra lateral ---------- */
+#chans [draggable="true"]{cursor:grab}
+#chans .dragging{opacity:.35}
+#chans .drop-before{box-shadow:inset 0 2px 0 var(--amber)}
+#chans .drop-after{box-shadow:inset 0 -2px 0 var(--amber)}
+#chans .drop-into{background:#ff9d2e1a;box-shadow:inset 0 0 0 1px var(--amber)}
+
+/* ---------- ruído de CRT ---------- */
+/* `contain` prende layout, pintura e estilo aqui dentro: o que acontece nesta
+   camada nunca obriga o resto da página a ser recalculado. */
+#crt{position:fixed;inset:0;pointer-events:none;z-index:100;overflow:hidden;contain:layout paint style}
+:root.no-crt #crt{display:none}
+/* varredura lenta, como o feixe de um tubo antigo. É a única animação que roda
+   o tempo todo, então precisa ser só `transform` e ter camada própria. */
+.crt-scan{position:absolute;left:0;right:0;height:38vh;
+  background:linear-gradient(180deg,transparent,#ff9d2e08 35%,#4ad9ff10 50%,#ff9d2e08 65%,transparent);
+  animation:crt-sweep 9s linear infinite;will-change:transform}
+@keyframes crt-sweep{from{transform:translateY(-40vh)}to{transform:translateY(105vh)}}
+.crt-flick{position:absolute;inset:0;opacity:0;background:linear-gradient(120deg,var(--amber),var(--ember) 60%,var(--xenon))}
+:root.flick .crt-flick{animation:crt-flick .28s steps(4)}
+@keyframes crt-flick{
+  0%{opacity:0}12%{opacity:.1}22%{opacity:.01}
+  38%{opacity:.15}48%{opacity:.03}
+  62%{opacity:.08}74%{opacity:0}86%{opacity:.05}100%{opacity:0}
+}
+.crt-tear{position:absolute;left:-4%;right:-4%;height:9vh;top:0;opacity:0;
+  background:repeating-linear-gradient(0deg,#0000 0 2px,#ff9d2e22 2px 3px);
+  box-shadow:0 0 30px #ff5c1a55;mix-blend-mode:screen}
+:root.flick .crt-tear{animation:crt-tear .28s linear}
+@keyframes crt-tear{
+  0%{opacity:0;top:8%;transform:translateX(0)}
+  20%{opacity:.9;transform:translateX(-9px) scaleY(.6)}
+  45%{opacity:.7;top:46%;transform:translateX(7px) scaleY(1.3)}
+  70%{opacity:.85;top:72%;transform:translateX(-5px) scaleY(.8)}
+  100%{opacity:0;top:96%;transform:translateX(0)}
+}
+:root.flick #app,:root.flick #auth{animation:crt-shift .28s steps(3)}
+@keyframes crt-shift{0%,100%{opacity:1}18%{opacity:.86}40%{opacity:1}58%{opacity:.9}72%{opacity:1}}
+@media print{#crt{display:none!important}}
+@media(prefers-reduced-motion:reduce){#crt{display:none!important}}
+
+/* ---------- modo leve ---------- */
+/* O botão ▩ não desliga só a "vacilada": derruba tudo que custa quadro o tempo
+   todo. Serve para máquina fraca e, principalmente, para quem abre o site
+   dentro do jogo, onde navegador e jogo dividem a mesma GPU. */
+:root.no-crt body::after{content:none}
+@media(prefers-reduced-motion:reduce){body::after{content:none}}
+
+/* ---------- nitro (três cliques no tigre) ---------- */
+#nitro{position:fixed;inset:0;z-index:2000;pointer-events:none;opacity:0;transition:opacity .25s}
+#nitro.on{opacity:1}
+#nitro .linhas{position:absolute;inset:-20%;
+  background:repeating-linear-gradient(90deg,transparent 0 26px,#4ad9ff55 26px 28px,transparent 28px 54px);
+  -webkit-mask-image:radial-gradient(ellipse at center,transparent 8%,#000 62%);
+  mask-image:radial-gradient(ellipse at center,transparent 8%,#000 62%);
+  animation:nitro-rasga .45s linear infinite}
+@keyframes nitro-rasga{from{transform:scale(1)}to{transform:scale(1.5)}}
+#nitro .clarao{position:absolute;inset:0;background:radial-gradient(ellipse at center,#4ad9ff22,transparent 60%)}
+@media(prefers-reduced-motion:reduce){#nitro{display:none!important}}
+
+/* ---------- telas pequenas ---------- */
+@media(max-width:760px){
+  #side{position:fixed;inset:0 25% 0 0;z-index:25;transform:translateX(-100%);transition:transform .2s}
+  #side.open{transform:none;box-shadow:0 0 0 100vmax #000a}
+  #app>.grip{display:none}
+  #menu{display:block}
+  #ch-hint{display:none}
+  .fmt-hint{display:none}
+  #hud{display:none}
+  .mg-row,.cor-row,.q-row{grid-template-columns:1fr 1fr;gap:.4rem}
+  .mg-hr{display:none}
+  .mg-acts,.q-acts{grid-column:1/-1;justify-content:flex-start}
+  #members{font-size:0;padding:.4rem .55rem}
+  #members::before{content:"\2687";font-size:.9rem}
+}
+@media(max-width:520px){.paleta{grid-template-columns:repeat(4,1fr)}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
