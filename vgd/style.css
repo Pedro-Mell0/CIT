@@ -547,7 +547,9 @@ mark{background:#ff9d2e33;color:var(--amber);padding:0 .1rem}
   animation:nitro-rasga .45s linear infinite}
 @keyframes nitro-rasga{from{transform:scale(1)}to{transform:scale(1.5)}}
 #nitro .clarao{position:absolute;inset:0;background:radial-gradient(ellipse at center,#4ad9ff22,transparent 60%)}
-@media(prefers-reduced-motion:reduce){#nitro{display:none!important}}
+/* o carro que atravessa derrapando fica acima das linhas de velocidade */
+#drift{position:fixed;inset:0;z-index:2001;pointer-events:none}
+@media(prefers-reduced-motion:reduce){#nitro,#drift{display:none!important}}
 
 /* ---------- telas pequenas ---------- */
 @media(max-width:760px){

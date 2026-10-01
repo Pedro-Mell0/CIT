@@ -141,7 +141,7 @@ function mode(up) {
   $('#go').textContent = up ? 'Criar acesso' : 'Entrar';
   $('#p').autocomplete = up ? 'new-password' : 'current-password';
   $('#auth-tip').textContent = up
-    ? 'Use o nome do seu personagem no RP, igual ao da ficha. É por ele que o comando vai te reconhecer — e é com ele que você entra daqui em diante.'
+    ? 'Use o nome do seu personagem no RP, igual ao da ficha. É por ele que o comando vai te reconhecer. É com ele que você entra daqui em diante.'
     : 'Entre com o nome do seu personagem e a senha que você cadastrou.';
   $('#err').textContent = '';
 }

@@ -200,13 +200,56 @@
         tom(52, t + 0.08, 0.34, 'sine', 0.11);      // sub grave fechando
       },
 
-      /** o estouro do nitro: três cliques no tigre */
-      nitro(dur) {
+      /** raspão num cone: uma batida seca e o pneu reclamando de leve */
+      raspada() {
         if (!on || !pronto()) return;
         const t = ctx.currentTime;
-        estalo(t, 0.25, 600, 0.3);                  // o sopro
-        acelera(t, dur * 0.8, 110, 900, 0.1);
-        derrapa(t + dur * 0.78, 0.4, 0.09);
+        estalo(t, 0.13, 800, 0.06);
+        tom(85, t, 0.1, 'square', 0.075);
+        derrapa(t + 0.03, 0.2, 0.055);
+      },
+
+      /**
+       * Partida de um motor turbinado, em quatro tempos: o arranque girando
+       * em pulsos graves, o motor pegando, a acelerada cheia, e a válvula de
+       * alívio soltando no fim. Por cima de tudo, o assobio da turbina subindo
+       * junto com o giro — é ele que dá o caráter de turbo, e não o volume.
+       */
+      turbo(dur) {
+        if (!on || !pronto()) return;
+        const t = ctx.currentTime;
+
+        // arranque: o motor de partida engasgando antes de pegar
+        for (let i = 0; i < 6; i++) {
+          const ini = t + i * 0.09;
+          tom(56 + Math.random() * 12, ini, 0.07, 'square', 0.075);
+          estalo(ini, 0.055, 480, 0.035);
+        }
+
+        const pega = t + 0.58;
+        const subida = Math.max(0.8, dur - 1.25);
+        acelera(pega, 0.42, 52, 190, 0.1);            // o motor segurando
+        acelera(pega + 0.42, subida, 140, 640, 0.13); // a acelerada imponente
+
+        // assobio da turbina, acompanhando o giro
+        const sopro = ctx.createOscillator(), sg = ctx.createGain(), sf = ctx.createBiquadFilter();
+        sopro.type = 'sine';
+        sf.type = 'bandpass'; sf.Q.value = 7;
+        [sopro.frequency, sf.frequency].forEach(p => {
+          p.setValueAtTime(1100, pega);
+          p.exponentialRampToValueAtTime(5400, pega + subida);
+        });
+        sg.gain.setValueAtTime(0.0001, pega);
+        sg.gain.exponentialRampToValueAtTime(0.04, pega + 0.7);
+        sg.gain.exponentialRampToValueAtTime(0.0001, pega + subida + 0.12);
+        sopro.connect(sf); sf.connect(sg); sg.connect(master);
+        sopro.start(pega); sopro.stop(pega + subida + 0.2);
+
+        // a válvula soltando a pressão, e o pneu cantando na saída
+        const fim = t + dur - 0.55;
+        estalo(fim, 0.17, 2800, 0.14);
+        tom(70, fim, 0.2, 'sine', 0.09);
+        derrapa(fim + 0.06, 0.52, 0.1);
       },
 
       /** marcha lenta de fundo, em laço */
@@ -391,6 +434,33 @@
     let obstaculos = [];                   // { faixa, z }
     let faixaCarro = 0, faixaAlvo = 0;     // a primeira persegue a segunda
 
+    // ---- volante nas mãos de quem olha ----
+    // Sozinho o carro desvia; clicando fora do cartão de acesso, quem dirige é
+    // o visitante. Clicar de volta no cartão devolve o volante ao piloto
+    // automático, para a página não ficar engolindo teclas de quem só quer
+    // digitar a senha.
+    let manual = false, impulso = 0, batida = 0;
+    const teclas = new Set();
+    const LATERAL = 2.4;                   // faixas por segundo, no volante
+    const DIGITANDO = n => n && (n.tagName === 'INPUT' || n.tagName === 'TEXTAREA' || n.isContentEditable);
+
+    addEventListener('pointerdown', e => {
+      const noCartao = !!e.target.closest?.('.card, #modal, #app');
+      if (noCartao === !manual) return;    // já está no modo certo
+      manual = !noCartao;
+      if (!manual) { teclas.clear(); impulso = 0; faixaAlvo = faixaCarro; }
+    });
+
+    addEventListener('keydown', e => {
+      if (!manual || DIGITANDO(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (!'wasd'.includes(k) && !k.startsWith('arrow')) return;
+      teclas.add(k);
+      e.preventDefault();                  // senão as setas rolam a página
+    });
+    addEventListener('keyup', e => teclas.delete(e.key.toLowerCase()));
+    addEventListener('blur', () => teclas.clear());
+
     const medir = () => {
       w = cv.width = innerWidth;
       h = cv.height = innerHeight;
@@ -421,6 +491,29 @@
       if (!livres.length) return;
       livres.sort((a, b) => Math.abs(a - faixaAlvo) - Math.abs(b - faixaAlvo));
       faixaAlvo = livres[0];
+    }
+
+    /**
+     * No volante não existe desvio automático, então o cone tem de significar
+     * alguma coisa: encostar nele derruba o cone, canta pneu e deixa a lataria
+     * piscando. Sem placar e sem punição — é enfeite de tela de login, não um
+     * jogo a ser vencido.
+     */
+    function confere() {
+      obstaculos = obstaculos.filter(o => {
+        const perto = o.z < Z_CARRO + 0.3 && o.z > Z_CARRO - 0.25;
+        if (!perto || Math.abs(o.faixa - faixaCarro) > 0.5) return true;
+        batida = 0.5;
+        SFX.raspada();
+        return false;
+      });
+    }
+
+    /** Lembrete discreto de quem está com o volante. */
+    function dica() {
+      ctx.font = "11px 'JetBrains Mono',monospace";
+      ctx.fillStyle = 'rgba(255,157,46,.75)';
+      ctx.fillText('WASD  ·  clique no cartão para soltar o volante', 16, h - 16);
     }
 
     function nasce() {
@@ -518,7 +611,9 @@
       ctx.fillRect(x - s * 2.6, y - s * 1.1, s * 0.75, s * 1.4);
       ctx.fillRect(x + s * 1.85, y - s * 1.1, s * 0.75, s * 1.4);
 
-      quad([-1.9, -1.9, 1.9, -1.9, 2.3, 0.2, -2.3, 0.2], '#ff7a2e');   // carroceria
+      // a lataria pisca quando raspa num cone
+      const lata = batida > 0 && Math.floor(batida * 14) % 2 ? '#ff3b5c' : '#ff7a2e';
+      quad([-1.9, -1.9, 1.9, -1.9, 2.3, 0.2, -2.3, 0.2], lata);        // carroceria
       quad([-1.25, -3.2, 1.25, -3.2, 1.7, -1.9, -1.7, -1.9], '#1d1309'); // cabine
       quad([-1, -3, 1, -3, 1.35, -2.15, -1.35, -2.15], 'rgba(74,217,255,.5)'); // vidro
 
@@ -541,14 +636,30 @@
       const dt = Math.min(0.12, (t - ultimo) / 1000);
       ultimo = t;
 
-      const vel = 3.1 + turbo * 7;
+      // No volante, W e S mexem no acelerador; o impulso é perseguido em vez
+      // de aplicado de uma vez, senão o carro liga e desliga a cada toque.
+      const querImpulso = manual
+        ? (teclas.has('w') || teclas.has('arrowup') ? 1 : 0)
+          - (teclas.has('s') || teclas.has('arrowdown') ? 0.6 : 0)
+        : 0;
+      impulso += (querImpulso - impulso) * Math.min(1, dt * 3);
+
+      const vel = (3.1 + turbo * 7) * (1 + impulso);
       rolagem += vel * dt;
       obstaculos.forEach(o => o.z -= vel * dt);
       obstaculos = obstaculos.filter(o => o.z > Z_PERTO);
       if (Math.random() < 0.055 + turbo * 0.06) nasce();
 
-      decide();
-      faixaCarro += (faixaAlvo - faixaCarro) * Math.min(1, dt * 7);
+      if (manual) {
+        const lado = (teclas.has('d') || teclas.has('arrowright') ? 1 : 0)
+                   - (teclas.has('a') || teclas.has('arrowleft') ? 1 : 0);
+        faixaCarro = Math.max(-1.15, Math.min(1.15, faixaCarro + lado * LATERAL * dt));
+        faixaAlvo = faixaCarro;            // para a volta ao automático não dar solavanco
+        confere();
+      } else {
+        decide();
+        faixaCarro += (faixaAlvo - faixaCarro) * Math.min(1, dt * 7);
+      }
 
       ctx.fillStyle = '#0a0704';
       ctx.fillRect(0, 0, w, h);
@@ -556,8 +667,10 @@
       // de trás para a frente: o que está perto tem de cobrir o que está longe
       obstaculos.slice().sort((a, b) => b.z - a.z).forEach(cone);
       carro();
+      if (manual) dica();
 
       if (turbo > 0) turbo = Math.max(0, turbo - dt * 0.5);
+      if (batida > 0) batida = Math.max(0, batida - dt);
     };
 
     const liga = () => { if (!rodando) { rodando = true; requestAnimationFrame(quadro); } };
@@ -616,11 +729,118 @@
     flash.classList.add('on');
   }
 
-  // ========================================================= 🐯 nitro
-  // Três cliques seguidos no tigre e a tela rasga de velocidade por um instante.
-  const NITRO = 2600;
+  // ========================================================= 🐯 turbo
+  // Três cliques seguidos no tigre: o motor dá a partida e um carro atravessa
+  // a tela de lado, em drift.
+  const NITRO = 3400;
   let nitrando = false;
   let pista_;
+
+  /**
+   * O carro do easter egg, visto de cima, cruzando a tela em drift. Vai numa
+   * camada criada na hora, e não na estrada do fundo: assim o segredo vale em
+   * qualquer tela do site, inclusive depois de entrar, onde a estrada nem está
+   * desenhada.
+   *
+   * O truque do drift é o ângulo não acompanhar o movimento. O carro anda para
+   * a direita o tempo todo, mas aponta para cima e para a esquerda no meio da
+   * travessia — é esse descolamento entre para onde ele olha e para onde ele
+   * vai que o olho lê como traseira saindo.
+   */
+  function driftada(ms) {
+    const cv = document.createElement('canvas');
+    cv.id = 'drift';
+    cv.setAttribute('aria-hidden', 'true');
+    document.body.append(cv);
+    const c = cv.getContext('2d');
+    if (!c) { cv.remove(); return; }
+
+    const w = cv.width = innerWidth, h = cv.height = innerHeight;
+    const s = Math.max(11, Math.min(24, w / 58));    // unidade do desenho
+    const y0 = h * 0.62;
+    const marcas = [], fumaca = [];
+    let antes = null;                                // rodas traseiras no quadro anterior
+    const ini = performance.now();
+
+    const caixa = (x, y, lar, alt, r, cor) => {
+      c.fillStyle = cor;
+      c.beginPath();
+      if (c.roundRect) c.roundRect(x, y, lar, alt, r); else c.rect(x, y, lar, alt);
+      c.fill();
+    };
+
+    function desenha(x, y, ang) {
+      c.save();
+      c.translate(x, y);
+      c.rotate(ang);
+      c.fillStyle = 'rgba(0,0,0,.42)';
+      c.beginPath(); c.ellipse(0, s * 0.45, s * 3, s * 1.25, 0, 0, Math.PI * 2); c.fill();
+      [[-1.95, -1.3], [-1.95, 0.75], [1.15, -1.3], [1.15, 0.75]]
+        .forEach(([rx, ry]) => caixa(rx * s, ry * s, s * 0.9, s * 0.55, s * 0.2, '#120b05'));
+      caixa(-s * 2.6, -s, s * 5.2, s * 2, s * 0.5, '#ff7a2e');          // lataria
+      caixa(-s * 0.95, -s * 0.74, s * 2.2, s * 1.48, s * 0.3, '#1d1309'); // teto
+      caixa(-s * 0.6, -s * 0.58, s * 0.5, s * 1.16, s * 0.12, 'rgba(74,217,255,.55)');
+      caixa(s * 2.28, -s * 0.8, s * 0.32, s * 0.5, s * 0.1, '#fff3d0');  // faróis
+      caixa(s * 2.28, s * 0.3, s * 0.32, s * 0.5, s * 0.1, '#fff3d0');
+      caixa(-s * 2.6, -s * 0.8, s * 0.28, s * 0.5, s * 0.1, '#ff3b5c');  // lanternas
+      caixa(-s * 2.6, s * 0.3, s * 0.28, s * 0.5, s * 0.1, '#ff3b5c');
+      c.restore();
+    }
+
+    const quadro = t => {
+      const p = (t - ini) / ms;
+      if (p >= 1) { cv.remove(); return; }
+      requestAnimationFrame(quadro);
+
+      const x = -w * 0.2 + p * w * 1.4;
+      const y = y0 - Math.sin(p * Math.PI) * h * 0.1;
+      const ang = -0.62 * Math.sin(p * Math.PI) - 0.05;
+
+      // os pneus de trás são os que marcam e fumegam. A marca é o segmento
+      // entre onde a roda estava e onde ela está: marcar só o ponto de cada
+      // quadro deixaria um tracejado de bolinhas, porque a cada 16 ms o carro
+      // já andou mais que a largura do pneu.
+      const tras = -2 * s, cos = Math.cos(ang), sen = Math.sin(ang);
+      const rodas = [-1, 1].map(lado => ({
+        x: x + cos * tras - sen * lado * s,
+        y: y + sen * tras + cos * lado * s,
+      }));
+      if (antes) rodas.forEach((r, i) => marcas.push({ de: antes[i], ate: r, a: 1 }));
+      antes = rodas;
+      if (Math.random() < 0.5) fumaca.push({
+        x: x + cos * tras + (Math.random() - 0.5) * s * 1.6,
+        y: y + sen * tras + (Math.random() - 0.5) * s * 1.6,
+        r: s * 0.26, a: 0.26,
+      });
+
+      c.clearRect(0, 0, w, h);
+
+      // Marca de pneu em âmbar apagado, e não em preto: a página é quase
+      // preta, e borracha preta sobre asfalto preto simplesmente não existe
+      // na tela. O tom quente lê como asfalto raspado sob luz de neon.
+      c.strokeStyle = '#ff9d2e';
+      c.lineWidth = s * 0.42;
+      c.lineCap = 'round';
+      marcas.forEach(m => {
+        m.a -= 0.005;
+        if (m.a <= 0) return;
+        c.globalAlpha = m.a * 0.14;
+        c.beginPath(); c.moveTo(m.de.x, m.de.y); c.lineTo(m.ate.x, m.ate.y); c.stroke();
+      });
+
+      c.fillStyle = '#cdbaa6';
+      fumaca.forEach(f => {
+        f.r += s * 0.05; f.a -= 0.013;
+        if (f.a <= 0) return;
+        c.globalAlpha = f.a;
+        c.beginPath(); c.arc(f.x, f.y, f.r, 0, Math.PI * 2); c.fill();
+      });
+
+      c.globalAlpha = 1;
+      desenha(x, y, ang);
+    };
+    requestAnimationFrame(quadro);
+  }
 
   function nitro() {
     if (nitrando || calmo()) return;
@@ -632,8 +852,10 @@
     document.body.append(tela);
     void tela.offsetWidth;                  // deixa o fade de entrada pegar
     tela.classList.add('on');
-    SFX.nitro(NITRO / 1000);
+    SFX.turbo(NITRO / 1000);
     pista_?.acelera(NITRO / 1000);
+    // o carro entra depois do arranque, junto com o motor pegando
+    setTimeout(() => driftada(1700), 620);
 
     setTimeout(() => tela.classList.remove('on'), NITRO);
     setTimeout(() => { tela.remove(); nitrando = false; }, NITRO + 350);
