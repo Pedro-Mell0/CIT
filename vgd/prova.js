@@ -262,7 +262,12 @@
     box.append(head);
 
     const { data, error } = await sb.from('exam_attempts')
-      .select('*, profiles(name,color,role)')
+      // `!profile_id` é obrigatório: exam_attempts aponta para profiles duas
+      // vezes — quem prestou a prova e quem decidiu o resultado — e sem dizer
+      // qual das duas o PostgREST recusa a consulta por ambiguidade. A dica
+      // vai pela coluna, e não pelo nome da constraint, para não depender de
+      // um nome que o Postgres gerou sozinho.
+      .select('*, profiles!profile_id(name,color,role)')
       .eq('arquivada', false)
       .order('submitted_at', { ascending: false, nullsFirst: false })
       .order('started_at', { ascending: false });
