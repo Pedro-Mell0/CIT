@@ -3,15 +3,23 @@
    categorias/canais pelo COMANDO.
    =========================================================================== */
 (() => {
-  const ROLES = { agent: 'AGENTE', command: 'COMANDO', admin: 'ADMIN' };
+  const ROLES = { agent: 'AGENTE', command: 'COMANDO', admin: 'ADMIN', master: 'MASTER' };
+  const ORDEM_CARGO = ['master', 'admin', 'command', 'agent'];
+  let realNames = {};   // id -> nome real (só chega preenchido para MASTER)
 
   // ---------------------------------------------------------------- usuários
-  function open() {
+  async function open() {
     const root = $('#manage');
     root.innerHTML = '';
     if (!isAdmin()) {
       root.append(el('p', 'empty', '> acesso restrito ao ADMIN.'));
       return;
+    }
+
+    realNames = {};
+    if (isMaster()) {
+      const { data } = await sb.from('real_names').select('*');
+      (data || []).forEach(r => realNames[r.profile_id] = r.real_name);
     }
 
     const head = el('header', 'mg-head');
@@ -21,19 +29,23 @@
     head.append(add);
     root.append(head);
 
-    const table = el('div', 'mg-table');
+    const table = el('div', 'mg-table' + (isMaster() ? ' mg-table-master' : ''));
     const hr = el('div', 'mg-row mg-hr');
-    ['CODINOME', 'CARGO', 'DESDE', 'AÇÕES'].forEach(t => hr.append(el('span', null, t)));
+    const cols = ['CODINOME', 'CARGO', 'DESDE'];
+    if (isMaster()) cols.push('NOME REAL (RP)');
+    cols.push('AÇÕES');
+    cols.forEach(t => hr.append(el('span', null, t)));
     table.append(hr);
 
     Object.values(people)
-      .sort((a, b) => (['admin', 'command', 'agent'].indexOf(a.role) - ['admin', 'command', 'agent'].indexOf(b.role))
+      .sort((a, b) => (ORDEM_CARGO.indexOf(a.role) - ORDEM_CARGO.indexOf(b.role))
         || a.codename.localeCompare(b.codename))
       .forEach(p => table.append(userRow(p)));
 
     root.append(table);
     root.append(el('p', 'mg-note',
-      'COMANDO cria categorias e canais e edita mensagens de qualquer agente. ADMIN faz tudo isso e ainda gerencia contas.'));
+      'COMANDO cria categorias e canais e edita mensagens de qualquer agente. ADMIN faz tudo isso e ainda gerencia contas.'
+      + (isMaster() ? ' MASTER enxerga, além disso, o nome real por trás de cada personagem — informação que mais ninguém alcança.' : '')));
   }
 
   function userRow(p) {
@@ -44,6 +56,7 @@
     row.append(name);
     row.append(el('span', 'badge r-' + p.role, ROLES[p.role] || p.role));
     row.append(el('span', 'mg-date', p.created_at ? new Date(p.created_at).toLocaleDateString('pt-BR') : '—'));
+    if (isMaster()) row.append(el('span', 'mg-real', realNames[p.id] || '— ainda não informado —'));
 
     const acts = el('span', 'mg-acts');
     const self = p.id === me.id;
@@ -152,7 +165,9 @@
     const wrap = el('label', 'fld');
     wrap.append(el('span', null, 'Cargo'));
     const role = el('select');
-    Object.entries(ROLES).forEach(([k, v]) => {
+    // MASTER não entra aqui: é credencial única, criada só pelo código de
+    // acesso reservado a ela (ver schema.sql), nunca por este painel.
+    Object.entries(ROLES).filter(([k]) => k !== 'master').forEach(([k, v]) => {
       const o = el('option', null, v); o.value = k; role.append(o);
     });
     wrap.append(role);

@@ -86,8 +86,9 @@ async function varreNaoLidas() {
   });
 }
 
-const isStaff = () => me && (me.role === 'command' || me.role === 'admin');
-const isAdmin = () => me && me.role === 'admin';
+const isStaff = () => me && (me.role === 'command' || me.role === 'admin' || me.role === 'master');
+const isAdmin = () => me && (me.role === 'admin' || me.role === 'master');
+const isMaster = () => me && me.role === 'master';
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -130,30 +131,34 @@ $('#go').onclick = async () => {
 $('#out').onclick = async () => { await sb.auth.signOut(); location.reload(); };
 
 // ---------- janelas ----------
-function modal(title, { onClose } = {}) {
+function modal(title, { onClose, closable = true } = {}) {
   const root = $('#modal');
   root.innerHTML = '';
   root.classList.remove('hide');
   const box = el('div', 'modal-box');
   const head = el('header');
   head.append(el('b', null, title));
-  const x = el('button', 'ghost', '✕');
-  x.setAttribute('aria-label', 'Fechar');
-  head.append(x);
+  if (closable) {
+    const x = el('button', 'ghost', '✕');
+    x.setAttribute('aria-label', 'Fechar');
+    x.onclick = close;
+    head.append(x);
+  }
   const body = el('div', 'modal-body');
   const foot = el('div', 'modal-foot');
   box.append(head, body, foot);
   root.append(box);
 
-  const close = () => {
+  // closable=false tira o ✕, o ESC e o clique fora: usado no cadastro
+  // obrigatório de primeiro acesso, que não é um aviso para dispensar.
+  function close() {
     root.classList.add('hide'); root.innerHTML = '';
     document.removeEventListener('keydown', esc);
     onClose?.();                    // vale para o ✕, o ESC e o clique fora
-  };
-  const esc = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+  }
+  const esc = e => { if (closable && e.key === 'Escape') { e.stopPropagation(); close(); } };
   document.addEventListener('keydown', esc);
-  x.onclick = close;
-  root.onmousedown = e => { if (e.target === root) close(); };
+  root.onmousedown = e => { if (closable && e.target === root) close(); };
   return { body, foot, close };
 }
 
@@ -213,7 +218,7 @@ async function start() {
   window.FX?.rain?.visivel(false);   // a chuva fica só na tela de acesso
   $('#me-name').textContent = me.codename;
   $('#me-name').style.color = corDe(me);
-  $('#me-role').textContent = { admin: 'ADMIN', command: 'COMANDO', agent: 'AGENTE' }[me.role] || 'AGENTE';
+  $('#me-role').textContent = { admin: 'ADMIN', command: 'COMANDO', agent: 'AGENTE', master: 'MASTER' }[me.role] || 'AGENTE';
   $('#me-role').className = 'role-' + me.role;
   $('#new-ch').classList.toggle('hide', !isStaff());
 
@@ -221,6 +226,44 @@ async function start() {
   drawChannels();
   openChannel('geral');
   listen();
+
+  if (!isMaster()) await garanteNomeReal();
+}
+
+/**
+ * Primeiro acesso: pede o nome real do personagem (RP) e grava uma vez só,
+ * por sessão fora. Só MASTER volta a ler essa informação (ver real_names no
+ * schema) — não aparece no chat nem em lugar nenhum visível a mais ninguém.
+ * O modal nasce sem jeito de fechar sem responder: é cadastro, não aviso.
+ */
+async function garanteNomeReal() {
+  const { data } = await sb.from('real_names').select('profile_id').eq('profile_id', me.id).maybeSingle();
+  if (data) return;
+  await new Promise(resolve => {
+    const m = modal('IDENTIFICAÇÃO · PRIMEIRO ACESSO', { closable: false });
+    m.body.append(el('p', 'form-note',
+      'Antes de continuar, informe o nome real do seu personagem no RP. Fica reservado à administração MASTER — ninguém mais tem acesso.'));
+    const nome = field(m.body, 'Nome do personagem (RP)', '', { ph: 'nome completo usado no RP' });
+    const err = el('p', 'lock-err hide');
+    err.setAttribute('role', 'alert');
+    m.body.append(err);
+    const go = el('button', 'primary', 'Confirmar');
+    m.foot.append(go);
+    nome.focus();
+
+    const envia = async () => {
+      const v = nome.value.trim();
+      if (v.length < 2) { err.textContent = 'Informe um nome válido.'; err.classList.remove('hide'); return; }
+      go.disabled = true;
+      const { error } = await sb.rpc('set_real_name', { p_name: v });
+      go.disabled = false;
+      if (error) { err.textContent = error.message; err.classList.remove('hide'); return; }
+      m.close();
+      resolve();
+    };
+    go.onclick = envia;
+    nome.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); envia(); } });
+  });
 }
 
 function listen() {

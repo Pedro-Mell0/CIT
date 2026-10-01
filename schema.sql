@@ -76,9 +76,16 @@ begin
 end $do$;
 
 alter table public.profiles add constraint profiles_role_check
-  check (role in ('agent','command','admin'));
+  check (role in ('agent','command','admin','master'));
 alter table public.invite_codes add constraint invite_codes_role_check
-  check (role in ('agent','command','admin'));
+  check (role in ('agent','command','admin','master'));
+
+-- Só pode existir UMA conta MASTER. O índice é a trava de verdade: mesmo que
+-- alguém engane o RPC ou a tela de cadastro, o banco recusa a segunda linha
+-- com role = 'master' (o valor indexado é a mesma constante para qualquer
+-- linha que bater na condição, então a segunda vira duplicata).
+drop index if exists public.one_master_only;
+create unique index one_master_only on public.profiles ((role)) where role = 'master';
 
 -- Os códigos de acesso NÃO ficam neste arquivo. Ele é versionado, e um código
 -- escrito aqui é um código publicado: quem lê o repositório cria conta com o
@@ -99,6 +106,32 @@ alter table public.invite_codes add constraint invite_codes_role_check
 insert into public.invite_codes (code, role)
 select upper(encode(extensions.gen_random_bytes(6), 'hex')), 'admin'
  where not exists (select 1 from public.invite_codes);
+
+-- Mesma lógica para a conta MASTER, a credencial exclusiva do dono do site:
+-- enquanto nenhuma conta MASTER existir, garante que haja um código pendente
+-- para criá-la. Leia-o uma vez e cadastre-se com ele pela aba "Cadastrar
+-- agente" — depois ANOTE E APAGUE o código (ele é reutilizável até ser
+-- apagado, e o índice único só impede a segunda CONTA, não a leitura do
+-- código por outra pessoa):
+--   select code from public.invite_codes where role = 'master';
+--   delete from public.invite_codes where role = 'master';   -- depois de usar
+insert into public.invite_codes (code, role)
+select upper(encode(extensions.gen_random_bytes(6), 'hex')), 'master'
+ where not exists (select 1 from public.profiles where role = 'master')
+   and not exists (select 1 from public.invite_codes where role = 'master');
+
+-- ---------- nomes reais (RP) ----------
+-- O nome de verdade por trás do personagem. Fica fora de `profiles` de
+-- propósito: `profiles` é lido por todo mundo autenticado (profiles_read usa
+-- `using (true)`, porque o codinome e a cor aparecem no chat para todos), e
+-- esta informação não pode vazar por tabela nenhuma — só quem tem a
+-- credencial MASTER enxerga. Cada agente grava a própria linha, uma vez, pelo
+-- RPC set_real_name(); dali em diante só MASTER volta a ler.
+create table if not exists public.real_names (
+  profile_id uuid primary key references public.profiles(id) on delete cascade,
+  real_name  text not null,
+  updated_at timestamptz not null default now()
+);
 
 -- ---------- categorias ----------
 create table if not exists public.categories (
@@ -284,14 +317,22 @@ returns text language sql stable security definer set search_path = public as $f
   select role from public.profiles where id = auth.uid()
 $fn$;
 
+-- MASTER enxerga e pode tudo que COMANDO e ADMIN podem — é um ADMIN a mais,
+-- com acesso exclusivo ao nome real por trás de cada personagem.
 create or replace function public.is_staff()
 returns boolean language sql stable security definer set search_path = public as $fn$
-  select coalesce((select role from public.profiles where id = auth.uid()) in ('command','admin'), false)
+  select coalesce((select role from public.profiles where id = auth.uid()) in ('command','admin','master'), false)
 $fn$;
 
 create or replace function public.is_admin()
 returns boolean language sql stable security definer set search_path = public as $fn$
-  select coalesce((select role from public.profiles where id = auth.uid()) = 'admin', false)
+  select coalesce((select role from public.profiles where id = auth.uid()) in ('admin','master'), false)
+$fn$;
+
+-- Só a credencial MASTER passa aqui — é o que guarda o nome real do RP.
+create or replace function public.is_master()
+returns boolean language sql stable security definer set search_path = public as $fn$
+  select coalesce((select role from public.profiles where id = auth.uid()) = 'master', false)
 $fn$;
 
 -- Uma categoria é visível para o ADMIN, para quem está na lista de acesso,
@@ -433,6 +474,9 @@ begin
   if r is null then
     raise exception 'Código de acesso inválido.';
   end if;
+  if r = 'master' and exists (select 1 from public.profiles where role = 'master') then
+    raise exception 'Já existe uma conta MASTER — essa credencial é única.';
+  end if;
   insert into public.profiles (id, codename, role, color)
     values (new.id, cn, r, public.cor_livre());
   return new;
@@ -473,6 +517,9 @@ begin
   end if;
   if new_role not in ('agent','command','admin') then
     raise exception 'Cargo inválido.';
+  end if;
+  if (select role from public.profiles where id = target) = 'master' then
+    raise exception 'A credencial MASTER não se altera por aqui.';
   end if;
   if target = auth.uid() and new_role <> 'admin' then
     raise exception 'Você não pode rebaixar a própria conta.';
@@ -549,6 +596,9 @@ begin
   if not public.is_admin() then
     raise exception 'Apenas o ADMIN pode alterar codinomes.';
   end if;
+  if target <> auth.uid() and (select role from public.profiles where id = target) = 'master' then
+    raise exception 'Só a própria credencial MASTER altera essa conta.';
+  end if;
   if new_name !~ '^[A-Za-z0-9_]{3,20}$' then
     raise exception 'Codinome: 3 a 20 caracteres (letras, números e _).';
   end if;
@@ -624,12 +674,33 @@ begin
   end if;
 end $fn$;
 
+-- Cada conta grava o próprio nome real (RP), geralmente uma vez só, logo após
+-- o primeiro login. security definer de propósito: a escrita direta na tabela
+-- é só para MASTER (ver RLS), então o próprio agente só consegue gravar a
+-- própria linha por este caminho.
+create or replace function public.set_real_name(p_name text)
+returns void language plpgsql security definer set search_path = public as $fn$
+begin
+  if auth.uid() is null then
+    raise exception 'Sessão expirada. Entre de novo.';
+  end if;
+  if length(btrim(coalesce(p_name, ''))) < 2 then
+    raise exception 'Nome: mínimo de 2 caracteres.';
+  end if;
+  insert into public.real_names (profile_id, real_name, updated_at)
+       values (auth.uid(), btrim(p_name), now())
+  on conflict (profile_id) do update set real_name = excluded.real_name, updated_at = now();
+end $fn$;
+
 -- ADMIN troca a cor de qualquer conta.
 create or replace function public.admin_set_color(target uuid, new_color text)
 returns void language plpgsql security definer set search_path = public as $fn$
 begin
   if not public.is_admin() then
     raise exception 'Apenas o ADMIN pode alterar a cor de outra conta.';
+  end if;
+  if target <> auth.uid() and (select role from public.profiles where id = target) = 'master' then
+    raise exception 'Só a própria credencial MASTER altera essa conta.';
   end if;
   if new_color !~ '^#[0-9a-fA-F]{6}$' then
     raise exception 'Cor inválida.';
@@ -644,6 +715,9 @@ set search_path = public, auth, extensions as $fn$
 begin
   if not public.is_admin() then
     raise exception 'Apenas o ADMIN pode redefinir senhas.';
+  end if;
+  if target <> auth.uid() and (select role from public.profiles where id = target) = 'master' then
+    raise exception 'Só a própria credencial MASTER redefine essa senha.';
   end if;
   if length(p_password) < 6 then
     raise exception 'Senha: mínimo de 6 caracteres.';
@@ -667,6 +741,9 @@ begin
   end if;
   if target = auth.uid() then
     raise exception 'Você não pode remover a própria conta.';
+  end if;
+  if r = 'master' then
+    raise exception 'A conta MASTER não pode ser removida por aqui.';
   end if;
   if public.is_admin() then
     null;
@@ -795,6 +872,7 @@ alter table public.channel_locks     enable row level security;
 alter table public.messages          enable row level security;
 alter table public.operations        enable row level security;
 alter table public.operation_entries enable row level security;
+alter table public.real_names        enable row level security;
 
 -- limpa policies antigas (inclusive as de versões anteriores do projeto)
 do $do$
@@ -805,7 +883,7 @@ begin
      where schemaname = 'public'
        and tablename in ('profiles','invite_codes','categories','category_members',
                          'category_locks','channels','channel_members','channel_locks',
-                         'messages','operations','operation_entries','sidebar_order')
+                         'messages','operations','operation_entries','sidebar_order','real_names')
   loop
     execute format('drop policy if exists %I on public.%I', p.policyname, p.tablename);
   end loop;
@@ -813,8 +891,21 @@ end $do$;
 
 -- ---------- profiles ----------
 create policy profiles_read   on public.profiles for select to authenticated using (true);
+-- Além de exigir ADMIN, barra a linha MASTER para quem não for MASTER — sem
+-- isso, um ADMIN comum contornaria as travas de set_role()/admin_set_*()
+-- escrevendo direto na tabela por baixo do RPC.
 create policy profiles_update on public.profiles for update to authenticated
-  using (public.is_admin()) with check (public.is_admin());
+  using (public.is_admin() and (role <> 'master' or public.is_master()))
+  with check (public.is_admin() and (role <> 'master' or public.is_master()));
+
+-- ---------- nomes reais (RP) ----------
+-- Cada um lê a própria linha (para saber o que já gravou); só MASTER lê as
+-- demais. Escrita direta pela REST é só para MASTER — o resto grava pelo RPC
+-- set_real_name(), que roda como security definer e passa por cima do RLS.
+create policy realname_read  on public.real_names for select to authenticated
+  using (profile_id = auth.uid() or public.is_master());
+create policy realname_write on public.real_names for all to authenticated
+  using (public.is_master()) with check (public.is_master());
 
 -- ---------- invite_codes ----------
 create policy codes_read  on public.invite_codes for select to authenticated using (public.is_admin());
