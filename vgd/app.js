@@ -20,7 +20,13 @@ const $ = s => document.querySelector(s);
 // Enquanto o config.js estiver com os valores de exemplo, `createClient` morre
 // com "Invalid URL" e a página fica preta, sem uma linha que explique por quê.
 // O aviso na tela custa cinco linhas e economiza meia hora de console.
-if (!/^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/i.test(CFG?.url || '') || (CFG?.key || '').length < 40) {
+//
+// A conferência da chave é deliberadamente frouxa: serve para pegar o
+// texto de exemplo, não para validar formato. O Supabase aceita tanto a
+// `anon` antiga (um JWT longo) quanto a publishable nova (`sb_publishable_…`,
+// bem mais curta), e exigir um tamanho mínimo generoso rejeitaria a segunda.
+if (!/^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/i.test(CFG?.url || '')
+    || (CFG?.key || '').length < 20 || /COLE_AQUI/i.test(CFG?.key || '')) {
   $('#boot').textContent = '> CONFIGURAÇÃO AUSENTE\n'
     + '> preencha a URL e a chave anon do Supabase em config.js\n'
     + '> (Project Settings → API, no projeto da VGD)';
