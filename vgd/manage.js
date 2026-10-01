@@ -24,9 +24,13 @@
     head.append(add);
     box.append(head);
 
+    cargosSection(box);
+
     const table = el('div', 'mg-table');
     const hr = el('div', 'mg-row mg-hr');
-    ['NOME DO PERSONAGEM', 'CARGO', 'DESDE', 'AÇÕES'].forEach(t => hr.append(el('span', null, t)));
+    // CREDENCIAL, e não "cargo": cargo virou outra coisa, e chamar as duas
+    // pela mesma palavra é pedir confusão na hora de dar acesso a alguém.
+    ['NOME DO PERSONAGEM', 'CREDENCIAL', 'DESDE', 'AÇÕES'].forEach(t => hr.append(el('span', null, t)));
     table.append(hr);
 
     Object.values(people)
@@ -40,11 +44,176 @@
       + 'monta o banco de questões e cria categorias e canais. ADMIN faz tudo isso e ainda gerencia contas.'));
   }
 
+  // ---------------------------------------------------------------- cargos
+  /** Bloco de cargos no alto do painel: criar, renomear, recolorir, excluir. */
+  function cargosSection(box) {
+    const head = el('header', 'pane-head');
+    head.append(el('h3', null, 'CARGOS'));
+    const novo = el('button', 'primary sm', '+ NOVO CARGO');
+    novo.onclick = () => cargoForm(null);
+    head.append(novo);
+    box.append(head);
+
+    box.append(el('p', 'pane-note',
+      'Cargo é etiqueta: você pendura numa conta e libera canais e categorias para ele inteiro, '
+      + 'sem listar pessoa por pessoa. É coisa diferente da credencial — ela é a escada de permissão '
+      + '(candidato, oficial, comando, admin) e manda no que cada um pode fazer; o cargo manda em onde entra.'));
+
+    const lista = el('div', 'cargo-lista');
+    const todos = Object.values(cargos)
+      .sort((a, b) => (a.position - b.position) || a.nome.localeCompare(b.nome));
+    if (!todos.length) lista.append(el('p', 'form-note', 'Nenhum cargo criado ainda.'));
+    todos.forEach(c => {
+      const n = Object.values(cargoMem).filter(s => s.has(c.id)).length;
+      const chip = el('button', 'cargo-chip');
+      const tag = el('span', 'cargo-tag', c.nome);
+      if (c.cor) { tag.style.color = c.cor; tag.style.borderColor = c.cor; }
+      chip.append(tag, el('span', 'cargo-n', n + (n === 1 ? ' conta' : ' contas')));
+      chip.title = 'Configurar o cargo ' + c.nome;
+      chip.onclick = () => cargoForm(c);
+      lista.append(chip);
+    });
+    box.append(lista);
+  }
+
+  function cargoForm(c) {
+    const m = modal(c ? 'CARGO · ' + c.nome : 'NOVO CARGO');
+    const nome = field(m.body, 'Nome do cargo', c?.nome || '', { ph: 'ex.: Instrutor' });
+    m.body.append(el('h4', 'form-block', 'COR DA ETIQUETA'));
+    const prova = el('p', 'prova-cor', c?.nome || 'Instrutor');
+    prova.style.color = c?.cor || PALETA[0];
+    m.body.append(prova);
+    const cor = paletaPicker(m.body, c?.cor);
+    nome.addEventListener('input', () => { prova.textContent = nome.value.trim() || 'Instrutor'; });
+
+    const save = el('button', 'primary', c ? 'Salvar' : 'Criar');
+    const cancel = el('button', 'ghost', 'Cancelar');
+    cancel.onclick = m.close;
+    m.foot.append(cancel, save);
+    if (c) {
+      const del = el('button', 'ghost danger', 'Excluir');
+      del.onclick = async () => {
+        if (!confirma(`Excluir o cargo "${c.nome}"? Ele some das contas que o têm e dos canais liberados por ele. `
+          + 'Quem entrava só por este cargo perde o acesso.')) return;
+        const { error } = await sb.from('cargos').delete().eq('id', c.id);
+        if (error) return toast(error.message, true);
+        m.close(); await loadTree(); open(); drawChannels();
+      };
+      m.foot.prepend(del);
+    }
+    nome.focus();
+
+    save.onclick = async () => {
+      const nm = nome.value.trim();
+      if (!nm) { nome.focus(); return toast('Dê um nome ao cargo.', true); }
+      save.disabled = true;
+      const linha = { nome: nm, cor: cor.value };
+      const { error } = c
+        ? await sb.from('cargos').update(linha).eq('id', c.id)
+        : await sb.from('cargos').insert({ ...linha, position: Object.keys(cargos).length });
+      save.disabled = false;
+      if (error) return toast(error.message, true);
+      m.close(); await loadTree(); open(); drawChannels();
+    };
+  }
+
+  /** Quais cargos esta conta tem. É a tela que o ADMIN usa no dia a dia. */
+  function cargosDaConta(p) {
+    const m = modal('CARGOS · ' + p.name);
+    const todos = Object.values(cargos)
+      .sort((a, b) => (a.position - b.position) || a.nome.localeCompare(b.nome));
+    if (!todos.length) {
+      m.body.append(el('p', 'form-note', 'Nenhum cargo criado ainda. Crie um no alto do painel de contas.'));
+      const ok = el('button', 'primary', 'Fechar');
+      ok.onclick = m.close;
+      m.foot.append(ok);
+      return;
+    }
+
+    m.body.append(el('p', 'form-note',
+      'Marque os cargos desta conta. O acesso aos canais liberados para eles muda na hora, sem precisar recarregar.'));
+    const escolhidos = new Set(cargoMem[p.id] || []);
+    const list = el('div', 'access-list');
+    todos.forEach(c => {
+      const lb = el('label', 'access-item');
+      const cb = el('input');
+      cb.type = 'checkbox';
+      cb.checked = escolhidos.has(c.id);
+      cb.onchange = () => cb.checked ? escolhidos.add(c.id) : escolhidos.delete(c.id);
+      const tag = el('span', 'cargo-tag', c.nome);
+      if (c.cor) { tag.style.color = c.cor; tag.style.borderColor = c.cor; }
+      lb.append(cb, tag);
+      list.append(lb);
+    });
+    m.body.append(list);
+
+    const save = el('button', 'primary', 'Salvar');
+    const cancel = el('button', 'ghost', 'Cancelar');
+    cancel.onclick = m.close;
+    m.foot.append(cancel, save);
+
+    save.onclick = async () => {
+      save.disabled = true;
+      // apaga e regrava: a lista é curta, e assim não há diferença a calcular
+      await sb.from('cargo_membros').delete().eq('profile_id', p.id);
+      let error = null;
+      if (escolhidos.size) {
+        ({ error } = await sb.from('cargo_membros')
+          .insert([...escolhidos].map(cid => ({ cargo_id: cid, profile_id: p.id }))));
+      }
+      save.disabled = false;
+      if (error) return toast(error.message, true);
+      m.close(); await loadTree(); open(); drawChannels();
+      toast('Cargos de ' + p.name + ' atualizados.');
+    };
+  }
+
+  /** Caixas de marcar com os cargos, para liberar um canal ou categoria. */
+  function cargoPicker(parent, marcados) {
+    parent.append(el('h4', 'form-block', 'LIBERAR PARA CARGOS'));
+    const todos = Object.values(cargos)
+      .sort((a, b) => (a.position - b.position) || a.nome.localeCompare(b.nome));
+    if (!todos.length) {
+      parent.append(el('p', 'form-note', 'Nenhum cargo criado ainda — crie no painel de contas.'));
+      return { get value() { return []; } };
+    }
+    parent.append(el('p', 'form-note',
+      'Quem tiver um destes cargos entra, mesmo fora da lista de acesso acima. É a forma de abrir '
+      + 'uma exceção precisa sem promover ninguém.'));
+    const escolhidos = new Set(marcados || []);
+    const list = el('div', 'access-list');
+    todos.forEach(c => {
+      const lb = el('label', 'access-item');
+      const cb = el('input');
+      cb.type = 'checkbox';
+      cb.checked = escolhidos.has(c.id);
+      cb.onchange = () => cb.checked ? escolhidos.add(c.id) : escolhidos.delete(c.id);
+      const tag = el('span', 'cargo-tag', c.nome);
+      if (c.cor) { tag.style.color = c.cor; tag.style.borderColor = c.cor; }
+      lb.append(cb, tag);
+      list.append(lb);
+    });
+    parent.append(list);
+    return { get value() { return [...escolhidos]; } };
+  }
+
+  /** Regrava as liberações por cargo de um canal ou categoria. */
+  async function salvaCargos(tipo, id, ids) {
+    const tabela = tipo === 'cat' ? 'category_cargos' : 'channel_cargos';
+    const chave = tipo === 'cat' ? 'category_id' : 'channel_id';
+    await sb.from(tabela).delete().eq(chave, id);
+    if (!ids.length) return null;
+    const { error } = await sb.from(tabela)
+      .insert(ids.map(cid => ({ [chave]: id, cargo_id: cid })));
+    return error;
+  }
+
   function userRow(p) {
     const row = el('div', 'mg-row');
     const nome = el('span', 'mg-name', p.name);
     nome.style.color = corDe(p);
     if (p.id === me.id) nome.append(el('em', null, ' (você)'));
+    etiquetasCargo(nome, p.id);
     row.append(nome);
     row.append(el('span', 'badge r-' + p.role, ROLES[p.role] || p.role));
     row.append(el('span', 'mg-date', p.created_at ? new Date(p.created_at).toLocaleDateString('pt-BR') : '—'));
@@ -61,6 +230,7 @@
       }
       if (p.role === 'admin') acts.append(btn('▼ tirar ADMIN', () => setRole(p, 'comando')));
     }
+    acts.append(btn('◈ cargos', () => cargosDaConta(p)));
     acts.append(btn('✎ nome/cor', () => renomear(p)));
     acts.append(btn('⚿ senha', () => resetPass(p)));
     if (!eu) acts.append(btn('✕ excluir', () => removeUser(p), 'danger'));
@@ -314,6 +484,7 @@
     const cand = marcador(m.body, 'Abrir também a candidatos',
       'Marcada, a categoria fica visível para quem ainda não passou na prova. É assim que o material de estudo chega a eles. Deixe desmarcada em tudo que não pode ser visto antes da aprovação.',
       cat?.candidatos);
+    const cargosSel = cargoPicker(m.body, cat ? [...(catCargos[cat.id] || [])] : []);
     const lock = lockPicker(m.body, { locked: !!cat?.locked, alvo: 'categoria' });
 
     const save = el('button', 'primary', cat ? 'Salvar' : 'Criar');
@@ -367,6 +538,7 @@
           ({ error } = await sb.from('category_members').insert(rows));
         }
       }
+      if (!error && id) error = await salvaCargos('cat', id, cargosSel.value);
       if (!error && id) error = await salvaTrava('cat', id, lock.value);
       save.disabled = false;
       if (error) return toast('Falha ao salvar: ' + error.message, true);
@@ -406,6 +578,7 @@
     const leitura = marcador(m.body, 'Somente leitura',
       'Só COMANDO e ADMIN publicam; o resto lê. É o que usar em canal de material do curso.',
       ch?.somente_leitura);
+    const cargosSel = cargoPicker(m.body, ch ? [...(chanCargos[ch.id] || [])] : []);
     const lock = lockPicker(m.body, { locked: !!ch?.locked, alvo: 'canal' });
 
     const save = el('button', 'primary', ch ? 'Salvar' : 'Criar');
@@ -456,6 +629,7 @@
           ({ error } = await sb.from('channel_members').insert(rows));
         }
       }
+      if (!error && id) error = await salvaCargos('chan', id, cargosSel.value);
       if (!error && id) error = await salvaTrava('chan', id, lock.value);
       save.disabled = false;
       if (error) return toast('Falha ao salvar: ' + error.message, true);

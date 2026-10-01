@@ -165,6 +165,43 @@ create table if not exists public.channel_locks (
   created_at timestamptz not null default now()
 );
 
+-- ---------- cargos ----------
+-- Etiqueta nomeada que o ADMIN pendura nas contas: Instrutor, Patrulheiro,
+-- Comandante de turno, o que a unidade quiser. Não é a mesma coisa que
+-- `profiles.role`, que é a escada de permissão do site (candidato → oficial →
+-- comando → admin) e continua mandando no que cada um PODE fazer. O cargo
+-- manda em ONDE se entra: um canal pode ser liberado para um cargo inteiro, e
+-- aí entra quem o tiver, sem lista de nome por nome.
+create table if not exists public.cargos (
+  id         uuid primary key default gen_random_uuid(),
+  nome       text not null,
+  cor        text,
+  position   int not null default 0,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists cargos_nome_idx on public.cargos (lower(nome));
+alter table public.cargos drop constraint if exists cargos_cor_check;
+alter table public.cargos add constraint cargos_cor_check
+  check (cor is null or cor ~ '^#[0-9a-fA-F]{6}$');
+
+create table if not exists public.cargo_membros (
+  cargo_id   uuid not null references public.cargos(id)   on delete cascade,
+  profile_id uuid not null references public.profiles(id) on delete cascade,
+  primary key (cargo_id, profile_id)
+);
+
+create table if not exists public.category_cargos (
+  category_id uuid not null references public.categories(id) on delete cascade,
+  cargo_id    uuid not null references public.cargos(id)     on delete cascade,
+  primary key (category_id, cargo_id)
+);
+
+create table if not exists public.channel_cargos (
+  channel_id uuid not null references public.channels(id) on delete cascade,
+  cargo_id   uuid not null references public.cargos(id)   on delete cascade,
+  primary key (channel_id, cargo_id)
+);
+
 -- ---------- ordem da barra lateral ----------
 -- Vale para todos: quem tem COMANDO arrasta e reorganiza para a unidade
 -- inteira. `key` é 'mural', 'cat:<uuid>' ou 'chan:<uuid>'.
@@ -331,7 +368,8 @@ begin
        and tablename in ('profiles','invite_codes','categories','category_members',
                          'category_locks','channels','channel_members','channel_locks',
                          'messages','sidebar_order','exam_config','exam_questions',
-                         'exam_attempts','exam_answers','exam_log')
+                         'exam_attempts','exam_answers','exam_log',
+                         'cargos','cargo_membros','category_cargos','channel_cargos')
   loop
     execute format('drop policy if exists %I on public.%I', p.policyname, p.tablename);
   end loop;
@@ -372,6 +410,26 @@ alter table public.channels   add column if not exists candidatos boolean not nu
 -- COMANDO e ADMIN publicam ali; o resto lê.
 alter table public.channels add column if not exists somente_leitura boolean not null default false;
 
+-- ---------- acesso por cargo ----------
+-- Liberação nomeada: o canal é dado a um cargo, e entra quem o tiver. Vale
+-- independentemente da credencial — é a ferramenta para o ADMIN abrir uma
+-- exceção precisa sem precisar promover ninguém.
+create or replace function public.tem_cargo_na_categoria(cat uuid)
+returns boolean language sql stable security definer set search_path = public as $fn$
+  select exists (
+    select 1 from public.category_cargos cc
+      join public.cargo_membros m on m.cargo_id = cc.cargo_id
+     where cc.category_id = cat and m.profile_id = auth.uid());
+$fn$;
+
+create or replace function public.tem_cargo_no_canal(cid uuid)
+returns boolean language sql stable security definer set search_path = public as $fn$
+  select exists (
+    select 1 from public.channel_cargos cc
+      join public.cargo_membros m on m.cargo_id = cc.cargo_id
+     where cc.channel_id = cid and m.profile_id = auth.uid());
+$fn$;
+
 create or replace function public.can_see_category(cat uuid)
 returns boolean language plpgsql stable security definer set search_path = public as $fn$
 declare ev boolean; cnd boolean; uid uuid := auth.uid();
@@ -381,6 +439,7 @@ begin
   select everyone, candidatos into ev, cnd from public.categories where id = cat;
   if not found then return false; end if;
   if coalesce(cnd, false) then return true; end if;
+  if public.tem_cargo_na_categoria(cat) then return true; end if;
   if not public.is_oficial() then return false; end if;
   return ev or exists (select 1 from public.category_members
                         where category_id = cat and profile_id = uid);
@@ -400,6 +459,7 @@ returns boolean language sql stable security definer set search_path = public as
   select public.is_admin()
       or autor = auth.uid()
       or coalesce(cnd, false)
+      or public.tem_cargo_na_categoria(cid)
       or (public.is_oficial()
           and (coalesce(ev, false)
                or exists (select 1 from public.category_members m
@@ -414,6 +474,7 @@ returns boolean language sql stable security definer set search_path = public as
   select public.is_admin()
       or autor = auth.uid()
       or coalesce(cnd, false)
+      or public.tem_cargo_no_canal(cid)
       -- herdando de uma categoria aberta ao candidato, o canal abre junto
       or (cat is not null and inh and public.can_see_category(cat))
       or (public.is_oficial()
@@ -1076,6 +1137,10 @@ alter table public.exam_questions   enable row level security;
 alter table public.exam_attempts    enable row level security;
 alter table public.exam_answers     enable row level security;
 alter table public.exam_log         enable row level security;
+alter table public.cargos           enable row level security;
+alter table public.cargo_membros    enable row level security;
+alter table public.category_cargos  enable row level security;
+alter table public.channel_cargos   enable row level security;
 
 do $do$
 declare p record;
@@ -1086,7 +1151,8 @@ begin
        and tablename in ('profiles','invite_codes','categories','category_members',
                          'category_locks','channels','channel_members','channel_locks',
                          'messages','sidebar_order','exam_config','exam_questions',
-                         'exam_attempts','exam_answers','exam_log')
+                         'exam_attempts','exam_answers','exam_log',
+                         'cargos','cargo_membros','category_cargos','channel_cargos')
   loop
     execute format('drop policy if exists %I on public.%I', p.policyname, p.tablename);
   end loop;
@@ -1178,6 +1244,31 @@ create policy an_read on public.exam_answers for select to authenticated
                   where t.id = attempt_id
                     and (t.profile_id = auth.uid() or public.is_staff())));
 
+-- ---------- cargos ----------
+-- O cargo é etiqueta visível: aparece ao lado do nome, como a cor. Quem cria,
+-- renomeia e distribui é o ADMIN.
+create policy cargo_read  on public.cargos for select to authenticated using (true);
+create policy cargo_write on public.cargos for all    to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+create policy cargom_read  on public.cargo_membros for select to authenticated using (true);
+create policy cargom_write on public.cargo_membros for all    to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+-- Quais cargos abrem qual canal: quem já enxerga o canal pode ler, para a
+-- lista de acesso não mentir sobre quem entra ali. Mexer, só quem configura
+-- canal. As funções de visibilidade leem estas tabelas por dentro, como
+-- `security definer`, então a regra daqui não tranca ninguém para fora.
+create policy catcargo_read on public.category_cargos for select to authenticated
+  using (public.can_see_category(category_id) or public.is_staff());
+create policy catcargo_write on public.category_cargos for all to authenticated
+  using (public.is_staff()) with check (public.is_staff());
+
+create policy chcargo_read on public.channel_cargos for select to authenticated
+  using (public.can_read_channel('chan:' || channel_id::text) or public.is_staff());
+create policy chcargo_write on public.channel_cargos for all to authenticated
+  using (public.is_staff()) with check (public.is_staff());
+
 -- O histórico de vereditos é do ADMIN. Ele guarda nome e nota de gente que já
 -- não tem conta; não é coisa para circular na unidade.
 create policy log_read on public.exam_log for select to authenticated
@@ -1191,7 +1282,8 @@ declare t text;
 begin
   foreach t in array array['profiles','messages','categories','channels',
                            'category_members','channel_members','sidebar_order',
-                           'exam_attempts','exam_questions']
+                           'exam_attempts','exam_questions',
+                           'cargos','cargo_membros','category_cargos','channel_cargos']
   loop
     begin
       execute format('alter publication supabase_realtime add table public.%I', t);
@@ -1209,6 +1301,8 @@ alter table public.messages       replica identity full;
 alter table public.sidebar_order  replica identity full;
 alter table public.exam_attempts  replica identity full;
 alter table public.exam_questions replica identity full;
+alter table public.cargos          replica identity full;
+alter table public.cargo_membros   replica identity full;
 
 -- ============================================================================
 -- 10. RECARGA DO CACHE

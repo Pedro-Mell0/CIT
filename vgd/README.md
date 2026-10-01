@@ -84,6 +84,24 @@ select code from public.invite_codes where role = 'admin';
 
 Leia-o uma vez, crie sua conta e troque por um seu.
 
+## Cargos
+
+Duas coisas diferentes convivem aqui, e confundi-las é o erro fácil:
+
+- **Credencial** (`profiles.role`) — a escada de permissão do site: candidato →
+  oficial → comando → admin. Manda no que cada um **pode fazer**.
+- **Cargo** (tabela `cargos`) — etiqueta nomeada e colorida que o ADMIN pendura
+  numa conta: Instrutor, Patrulheiro, Mecânica. Manda em **onde se entra**.
+
+Um canal ou categoria pode ser liberado para um cargo inteiro, e aí entra quem
+o tiver — sem lista de nome por nome, e sem precisar promover ninguém. A
+liberação por cargo vale independentemente da credencial: é a ferramenta para
+abrir uma exceção precisa, inclusive para um candidato.
+
+O ADMIN cria e distribui cargos no painel ⚙ *Contas*; o botão **◈ cargos** de
+cada conta abre as caixas de marcar. Dar ou tirar um cargo muda o que a pessoa
+enxerga na hora, sem recarregar.
+
 ## Quem vê o quê
 
 O candidato não é um oficial de segunda classe: ele é alguém de fora que
@@ -97,6 +115,7 @@ candidatos"**, na categoria ou no canal (coluna `candidatos`).
 | `#mural` e os canais da unidade | só a partir de OFICIAL |
 | categoria **INSTRUÇÃO** — prova prática, gabarito, critérios | COMANDO e ADMIN |
 | `#resultados` | ADMIN |
+| qualquer canal liberado para um **cargo** | quem tiver o cargo |
 
 O gabarito é o ponto sensível da coisa toda: ele vive na categoria INSTRUÇÃO,
 na coluna `correct` de `exam_questions` e na `rubrica` da mesma tabela. O

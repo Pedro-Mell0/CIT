@@ -329,6 +329,18 @@ body.dragging-v #msg-grip{background:linear-gradient(180deg,transparent 2px,var(
 .mg-date{color:var(--dim);font-size:.7rem}
 .mg-acts{display:flex;gap:.3rem;flex-wrap:wrap;justify-content:flex-end}
 .mg-acts .ghost{padding:.25rem .5rem;font-size:.7rem}
+/* ---------- cargos ---------- */
+/* A etiqueta herda a cor do cargo por `style`, então aqui só vem a forma. */
+.cargo-tag{font-size:.6rem;border:1px solid var(--dim);color:var(--dim);border-radius:9px;
+  padding:0 .45rem;letter-spacing:.06em;white-space:nowrap;line-height:1.5;
+  display:inline-block;vertical-align:middle;margin-left:.35rem}
+.cargo-lista{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1rem}
+.cargo-chip{display:flex;align-items:center;gap:.5rem;background:#180f07;border:1px solid var(--line);
+  padding:.35rem .5rem .35rem .15rem;color:var(--text)}
+.cargo-chip:hover{border-color:var(--amber);background:var(--panel)}
+.cargo-n{color:var(--dim);font-size:.62rem}
+.access-item .cargo-tag{margin-left:0}
+
 .badge{font-size:.62rem;border:1px solid var(--dim);color:var(--dim);padding:0 .35rem;justify-self:start;letter-spacing:.06em}
 .badge.r-candidato{border-color:var(--dim);color:var(--dim)}
 .badge.r-oficial{border-color:var(--xenon);color:var(--xenon)}

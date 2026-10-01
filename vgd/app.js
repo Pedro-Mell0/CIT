@@ -44,6 +44,10 @@ const cats    = {};       // id -> categoria
 const chans   = {};       // id -> canal
 const catMem  = {};       // categoria -> Set(perfil)
 const chanMem = {};       // canal     -> Set(perfil)
+const cargos    = {};     // id -> cargo
+const cargoMem  = {};     // perfil    -> Set(cargo)
+const catCargos = {};     // categoria -> Set(cargo)
+const chanCargos = {};    // canal     -> Set(cargo)
 const msgEls  = new Map();// id da mensagem -> elemento
 const order   = {};       // chave da barra lateral -> posição
 const unread  = new Set();// canais com informe novo ainda não visto
@@ -239,19 +243,48 @@ async function loadTree() {
   // O candidato também carrega a árvore: ele enxerga os canais da ACADEMIA,
   // que é onde está o material que a prova cobra. Quem decide o que volta é o
   // RLS, não esta função.
-  const [c, ch, cm, chm, ord] = await Promise.all([
+  // As duas últimas consultas são fechadas ao comando pelo RLS (ver
+  // catcargo_all e chcargo_all). Para o resto da unidade elas voltam vazias, e
+  // tudo bem: quem precisa delas é só o formulário de configurar canal.
+  const [c, ch, cm, chm, ord, cg, cgm, ccg, chcg] = await Promise.all([
     sb.from('categories').select('*').order('position').order('name'),
     sb.from('channels').select('*').order('position').order('name'),
     sb.from('category_members').select('*'),
     sb.from('channel_members').select('*'),
     sb.from('sidebar_order').select('*'),
+    sb.from('cargos').select('*').order('position').order('nome'),
+    sb.from('cargo_membros').select('*'),
+    sb.from('category_cargos').select('*'),
+    sb.from('channel_cargos').select('*'),
   ]);
-  [cats, chans, catMem, chanMem, order].forEach(o => Object.keys(o).forEach(k => delete o[k]));
+  [cats, chans, catMem, chanMem, order, cargos, cargoMem, catCargos, chanCargos]
+    .forEach(o => Object.keys(o).forEach(k => delete o[k]));
   (ord.data || []).forEach(x => order[x.key] = x.position);
   (c.data || []).forEach(x => cats[x.id] = x);
   (ch.data || []).forEach(x => chans[x.id] = x);
   (cm.data || []).forEach(x => (catMem[x.category_id] ||= new Set()).add(x.profile_id));
   (chm.data || []).forEach(x => (chanMem[x.channel_id] ||= new Set()).add(x.profile_id));
+  (cg.data || []).forEach(x => cargos[x.id] = x);
+  (cgm.data || []).forEach(x => (cargoMem[x.profile_id] ||= new Set()).add(x.cargo_id));
+  (ccg.data || []).forEach(x => (catCargos[x.category_id] ||= new Set()).add(x.cargo_id));
+  (chcg.data || []).forEach(x => (chanCargos[x.channel_id] ||= new Set()).add(x.cargo_id));
+}
+
+/** Os cargos de uma conta, na ordem em que a unidade os organizou. */
+function cargosDe(pid) {
+  return [...(cargoMem[pid] || [])]
+    .map(id => cargos[id])
+    .filter(Boolean)
+    .sort((a, b) => (a.position - b.position) || a.nome.localeCompare(b.nome));
+}
+
+/** Etiquetas coloridas dos cargos, para pendurar ao lado de um nome. */
+function etiquetasCargo(parent, pid) {
+  cargosDe(pid).forEach(c => {
+    const t = el('span', 'cargo-tag', c.nome);
+    if (c.cor) { t.style.color = c.cor; t.style.borderColor = c.cor; }
+    parent.append(t);
+  });
 }
 
 const ROTULO_CARGO = { candidato: 'CANDIDATO', oficial: 'OFICIAL', comando: 'COMANDO', admin: 'ADMIN' };
@@ -290,6 +323,7 @@ function listen() {
     // trava posta por outro oficial enquanto o canal estava aberto
     if (travaPendente(chan)) return openChannel('mural');
     drawChannels();
+    window.MANAGE?.refresh?.();
   };
 
   live = sb.channel('vgd')
@@ -332,6 +366,9 @@ function listen() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'category_members' }, reload)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'channel_members' }, reload)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'sidebar_order' }, reload)
+    // Um cargo dado ou tirado muda o que a pessoa enxerga na hora, sem F5.
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'cargos' }, reload)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'cargo_membros' }, reload)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'exam_attempts' }, () => window.PROVA?.realtime?.())
     .subscribe();
 }
@@ -609,11 +646,21 @@ function membrosDoCanal(key) {
     };
   }
   const ids = herda ? (catMem[c.category_id] || new Set()) : (chanMem[c.id] || new Set());
+  // quem entra por cargo não está na lista de nomes, e some da contagem se a
+  // gente não for buscá-lo
+  const porCargo = herda ? (catCargos[c.category_id] || new Set()) : (chanCargos[c.id] || new Set());
+  const nomes = new Set(ids);
+  porCargo.forEach(cid => Object.keys(cargoMem).forEach(pid => {
+    if (cargoMem[pid].has(cid)) nomes.add(pid);
+  }));
+
+  const etiquetas = [...porCargo].map(id => cargos[id]?.nome).filter(Boolean);
   return {
-    regra: herda
+    regra: (herda
       ? `Acesso restrito, herdado da categoria ${cat.name}.`
-      : 'Acesso restrito aos oficiais abaixo.',
-    lista: [...ids].map(id => people[id]).filter(Boolean),
+      : 'Acesso restrito aos oficiais abaixo.')
+      + (etiquetas.length ? ` Liberado também para o cargo ${etiquetas.join(', ')}.` : ''),
+    lista: [...nomes].map(id => people[id]).filter(Boolean),
     extra: 'a administração',
   };
 }
@@ -637,6 +684,7 @@ function abreMembros(key) {
     const pt = el('span', 'mb-dot');
     pt.style.background = corDe(p);
     li.append(pt, el('span', 'mb-nome', p.name));
+    etiquetasCargo(li, p.id);
     if (p.id === me.id) li.append(el('em', 'mb-voce', 'você'));
     ul.append(li);
   });
