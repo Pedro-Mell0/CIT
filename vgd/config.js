@@ -3,6 +3,6 @@
 // A chave "anon public" pode ficar no código: a segurança vem das regras (RLS)
 // do schema.sql.
 window.CFG = {
-  url: 'COLE_AQUI_A_PROJECT_URL',
-  key: 'COLE_AQUI_A_ANON_PUBLIC_KEY'
+  url: 'https://quhbgplaejrtelhdnoah.supabase.co',
+  key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF1aGJncGxhZWpydGVsaGRub2FoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA4OTgyMTQsImV4cCI6MjEwNjQ3NDIxNH0.dYYivY4iFfxH7BkTuo9PKxBswdhAgOAGhOO99u23_G0'
 };
