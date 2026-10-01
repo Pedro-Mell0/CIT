@@ -80,12 +80,10 @@ alter table public.profiles add constraint profiles_role_check
 alter table public.invite_codes add constraint invite_codes_role_check
   check (role in ('agent','command','admin','master'));
 
--- Só pode existir UMA conta MASTER. O índice é a trava de verdade: mesmo que
--- alguém engane o RPC ou a tela de cadastro, o banco recusa a segunda linha
--- com role = 'master' (o valor indexado é a mesma constante para qualquer
--- linha que bater na condição, então a segunda vira duplicata).
+-- Mais de uma conta pode ter a credencial MASTER (ela decide quem mais
+-- recebe). Versões antigas deste schema travavam numa única conta MASTER por
+-- um índice único; ele sai daqui, sem travar quem já rodou a versão anterior.
 drop index if exists public.one_master_only;
-create unique index one_master_only on public.profiles ((role)) where role = 'master';
 
 -- Os códigos de acesso NÃO ficam neste arquivo. Ele é versionado, e um código
 -- escrito aqui é um código publicado: quem lê o repositório cria conta com o
@@ -107,18 +105,15 @@ insert into public.invite_codes (code, role)
 select upper(encode(extensions.gen_random_bytes(6), 'hex')), 'admin'
  where not exists (select 1 from public.invite_codes);
 
--- Mesma lógica para a conta MASTER, a credencial exclusiva do dono do site:
--- enquanto nenhuma conta MASTER existir, garante que haja um código pendente
--- para criá-la. Leia-o uma vez e cadastre-se com ele pela aba "Cadastrar
--- agente" — depois ANOTE E APAGUE o código (ele é reutilizável até ser
--- apagado, e o índice único só impede a segunda CONTA, não a leitura do
--- código por outra pessoa):
+-- Mesma lógica para MASTER, a credencial que enxerga o nome real de todos:
+-- enquanto não houver um código de MASTER pendente, nasce um. Leia-o e
+-- cadastre a conta pela aba "Cadastrar agente" — depois APAGUE o código, que
+-- vale para quantas contas quiserem usá-lo enquanto estiver lá:
 --   select code from public.invite_codes where role = 'master';
 --   delete from public.invite_codes where role = 'master';   -- depois de usar
 insert into public.invite_codes (code, role)
 select upper(encode(extensions.gen_random_bytes(6), 'hex')), 'master'
- where not exists (select 1 from public.profiles where role = 'master')
-   and not exists (select 1 from public.invite_codes where role = 'master');
+ where not exists (select 1 from public.invite_codes where role = 'master');
 
 -- ---------- nomes reais (RP) ----------
 -- O nome de verdade por trás do personagem. Fica fora de `profiles` de
@@ -473,9 +468,6 @@ begin
   end if;
   if r is null then
     raise exception 'Código de acesso inválido.';
-  end if;
-  if r = 'master' and exists (select 1 from public.profiles where role = 'master') then
-    raise exception 'Já existe uma conta MASTER — essa credencial é única.';
   end if;
   insert into public.profiles (id, codename, role, color)
     values (new.id, cn, r, public.cor_livre());

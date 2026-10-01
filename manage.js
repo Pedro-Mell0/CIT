@@ -165,8 +165,8 @@
     const wrap = el('label', 'fld');
     wrap.append(el('span', null, 'Cargo'));
     const role = el('select');
-    // MASTER não entra aqui: é credencial única, criada só pelo código de
-    // acesso reservado a ela (ver schema.sql), nunca por este painel.
+    // MASTER não entra aqui: só se concede pelo código de acesso reservado a
+    // ela ou direto no banco (ver schema.sql), nunca por este painel.
     Object.entries(ROLES).filter(([k]) => k !== 'master').forEach(([k, v]) => {
       const o = el('option', null, v); o.value = k; role.append(o);
     });
