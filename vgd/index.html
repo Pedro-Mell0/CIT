@@ -9,6 +9,20 @@
 <meta name="color-scheme" content="dark">
 <meta name="robots" content="noindex, nofollow">
 <title>VGD · Vanguarda</title>
+<script>
+// Servida em "/vgd" (sem a barra no fim), esta página é entregue normalmente,
+// mas o navegador resolve `style.css`, `app.js` e `config.js` contra a RAIZ do
+// site — e, num domínio que também hospeda o CIT, carrega os arquivos dele. O
+// resultado é a VGD com a cara, o código e o BANCO do outro site, falhando no
+// cadastro por um motivo que não tem nada a ver com o que está escrito na tela.
+// A barra no fim conserta, então é ela que a página coloca.
+(function () {
+  var p = location.pathname;
+  if (p && !/\/$/.test(p) && !/\.[a-z0-9]+$/i.test(p)) {
+    location.replace(p + '/' + location.search + location.hash);
+  }
+})();
+</script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐯</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=JetBrains+Mono:wght@400;600&family=Orbitron:wght@600;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
