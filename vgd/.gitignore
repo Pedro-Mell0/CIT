@@ -1,0 +1,5 @@
+# O PDF do curso traz o gabarito da prova nas últimas páginas. Esta pasta
+# inteira vira URL na Vercel: um arquivo largado aqui fica a um clique de
+# qualquer candidato que adivinhe o nome. O conteúdo do curso entra no site
+# pelo curso.sql, que separa o que é material de estudo do que é gabarito.
+*.pdf

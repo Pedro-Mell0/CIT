@@ -10,6 +10,8 @@
    =========================================================================== */
 (() => {
   const LETRAS = 'ABCDE';
+  const KINDS = { objetiva: 'OBJETIVA', aberta: 'ABERTA', dissertativa: 'DISSERTATIVA' };
+  const rotuloKind = k => KINDS[k] || String(k).toUpperCase();
   const ST = { em_andamento: 'EM ANDAMENTO', aguardando: 'AGUARDANDO CORREÇÃO', aprovado: 'APROVADO', reprovado: 'REPROVADO' };
 
   let cfg = { intro: '', min_percent: 70 };
@@ -40,7 +42,7 @@
     await carrega();
     drawChannels();
     if (chan === 'prova') abre();
-    if (chan === 'correcao' && !document.querySelector('#correcao .cor-detalhe')) abreCorrecao();
+    if (chan === 'resultados' && !document.querySelector('#resultados .cor-detalhe')) abreResultados();
   }
 
   // ---------------------------------------------------------------- rascunho
@@ -73,10 +75,11 @@
     regras.append(el('b', null, 'ANTES DE LARGAR'));
     const ul = el('ul');
     [
-      'A prova mistura questões objetivas e dissertativas.',
-      'As objetivas são corrigidas na hora; as dissertativas passam pelo comando.',
-      `A nota de corte é ${cfg.min_percent}%.`,
-      'Você tem uma tentativa. Uma segunda só com liberação do comando.',
+      'A prova mistura questões objetivas e questões abertas, que você escreve.',
+      'A correção é automática e acontece na entrega; o resultado vai para a administração.',
+      `A nota de corte do curso é ${cfg.min_percent}%.`,
+      'Estude o material da ACADEMIA antes: é de lá que saem todas as questões.',
+      'Você tem uma tentativa. Uma segunda só com liberação da administração.',
       'Suas respostas ficam salvas neste navegador até a entrega — pode fechar e voltar.',
     ].forEach(t => ul.append(el('li', null, t)));
     regras.append(ul);
@@ -136,8 +139,7 @@
 
       const head = el('div', 'q-head');
       head.append(el('span', 'q-num', String(i + 1).padStart(2, '0')));
-      head.append(el('span', 'q-kind' + (q.kind === 'dissertativa' ? ' dis' : ''),
-        q.kind === 'dissertativa' ? 'DISSERTATIVA' : 'OBJETIVA'));
+      head.append(el('span', 'q-kind' + (q.kind === 'objetiva' ? '' : ' dis'), rotuloKind(q.kind)));
       head.append(el('span', 'q-pts', q.points + (q.points === 1 ? ' ponto' : ' pontos')));
       card.append(head);
       card.append(el('p', 'q-prompt', q.prompt));
@@ -218,8 +220,12 @@
     card.append(selo);
 
     if (t.status === 'aguardando') {
+      // a nota já existe, mas não aparece aqui: o veredito é da administração,
+      // e mostrar o número antes dela decidir criaria uma expectativa que ela
+      // ainda pode contrariar
       card.append(el('p', null,
-        'Prova entregue em ' + dataBR(t.submitted_at) + '. As dissertativas estão com o comando; o resultado aparece aqui assim que sair.'));
+        'Prova entregue em ' + dataBR(t.submitted_at)
+        + '. A administração vai analisar e o resultado aparece aqui assim que sair.'));
     } else {
       const nota = el('div', 'res-nota', (t.nota ?? 0) + '%');
       nota.append(el('small', null, `NOTA DE CORTE ${cfg.min_percent}%`));
@@ -240,17 +246,19 @@
     root.append(box);
   }
 
-  // ---------------------------------------------------------------- corrigir
-  async function abreCorrecao() {
-    const root = $('#correcao');
+  // ---------------------------------------------------------------- resultados
+  // A conta já veio pronta do banco: a entrega corrige objetivas e abertas e
+  // grava a nota. O que acontece aqui é o veredito, que é de gente.
+  async function abreResultados() {
+    const root = $('#resultados');
     root.innerHTML = '';
-    if (!isStaff()) { root.append(el('p', 'empty', '> acesso restrito ao comando.')); return; }
+    if (!isAdmin()) { root.append(el('p', 'empty', '> acesso restrito à administração.')); return; }
 
     const box = el('div', 'pane-scroll');
     root.append(box);
 
     const head = el('header', 'pane-head');
-    head.append(el('h3', null, 'CORREÇÃO DE PROVAS'));
+    head.append(el('h3', null, 'RESULTADOS DA PROVA TEÓRICA'));
     box.append(head);
 
     const { data, error } = await sb.from('exam_attempts')
@@ -259,16 +267,47 @@
       .order('submitted_at', { ascending: false, nullsFirst: false })
       .order('started_at', { ascending: false });
     if (error) { box.append(el('p', 'empty', '> ' + error.message)); return; }
-    if (!data?.length) { box.append(el('p', 'empty', '> nenhuma prova iniciada até agora.')); return; }
 
-    const aguardando = data.filter(t => t.status === 'aguardando');
+    const aguardando = (data || []).filter(t => t.status === 'aguardando');
     box.append(el('p', 'pane-note', aguardando.length
-      ? `${aguardando.length} prova(s) esperando correção.`
-      : 'Nenhuma prova esperando correção no momento.'));
+      ? `${aguardando.length} prova(s) esperando decisão. A nota e a recomendação são automáticas; aprovar ou reprovar é sua.`
+      : 'Nenhuma prova esperando decisão no momento.'));
 
+    if (!data?.length) box.append(el('p', 'empty', '> nenhuma prova entregue até agora.'));
+    else {
+      const lista = el('div', 'cor-lista');
+      data.forEach(t => lista.append(linhaTentativa(t)));
+      box.append(lista);
+    }
+
+    await historico(box);
+  }
+
+  /** Vereditos antigos, inclusive de contas que já não existem. */
+  async function historico(box) {
+    const { data } = await sb.from('exam_log').select('*').order('decidido_em', { ascending: false }).limit(40);
+    if (!data?.length) return;
+    box.append(el('h4', 'form-block', 'HISTÓRICO DE VEREDITOS'));
+    box.append(el('p', 'pane-note',
+      'Registro que sobrevive à conta: reprovar apaga o candidato do site, e é aqui que fica a memória do que foi decidido.'));
     const lista = el('div', 'cor-lista');
-    data.forEach(t => lista.append(linhaTentativa(t)));
+    data.forEach(l => {
+      const row = el('div', 'cor-row');
+      row.append(el('span', 'cor-nome', l.nome));
+      row.append(el('span', 'st ' + l.veredito, l.veredito.toUpperCase()));
+      row.append(el('span', 'cor-nota', (l.nota ?? 0) + '%'));
+      row.append(el('span', 'cor-data', dataBR(l.decidido_em)));
+      row.append(el('span', 'form-note',
+        (l.decidido_por ? 'por ' + l.decidido_por : '') + (l.removido ? ' · conta removida' : '')));
+      lista.append(row);
+    });
     box.append(lista);
+  }
+
+  /** "Nota 72% — Recomendação: Aprovar" */
+  function recomendacao(t) {
+    if (t.nota == null) return null;
+    return `Nota ${t.nota}% — Recomendação: ${t.nota >= cfg.min_percent ? 'Aprovar' : 'Reprovar'}`;
   }
 
   function linhaTentativa(t) {
@@ -277,24 +316,25 @@
     nome.style.color = t.profiles?.color || 'var(--text)';
     row.append(nome);
     row.append(el('span', 'st ' + t.status, ST[t.status] || t.status));
-    row.append(el('span', 'cor-nota', t.nota != null ? t.nota + '%' : '—'));
+    const nota = el('span', 'cor-nota', t.nota != null ? t.nota + '%' : '—');
+    if (t.nota != null) nota.style.color = t.nota >= cfg.min_percent ? 'var(--lime)' : 'var(--dead)';
+    row.append(nota);
     row.append(el('span', 'cor-data', dataBR(t.submitted_at || t.started_at)));
-    const ir = el('span', 'form-note', t.status === 'em_andamento' ? 'em prova' : 'abrir ›');
-    row.append(ir);
+    row.append(el('span', 'form-note', t.status === 'em_andamento' ? 'fazendo a prova' : 'abrir ›'));
     row.onclick = () => { if (t.status !== 'em_andamento') detalhe(t); };
     if (t.status === 'em_andamento') row.disabled = true;
     return row;
   }
 
   async function detalhe(t) {
-    const root = $('#correcao');
+    const root = $('#resultados');
     root.innerHTML = '';
     const box = el('div', 'pane-scroll cor-detalhe');
     root.append(box);
 
     const head = el('header', 'pane-head');
     const voltar = el('button', 'ghost', '‹ Voltar');
-    voltar.onclick = abreCorrecao;
+    voltar.onclick = abreResultados;
     head.append(voltar);
     head.append(el('h3', null, (t.profiles?.name || '[removido]').toUpperCase()));
     head.append(el('span', 'st ' + t.status, ST[t.status] || t.status));
@@ -314,28 +354,34 @@
     // entrega não pode aparecer como se o candidato a tivesse ignorado
     const qs = (qr.data || []).filter(q => resp[q.id]);
 
-    const notas = {};   // question_id -> pontos dados agora
+    const notas = {};   // question_id -> pontos dados agora, só para dissertativas
     qs.forEach(q => { if (q.kind === 'dissertativa') notas[q.id] = resp[q.id]?.pontos || 0; });
 
+    const selo = el('div', 'res-selo ' + (t.nota >= cfg.min_percent ? 'aprovado' : 'reprovado'));
+    selo.textContent = recomendacao(t) || 'Sem nota';
+    selo.style.fontSize = '1rem';
+    box.append(selo);
+
     const resumo = el('div', 'cor-sum');
-    const vObj = el('b', 'v'), vDis = el('b', 'v'), vTot = el('b', 'v');
-    [['OBJETIVAS', vObj], ['DISSERTATIVAS', vDis], ['NOTA', vTot]].forEach(([k, v]) => {
+    const vAuto = el('b', 'v'), vDis = el('b', 'v'), vTot = el('b', 'v');
+    [['CORREÇÃO AUTOMÁTICA', vAuto], ['DISSERTATIVAS', vDis], ['NOTA', vTot]].forEach(([k, v]) => {
       const d = el('div');
       d.append(el('span', 'k', k), v);
       resumo.append(d);
     });
     box.append(resumo);
 
-    const maxObj = qs.filter(q => q.kind === 'objetiva').reduce((s, q) => s + q.points, 0);
+    const maxAuto = qs.filter(q => q.kind !== 'dissertativa').reduce((s, q) => s + q.points, 0);
     const maxDis = qs.filter(q => q.kind === 'dissertativa').reduce((s, q) => s + q.points, 0);
-    const pontosObj = qs.filter(q => q.kind === 'objetiva' && resp[q.id]?.certa).reduce((s, q) => s + q.points, 0);
+    const pontosAuto = qs.filter(q => q.kind !== 'dissertativa')
+      .reduce((s, q) => s + (resp[q.id]?.pontos || 0), 0);
 
     const recalcula = () => {
       const dis = Object.values(notas).reduce((s, n) => s + (+n || 0), 0);
-      const total = t.pontos_max || (maxObj + maxDis) || 1;
-      vObj.textContent = `${pontosObj}/${maxObj}`;
-      vDis.textContent = `${dis}/${maxDis}`;
-      vTot.textContent = Math.round((pontosObj + dis) * 10000 / total) / 100 + '%';
+      const total = t.pontos_max || (maxAuto + maxDis) || 1;
+      vAuto.textContent = `${pontosAuto}/${maxAuto}`;
+      vDis.textContent = maxDis ? `${dis}/${maxDis}` : '—';
+      vTot.textContent = Math.round((pontosAuto + dis) * 10000 / total) / 100 + '%';
     };
 
     qs.forEach((q, i) => {
@@ -343,9 +389,8 @@
       const card = el('div', 'q-card');
       const h = el('div', 'q-head');
       h.append(el('span', 'q-num', String(i + 1).padStart(2, '0')));
-      h.append(el('span', 'q-kind' + (q.kind === 'dissertativa' ? ' dis' : ''),
-        q.kind === 'dissertativa' ? 'DISSERTATIVA' : 'OBJETIVA'));
-      h.append(el('span', 'q-pts', q.points + (q.points === 1 ? ' ponto' : ' pontos')));
+      h.append(el('span', 'q-kind' + (q.kind === 'objetiva' ? '' : ' dis'), rotuloKind(q.kind)));
+      h.append(el('span', 'q-pts', (a?.pontos || 0) + ' de ' + q.points));
       card.append(h, el('p', 'q-prompt', q.prompt));
 
       if (q.kind === 'objetiva') {
@@ -363,53 +408,75 @@
         });
         if (!a?.escolha) opts.append(el('p', 'form-note', 'Deixou em branco.'));
         card.append(opts);
+
       } else {
-        const r = el('div', 'resposta' + (a?.texto ? '' : ' vazia'), a?.texto || 'Deixou em branco.');
-        card.append(r);
-        const nb = el('div', 'nota-box');
-        nb.append(el('span', null, 'Pontos:'));
-        const inp = el('input');
-        inp.type = 'number'; inp.min = '0'; inp.max = String(q.points);
-        inp.value = String(notas[q.id] ?? 0);
-        inp.oninput = () => {
-          notas[q.id] = Math.max(0, Math.min(q.points, +inp.value || 0));
-          recalcula();
-        };
-        nb.append(inp, el('span', null, 'de ' + q.points));
-        card.append(nb);
+        card.append(el('div', 'resposta' + (a?.texto ? '' : ' vazia'), a?.texto || 'Deixou em branco.'));
+
+        if (q.kind === 'aberta') {
+          // a conta aberta: cada critério da rubrica e o que ele rendeu. Sem
+          // isto o ADMIN veria só um número e teria de confiar nele.
+          const crit = el('div', 'q-opts');
+          (a?.criterios || []).forEach(c => {
+            const linha = el('div', 'opt' + (c.bateu ? ' certa' : ' errada'));
+            linha.append(el('span', 'letra', c.bateu ? '✓' : '✕'), el('span', null, c.rotulo));
+            linha.append(el('span', 'marca', (c.bateu ? '+' : '0 de ') + c.pontos));
+            crit.append(linha);
+          });
+          if (crit.children.length) card.append(crit);
+        } else {
+          const nb = el('div', 'nota-box');
+          nb.append(el('span', null, 'Pontos:'));
+          const inp = el('input');
+          inp.type = 'number'; inp.min = '0'; inp.max = String(q.points);
+          inp.value = String(notas[q.id] ?? 0);
+          inp.oninput = () => {
+            notas[q.id] = Math.max(0, Math.min(q.points, +inp.value || 0));
+            recalcula();
+          };
+          nb.append(inp, el('span', null, 'de ' + q.points));
+          card.append(nb);
+        }
       }
       box.append(card);
     });
 
     const parecer = el('textarea');
     parecer.rows = 3;
-    parecer.placeholder = 'Parecer do comando — o candidato vai ler isto.';
+    parecer.placeholder = 'Parecer da administração — o candidato só vê isto se for aprovado.';
     parecer.value = t.parecer || '';
     const lbl = el('label', 'fld');
     lbl.append(el('span', null, 'PARECER'), parecer);
     box.append(lbl);
 
     const foot = el('div', 'prova-foot');
-    foot.append(el('span', 'form-note', `Nota de corte: ${cfg.min_percent}%. O veredito é seu, não da conta.`));
+    foot.append(el('span', 'form-note', `Nota de corte do curso: ${cfg.min_percent}%.`));
+
+    const euMesmo = t.profile_id === me.id;
+    const admin = t.profiles?.role === 'admin';
+    const apaga = !euMesmo && !admin;
 
     const mandar = async aprovar => {
       const quem = t.profiles?.name || 'o candidato';
-      if (!confirma(aprovar
-        ? `Aprovar ${quem}? A conta vira OFICIAL e os informes abrem na hora.`
-        : `Reprovar ${quem}?`)) return;
+      const aviso = aprovar
+        ? `Aprovar ${quem}? A conta passa a OFICIAL e o mural e os canais da unidade abrem na hora.`
+        : apaga
+          ? `Reprovar ${quem}?\n\nA CONTA DELE SERÁ APAGADA do site, junto com a prova e as respostas. Não há volta. O resultado fica no histórico.`
+          : `Reprovar ${quem}? A conta não será apagada: ${admin ? 'contas de ADMIN nunca são removidas' : 'você não pode remover a própria conta'}.`;
+      if (!confirma(aviso)) return;
+
       const notasArr = Object.entries(notas).map(([q, pontos]) => ({ q, pontos: +pontos || 0 }));
       const { error } = await sb.rpc('corrigir_prova', {
         p_attempt: t.id, p_notas: notasArr, p_aprovar: aprovar, p_parecer: parecer.value.trim(),
       });
       if (error) return toast(error.message, true);
-      window.FX?.som[aprovar ? 'permitido' : 'falha']();
-      toast(aprovar ? `${quem} aprovado.` : `${quem} reprovado.`);
+      window.FX?.som[aprovar ? 'permitido' : 'negado']();
+      toast(aprovar ? `${quem} aprovado.` : apaga ? `${quem} reprovado e removido.` : `${quem} reprovado.`);
       await carrega();
       drawChannels();
-      abreCorrecao();
+      abreResultados();
     };
 
-    const rep = el('button', 'ghost danger', '✕ REPROVAR');
+    const rep = el('button', 'ghost danger', apaga ? '✕ REPROVAR E REMOVER' : '✕ REPROVAR');
     rep.onclick = () => mandar(false);
     const apr = el('button', 'primary', '✔ APROVAR');
     apr.onclick = () => mandar(true);
@@ -424,7 +491,7 @@
         toast('Nova tentativa liberada.');
         await carrega();
         drawChannels();
-        abreCorrecao();
+        abreResultados();
       };
       foot.append(nova);
     }
@@ -473,8 +540,7 @@
     const row = el('div', 'q-row' + (q.active ? '' : ' off'));
     row.append(el('span', 'q-num', String(i + 1).padStart(2, '0')));
     row.append(el('span', 'txt', MD.plain(q.prompt)));
-    row.append(el('span', 'q-kind' + (q.kind === 'dissertativa' ? ' dis' : ''),
-      q.kind === 'dissertativa' ? 'DISSERTATIVA' : 'OBJETIVA'));
+    row.append(el('span', 'q-kind' + (q.kind === 'objetiva' ? '' : ' dis'), rotuloKind(q.kind)));
     row.append(el('span', 'cor-data', q.points + ' pt'));
 
     const acts = el('span', 'q-acts');
@@ -653,7 +719,7 @@
   }
 
   window.PROVA = {
-    carrega, realtime, abre, abreCorrecao, abreBanco,
+    carrega, realtime, abre, abreResultados, abreBanco,
     pendentes: () => pendentesN,
     // Quem já fez a prova continua alcançando o resultado depois de aprovado:
     // o parecer do comando é dele, e sumir com ele junto com a promoção seria

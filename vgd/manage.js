@@ -236,6 +236,18 @@
     };
   }
 
+  /** Caixa de marcar com explicação embaixo. */
+  function marcador(parent, label, nota, marcado) {
+    const lb = el('label', 'access-item');
+    const cb = el('input');
+    cb.type = 'checkbox';
+    cb.checked = !!marcado;
+    lb.append(cb, el('span', null, label));
+    parent.append(lb);
+    if (nota) parent.append(el('p', 'form-note', nota));
+    return { get value() { return cb.checked; } };
+  }
+
   /** Trava por código: campo de definir, trocar ou remover. */
   function lockPicker(parent, { locked, alvo }) {
     parent.append(el('h4', 'form-block', '⚿ TRAVA DE ACESSO'));
@@ -299,6 +311,9 @@
       everyone: cat ? cat.everyone : true,
       members: cat ? [...(catMem[cat.id] || [])] : [me.id],
     });
+    const cand = marcador(m.body, 'Abrir também a candidatos',
+      'Marcada, a categoria fica visível para quem ainda não passou na prova. É assim que o material de estudo chega a eles. Deixe desmarcada em tudo que não pode ser visto antes da aprovação.',
+      cat?.candidatos);
     const lock = lockPicker(m.body, { locked: !!cat?.locked, alvo: 'categoria' });
 
     const save = el('button', 'primary', cat ? 'Salvar' : 'Criar');
@@ -338,9 +353,10 @@
       const v = acc.value;
       save.disabled = true;
       let id = cat?.id, error;
-      if (cat) ({ error } = await sb.from('categories').update({ name: nm, everyone: v.everyone }).eq('id', cat.id));
+      const linha = { name: nm, everyone: v.everyone, candidatos: cand.value };
+      if (cat) ({ error } = await sb.from('categories').update(linha).eq('id', cat.id));
       else {
-        const r = await sb.from('categories').insert({ name: nm, everyone: v.everyone, created_by: me.id }).select().single();
+        const r = await sb.from('categories').insert({ ...linha, created_by: me.id }).select().single();
         error = r.error; id = r.data?.id;
       }
       if (!error && id) {
@@ -384,6 +400,12 @@
       members: ch ? [...(chanMem[ch.id] || [])] : [me.id],
       inheritFrom: ch ? ch.inherit_access : false,   // canal novo começa aberto a todos
     });
+    const cand = marcador(m.body, 'Abrir também a candidatos',
+      'Visível para quem ainda não passou na prova. Herdando o acesso de uma categoria já aberta a candidatos, o canal abre junto sem precisar desta marca.',
+      ch?.candidatos);
+    const leitura = marcador(m.body, 'Somente leitura',
+      'Só COMANDO e ADMIN publicam; o resto lê. É o que usar em canal de material do curso.',
+      ch?.somente_leitura);
     const lock = lockPicker(m.body, { locked: !!ch?.locked, alvo: 'canal' });
 
     const save = el('button', 'primary', ch ? 'Salvar' : 'Criar');
@@ -413,7 +435,11 @@
       const cid = sel.value || null;
       if (v.inherit && !cid) return toast('Escolha uma categoria para herdar o acesso, ou defina o acesso do canal.', true);
       const herda = !!cid && v.inherit;
-      const row = { name: nm, topic: topic.value.trim(), category_id: cid, inherit_access: herda, everyone: !herda && v.everyone };
+      const row = {
+        name: nm, topic: topic.value.trim(), category_id: cid,
+        inherit_access: herda, everyone: !herda && v.everyone,
+        candidatos: cand.value, somente_leitura: leitura.value,
+      };
       save.disabled = true;
       let id = ch?.id, error;
       if (ch) ({ error } = await sb.from('channels').update(row).eq('id', ch.id));

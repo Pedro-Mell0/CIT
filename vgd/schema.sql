@@ -217,9 +217,28 @@ create table if not exists public.exam_questions (
   active     boolean not null default true,
   created_at timestamptz not null default now()
 );
+-- A questão ABERTA é respondida por escrito e corrigida sozinha, por critérios.
+-- `rubrica` é a lista deles, cada um com um peso e uma expressão regular:
+--   [{"pontos":1,"rotulo":"abertura QAP Central","re":"qap\\s*central"}]
+-- É a tradução do que o PDF do curso descreve em prosa ("abertura QAP Central,
+-- 1; unidade correta, 1; ..."). Mora na mesma tabela do gabarito e, como ela, é
+-- invisível para quem faz a prova: a view pública não traz esta coluna.
+alter table public.exam_questions add column if not exists rubrica jsonb not null default '[]'::jsonb;
+
+-- Identidade estável das questões que vêm do curso (ver curso.sql): é por ela
+-- que o arquivo de conteúdo pode ser rodado de novo sem duplicar a prova.
+-- Questão criada à mão pelo painel não tem chave.
+-- Índice unique simples, e não parcial: `on conflict (chave)` só casa com um
+-- índice parcial se a cláusula WHERE dele for repetida na instrução, e o
+-- Postgres já deixa conviver quantos NULL quiser num unique comum — que é
+-- exatamente o que as questões criadas à mão precisam.
+drop index if exists public.exam_questions_chave_idx;
+alter table public.exam_questions add column if not exists chave text;
+create unique index if not exists exam_questions_chave_idx on public.exam_questions (chave);
+
 alter table public.exam_questions drop constraint if exists exam_questions_kind_check;
 alter table public.exam_questions add constraint exam_questions_kind_check
-  check (kind in ('objetiva','dissertativa'));
+  check (kind in ('objetiva','dissertativa','aberta'));
 alter table public.exam_questions drop constraint if exists exam_questions_points_check;
 alter table public.exam_questions add constraint exam_questions_points_check
   check (points between 1 and 100);
@@ -274,10 +293,49 @@ create table if not exists public.exam_answers (
   pontos      int not null default 0,
   primary key (attempt_id, question_id)
 );
+-- O que cada critério da rubrica rendeu, para quem corrige ver a conta aberta
+-- em vez de um número solto: [{"rotulo":"QTI","pontos":1,"bateu":true}]
+alter table public.exam_answers add column if not exists criterios jsonb not null default '[]'::jsonb;
+
+-- ---------- registro que sobrevive à conta ----------
+-- Reprovar apaga a conta do candidato, e com ela a tentativa e as respostas.
+-- Sem este registro, a unidade perderia a memória de quem prestou a prova e de
+-- quem decidiu o quê. Aqui fica só o resumo, por isso ele não cai na cascata.
+create table if not exists public.exam_log (
+  id          uuid primary key default gen_random_uuid(),
+  nome        text not null,
+  nota        numeric(5,2),
+  pontos      int not null default 0,
+  pontos_max  int not null default 0,
+  veredito    text not null,
+  parecer     text not null default '',
+  removido    boolean not null default false,
+  decidido_por text,
+  decidido_em timestamptz not null default now()
+);
+create index if not exists exam_log_data_idx on public.exam_log (decidido_em desc);
 
 -- ============================================================================
 -- 4. FUNÇÕES DE APOIO
 -- ============================================================================
+-- As policies saem de cena ANTES das funções serem redefinidas. Uma policy que
+-- usa `category_visible(uuid, boolean, uuid)` é uma dependência da função: com
+-- ela de pé, o DROP da assinatura antiga falha e o arquivo inteiro para no
+-- meio. Elas são todas recriadas na seção 8, logo abaixo.
+do $do$
+declare p record;
+begin
+  for p in
+    select policyname, tablename from pg_policies
+     where schemaname = 'public'
+       and tablename in ('profiles','invite_codes','categories','category_members',
+                         'category_locks','channels','channel_members','channel_locks',
+                         'messages','sidebar_order','exam_config','exam_questions',
+                         'exam_attempts','exam_answers','exam_log')
+  loop
+    execute format('drop policy if exists %I on public.%I', p.policyname, p.tablename);
+  end loop;
+end $do$;
 
 create or replace function public.my_role()
 returns text language sql stable security definer set search_path = public as $fn$
@@ -301,14 +359,29 @@ returns boolean language sql stable security definer set search_path = public as
   select coalesce((select role from public.profiles where id = auth.uid()) in ('oficial','comando','admin'), false)
 $fn$;
 
+-- ---------- porta aberta ao candidato ----------
+-- O candidato precisa estudar antes de fazer a prova, e o material de estudo
+-- mora em canais. `candidatos` é a chave dessa porta: marcada, a categoria ou o
+-- canal passa a ser legível por qualquer conta autenticada, inclusive quem
+-- ainda não foi aprovado. Como candidato é o cargo mais restrito de todos,
+-- "aberto ao candidato" é o mesmo que "aberto a todo mundo".
+alter table public.categories add column if not exists candidatos boolean not null default false;
+alter table public.channels   add column if not exists candidatos boolean not null default false;
+
+-- Canal de leitura: o material do curso não é lugar de conversa. Marcado, só
+-- COMANDO e ADMIN publicam ali; o resto lê.
+alter table public.channels add column if not exists somente_leitura boolean not null default false;
+
 create or replace function public.can_see_category(cat uuid)
 returns boolean language plpgsql stable security definer set search_path = public as $fn$
-declare ev boolean; uid uuid := auth.uid();
+declare ev boolean; cnd boolean; uid uuid := auth.uid();
 begin
-  if uid is null or cat is null or not public.is_oficial() then return false; end if;
+  if uid is null or cat is null then return false; end if;
   if public.is_admin() then return true; end if;
-  select everyone into ev from public.categories where id = cat;
+  select everyone, candidatos into ev, cnd from public.categories where id = cat;
   if not found then return false; end if;
+  if coalesce(cnd, false) then return true; end if;
+  if not public.is_oficial() then return false; end if;
   return ev or exists (select 1 from public.category_members
                         where category_id = cat and profile_id = uid);
 end $fn$;
@@ -321,37 +394,44 @@ end $fn$;
 -- INSERT: sem isso, uma categoria restrita ficaria invisível até para quem
 -- acabou de criá-la, e o RETURNING seria negado.
 drop function if exists public.category_visible(uuid, boolean, uuid);
-create or replace function public.category_visible(cid uuid, ev boolean, autor uuid)
+drop function if exists public.category_visible(uuid, boolean, boolean, uuid);
+create or replace function public.category_visible(cid uuid, ev boolean, cnd boolean, autor uuid)
 returns boolean language sql stable security definer set search_path = public as $fn$
-  select public.is_oficial()
-     and (public.is_admin()
-          or coalesce(ev, false)
-          or autor = auth.uid()
-          or exists (select 1 from public.category_members m
-                      where m.category_id = cid and m.profile_id = auth.uid()));
+  select public.is_admin()
+      or autor = auth.uid()
+      or coalesce(cnd, false)
+      or (public.is_oficial()
+          and (coalesce(ev, false)
+               or exists (select 1 from public.category_members m
+                           where m.category_id = cid and m.profile_id = auth.uid())));
 $fn$;
 
 drop function if exists public.channel_visible(uuid, boolean, boolean, uuid, uuid);
-create or replace function public.channel_visible(cat uuid, inh boolean, ev boolean, cid uuid, autor uuid)
+drop function if exists public.channel_visible(uuid, boolean, boolean, boolean, uuid, uuid);
+create or replace function public.channel_visible(
+  cat uuid, inh boolean, ev boolean, cnd boolean, cid uuid, autor uuid)
 returns boolean language sql stable security definer set search_path = public as $fn$
-  select public.is_oficial()
-     and (public.is_admin()
-          or autor = auth.uid()
-          or (cat is not null and inh and public.can_see_category(cat))
-          or ((cat is null or not inh)
-              and (coalesce(ev, false)
-                   or exists (select 1 from public.channel_members m
-                               where m.channel_id = cid and m.profile_id = auth.uid()))));
+  select public.is_admin()
+      or autor = auth.uid()
+      or coalesce(cnd, false)
+      -- herdando de uma categoria aberta ao candidato, o canal abre junto
+      or (cat is not null and inh and public.can_see_category(cat))
+      or (public.is_oficial()
+          and (cat is null or not inh)
+          and (coalesce(ev, false)
+               or exists (select 1 from public.channel_members m
+                           where m.channel_id = cid and m.profile_id = auth.uid())));
 $fn$;
 
 /** Regra única de acesso a canal, usada por todas as policies. */
 create or replace function public.can_read_channel(ch text)
 returns boolean language plpgsql stable security definer set search_path = public as $fn$
 declare
-  cid uuid; cat uuid; inh boolean; ev boolean; aut uuid; uid uuid := auth.uid();
+  cid uuid; cat uuid; inh boolean; ev boolean; cnd boolean; aut uuid; uid uuid := auth.uid();
 begin
-  if uid is null or ch is null or not public.is_oficial() then return false; end if;
-  if ch = 'mural' then return true; end if;
+  if uid is null or ch is null then return false; end if;
+  -- o mural é a sala da unidade: entra quem já passou na prova
+  if ch = 'mural' then return public.is_oficial(); end if;
   if public.is_admin() then return true; end if;
 
   if ch like 'chan:%' then
@@ -360,12 +440,37 @@ begin
     exception when others then
       return false;
     end;
-    select category_id, inherit_access, everyone, created_by into cat, inh, ev, aut
+    select category_id, inherit_access, everyone, candidatos, created_by
+      into cat, inh, ev, cnd, aut
       from public.channels where id = cid;
     if not found then return false; end if;
-    return public.channel_visible(cat, inh, ev, cid, aut);
+    return public.channel_visible(cat, inh, ev, cnd, cid, aut);
   end if;
 
+  return false;
+end $fn$;
+
+/**
+ * Quem pode publicar num canal. Ler e escrever deixaram de ser a mesma coisa
+ * quando o material do curso virou canal: o candidato precisa ler as páginas
+ * de teoria, e não precisa rabiscar nelas.
+ */
+create or replace function public.pode_escrever(ch text)
+returns boolean language plpgsql stable security definer set search_path = public as $fn$
+declare cid uuid; so_leitura boolean;
+begin
+  if not public.can_read_channel(ch) then return false; end if;
+  if public.is_staff() then return true; end if;
+  if ch = 'mural' then return public.is_oficial(); end if;
+  if ch like 'chan:%' then
+    begin
+      cid := substring(ch from 6)::uuid;
+    exception when others then
+      return false;
+    end;
+    select somente_leitura into so_leitura from public.channels where id = cid;
+    return not coalesce(so_leitura, false);
+  end if;
   return false;
 end $fn$;
 
@@ -772,17 +877,24 @@ end $fn$;
 /**
  * Entrega a prova. `p_respostas` é um array:
  *   [{"q":"<uuid>","escolha":"a"}, {"q":"<uuid>","texto":"..."}]
- * As objetivas são corrigidas na hora, contra o gabarito. As dissertativas
- * ficam valendo zero até alguém do comando dar a nota — por isso a prova sai
- * daqui como 'aguardando' sempre que houver ao menos uma delas.
+ *
+ * A correção é toda automática e acontece aqui dentro, no único lugar que
+ * enxerga o gabarito:
+ *   · objetiva     — compara a alternativa marcada com `correct`;
+ *   · aberta       — roda a rubrica da questão sobre o texto, critério por
+ *                    critério, e guarda o que bateu em `criterios`;
+ *   · dissertativa — fica em zero, esperando a nota de quem corrige.
+ *
+ * A prova sai daqui sempre como 'aguardando', mesmo com a nota já calculada:
+ * a conta é automática, o veredito não. Quem decide é o ADMIN, no canal de
+ * resultados, com a nota e a recomendação à frente.
  */
 create or replace function public.enviar_prova(p_attempt uuid, p_respostas jsonb)
 returns void language plpgsql security definer set search_path = public as $fn$
 declare
   uid uuid := auth.uid();
-  t record; q record; r jsonb;
-  tem_dis boolean := false;
-  obj int := 0; maxp int; minimo int; pct numeric;
+  t record; q record; r jsonb; c jsonb;
+  obj int := 0; dis int := 0; maxp int; pct numeric;
 begin
   if uid is null then
     raise exception 'Sessão expirada. Entre de novo.';
@@ -814,48 +926,67 @@ begin
              values (p_attempt, q.id, esc, ok, case when ok then q.points else 0 end);
         if ok then obj := obj + q.points; end if;
       end;
+
+    elsif q.kind = 'aberta' then
+      declare
+        txt text := btrim(coalesce(r->>'texto', ''));
+        ganhos int := 0; lista jsonb := '[]'::jsonb; bateu boolean;
+      begin
+        for c in select e.value from jsonb_array_elements(coalesce(q.rubrica, '[]'::jsonb)) as e(value) loop
+          -- `~*` é a comparação por expressão regular sem diferenciar
+          -- maiúsculas; texto vazio nunca bate, nem com padrão frouxo
+          bateu := txt <> '' and txt ~* (c->>'re');
+          if bateu then ganhos := ganhos + coalesce((c->>'pontos')::int, 0); end if;
+          lista := lista || jsonb_build_array(jsonb_build_object(
+            'rotulo', c->>'rotulo',
+            'pontos', coalesce((c->>'pontos')::int, 0),
+            'bateu', bateu));
+        end loop;
+        ganhos := least(ganhos, q.points);
+        insert into public.exam_answers (attempt_id, question_id, texto, pontos, criterios)
+             values (p_attempt, q.id, txt, ganhos, lista);
+        obj := obj + ganhos;
+      end;
+
     else
-      tem_dis := true;
       insert into public.exam_answers (attempt_id, question_id, texto)
            values (p_attempt, q.id, btrim(coalesce(r->>'texto', '')));
     end if;
   end loop;
 
   select coalesce(sum(points), 0) into maxp from public.exam_questions where active;
-  select min_percent into minimo from public.exam_config where id;
+  pct := case when maxp > 0 then round(obj::numeric * 100 / maxp, 2) else 0 end;
 
-  if tem_dis then
-    update public.exam_attempts
-       set status = 'aguardando', pontos_obj = obj, pontos_dis = 0,
-           pontos_max = maxp, nota = null, submitted_at = now()
-     where id = p_attempt;
-  else
-    pct := case when maxp > 0 then round(obj::numeric * 100 / maxp, 2) else 0 end;
-    update public.exam_attempts
-       set status = case when pct >= minimo then 'aprovado' else 'reprovado' end,
-           pontos_obj = obj, pontos_dis = 0, pontos_max = maxp, nota = pct,
-           submitted_at = now(), reviewed_at = now()
-     where id = p_attempt;
-    if pct >= minimo then
-      update public.profiles set role = 'oficial'
-       where id = uid and role = 'candidato';
-    end if;
-  end if;
+  update public.exam_attempts
+     set status = 'aguardando', pontos_obj = obj, pontos_dis = dis,
+         pontos_max = maxp, nota = pct, submitted_at = now()
+   where id = p_attempt;
 end $fn$;
 
 /**
- * Correção manual. `p_notas` é [{"q":"<uuid>","pontos":3}] e só vale para as
- * dissertativas. O veredito é de quem corrige: aprovar com nota baixa ou
- * reprovar com nota alta é decisão do comando, não da aritmética.
- * Aprovação promove o candidato a OFICIAL — é o que abre os informes para ele.
+ * Veredito do ADMIN. `p_notas` é [{"q":"<uuid>","pontos":3}] e só vale para as
+ * dissertativas, se houver alguma; o resto da nota já veio pronto da entrega.
+ * Aprovar com nota baixa ou reprovar com nota alta é decisão de quem decide,
+ * não da aritmética — a nota é recomendação.
+ *
+ * Aprovação promove o candidato a OFICIAL, que é o que abre o mural e os
+ * canais da unidade.
+ *
+ * Reprovação APAGA A CONTA do candidato, por regra da unidade. Duas exceções
+ * de segurança, para a função não virar uma arma: conta de ADMIN nunca é
+ * removida, e ninguém remove a si mesmo. Antes de apagar, o resultado é
+ * copiado para `exam_log`, que não cai na cascata — a unidade continua
+ * sabendo quem prestou e quem decidiu o quê.
  */
 create or replace function public.corrigir_prova(
   p_attempt uuid, p_notas jsonb, p_aprovar boolean, p_parecer text default '')
-returns void language plpgsql security definer set search_path = public as $fn$
-declare t record; n jsonb; dis int := 0; obj int := 0; maxp int; pct numeric;
+returns void language plpgsql security definer set search_path = public, auth as $fn$
+declare
+  t record; n jsonb; dis int := 0; obj int := 0; maxp int; pct numeric;
+  alvo record; quem text; remover boolean := false;
 begin
-  if not public.is_staff() then
-    raise exception 'Apenas COMANDO ou ADMIN corrigem provas.';
+  if not public.is_admin() then
+    raise exception 'Apenas o ADMIN decide o resultado de uma prova.';
   end if;
   select * into t from public.exam_attempts where id = p_attempt;
   if not found then
@@ -881,10 +1012,19 @@ begin
    where a.attempt_id = p_attempt and q.kind = 'dissertativa';
   select coalesce(sum(a.pontos), 0) into obj
     from public.exam_answers a join public.exam_questions q on q.id = a.question_id
-   where a.attempt_id = p_attempt and q.kind = 'objetiva';
+   where a.attempt_id = p_attempt and q.kind in ('objetiva','aberta');
 
   maxp := greatest(t.pontos_max, 1);
   pct := round((obj + dis)::numeric * 100 / maxp, 2);
+
+  select * into alvo from public.profiles where id = t.profile_id;
+  select name into quem from public.profiles where id = auth.uid();
+  -- o coalesce fecha o caso de `p_aprovar` chegar nulo: sem ele `remover`
+  -- sairia nulo e o INSERT no exam_log quebraria na coluna NOT NULL
+  remover := coalesce(not p_aprovar
+                      and alvo.id is not null
+                      and alvo.role <> 'admin'
+                      and alvo.id <> auth.uid(), false);
 
   update public.exam_attempts
      set status = case when p_aprovar then 'aprovado' else 'reprovado' end,
@@ -893,9 +1033,17 @@ begin
          reviewed_at = now(), reviewed_by = auth.uid()
    where id = p_attempt;
 
+  insert into public.exam_log (nome, nota, pontos, pontos_max, veredito, parecer, removido, decidido_por)
+       values (coalesce(alvo.name, '[removido]'), pct, obj + dis, maxp,
+               case when p_aprovar then 'aprovado' else 'reprovado' end,
+               coalesce(btrim(p_parecer), ''), remover, quem);
+
   if p_aprovar then
     update public.profiles set role = 'oficial'
      where id = t.profile_id and role = 'candidato';
+  elsif remover then
+    -- a cascata leva o perfil, a tentativa e as respostas; o exam_log fica
+    delete from auth.users where id = alvo.id;
   end if;
 end $fn$;
 
@@ -927,6 +1075,7 @@ alter table public.exam_config      enable row level security;
 alter table public.exam_questions   enable row level security;
 alter table public.exam_attempts    enable row level security;
 alter table public.exam_answers     enable row level security;
+alter table public.exam_log         enable row level security;
 
 do $do$
 declare p record;
@@ -937,7 +1086,7 @@ begin
        and tablename in ('profiles','invite_codes','categories','category_members',
                          'category_locks','channels','channel_members','channel_locks',
                          'messages','sidebar_order','exam_config','exam_questions',
-                         'exam_attempts','exam_answers')
+                         'exam_attempts','exam_answers','exam_log')
   loop
     execute format('drop policy if exists %I on public.%I', p.policyname, p.tablename);
   end loop;
@@ -960,14 +1109,14 @@ create policy ord_write on public.sidebar_order for all    to authenticated
 
 -- ---------- categorias ----------
 create policy cat_read   on public.categories for select to authenticated
-  using (public.category_visible(id, everyone, created_by));
+  using (public.category_visible(id, everyone, candidatos, created_by));
 create policy cat_insert on public.categories for insert to authenticated
   with check (public.is_staff());
 create policy cat_update on public.categories for update to authenticated
-  using (public.is_staff() and public.category_visible(id, everyone, created_by))
+  using (public.is_staff() and public.category_visible(id, everyone, candidatos, created_by))
   with check (public.is_staff());
 create policy cat_delete on public.categories for delete to authenticated
-  using (public.is_staff() and public.category_visible(id, everyone, created_by));
+  using (public.is_staff() and public.category_visible(id, everyone, candidatos, created_by));
 
 create policy catm_read  on public.category_members for select to authenticated
   using (public.can_see_category(category_id) or profile_id = auth.uid());
@@ -976,14 +1125,14 @@ create policy catm_write on public.category_members for all to authenticated
 
 -- ---------- canais ----------
 create policy ch_read   on public.channels for select to authenticated
-  using (public.channel_visible(category_id, inherit_access, everyone, id, created_by));
+  using (public.channel_visible(category_id, inherit_access, everyone, candidatos, id, created_by));
 create policy ch_insert on public.channels for insert to authenticated
   with check (public.is_staff());
 create policy ch_update on public.channels for update to authenticated
-  using (public.is_staff() and public.channel_visible(category_id, inherit_access, everyone, id, created_by))
+  using (public.is_staff() and public.channel_visible(category_id, inherit_access, everyone, candidatos, id, created_by))
   with check (public.is_staff());
 create policy ch_delete on public.channels for delete to authenticated
-  using (public.is_staff() and public.channel_visible(category_id, inherit_access, everyone, id, created_by));
+  using (public.is_staff() and public.channel_visible(category_id, inherit_access, everyone, candidatos, id, created_by));
 
 create policy chm_read  on public.channel_members for select to authenticated
   using (public.can_read_channel('chan:' || channel_id::text) or profile_id = auth.uid());
@@ -1002,7 +1151,7 @@ create policy chlock_all  on public.channel_locks  for all to authenticated
 create policy msg_read   on public.messages for select to authenticated
   using (public.can_read_channel(channel));
 create policy msg_insert on public.messages for insert to authenticated
-  with check (author_id = auth.uid() and public.can_read_channel(channel));
+  with check (author_id = auth.uid() and public.pode_escrever(channel));
 create policy msg_update on public.messages for update to authenticated
   using (public.can_read_channel(channel) and (author_id = auth.uid() or public.is_staff()))
   with check (public.can_read_channel(channel));
@@ -1028,6 +1177,11 @@ create policy an_read on public.exam_answers for select to authenticated
   using (exists (select 1 from public.exam_attempts t
                   where t.id = attempt_id
                     and (t.profile_id = auth.uid() or public.is_staff())));
+
+-- O histórico de vereditos é do ADMIN. Ele guarda nome e nota de gente que já
+-- não tem conta; não é coisa para circular na unidade.
+create policy log_read on public.exam_log for select to authenticated
+  using (public.is_admin());
 
 -- ============================================================================
 -- 9. REALTIME

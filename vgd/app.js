@@ -49,7 +49,7 @@ const order   = {};       // chave da barra lateral -> posição
 const unread  = new Set();// canais com informe novo ainda não visto
 
 // Painéis da sala. Só um fica visível de cada vez.
-const PAINEIS = { chat: '#chat', prova: '#prova', correcao: '#correcao', exame: '#exame', contas: '#manage' };
+const PAINEIS = { chat: '#chat', prova: '#prova', resultados: '#resultados', exame: '#exame', contas: '#manage' };
 
 /**
  * O nome do personagem reduzido a letras, números e pontos. É a parte local do
@@ -236,7 +236,9 @@ async function loadPeople() {
 }
 
 async function loadTree() {
-  if (!isOficial()) return;          // candidato não enxerga canal nenhum
+  // O candidato também carrega a árvore: ele enxerga os canais da ACADEMIA,
+  // que é onde está o material que a prova cobra. Quem decide o que volta é o
+  // RLS, não esta função.
   const [c, ch, cm, chm, ord] = await Promise.all([
     sb.from('categories').select('*').order('position').order('name'),
     sb.from('channels').select('*').order('position').order('name'),
@@ -339,11 +341,11 @@ const collapsed = new Set(JSON.parse(localStorage.getItem('vgd.collapsed') || '[
 const saveCollapsed = () => localStorage.setItem('vgd.collapsed', JSON.stringify([...collapsed]));
 
 function chanInfo(key) {
-  if (key === 'mural')    return { label: 'mural', icon: '◈', hint: 'informes gerais · toda a unidade' };
-  if (key === 'prova')    return { label: 'Prova da Vanguarda', icon: '◎', hint: 'admissão na unidade' };
-  if (key === 'correcao') return { label: 'Correção de provas', icon: '✓', hint: 'comando' };
-  if (key === 'exame')    return { label: 'Banco de questões', icon: '≡', hint: 'montagem da prova' };
-  if (key === 'contas')   return { label: 'Contas', icon: '⚙', hint: 'administração' };
+  if (key === 'mural')      return { label: 'mural', icon: '◈', hint: 'informes gerais · toda a unidade' };
+  if (key === 'prova')      return { label: 'prova-teórica', icon: '◎', hint: 'curso de modulação · admissão' };
+  if (key === 'resultados') return { label: 'resultados', icon: '✓', hint: 'provas entregues · só a administração' };
+  if (key === 'exame')      return { label: 'Banco de questões', icon: '≡', hint: 'montagem da prova' };
+  if (key === 'contas')     return { label: 'Contas', icon: '⚙', hint: 'administração' };
 
   const c = chans[key.slice(5)];
   if (!c) return { label: 'canal', icon: '#', hint: '' };
@@ -424,7 +426,9 @@ function topItems() {
     });
 
   const items = [
-    { key: 'mural', kind: 'mural', def: 0 },
+    // o mural é a sala da unidade: candidato não entra, e mostrar um canal que
+    // o banco vai negar é pior do que não mostrar
+    ...(isOficial() ? [{ key: 'mural', kind: 'mural', def: 0 }] : []),
     ...Object.values(cats).map(c => ({ key: 'cat:' + c.id, kind: 'cat', cat: c, def: 10 + (c.position || 0) })),
     ...soltos.map(c => ({ key: 'chan:' + c.id, kind: 'chan', ch: c, def: 100 + (c.position || 0) })),
   ];
@@ -435,16 +439,6 @@ function topItems() {
 function drawChannels() {
   const nav = $('#chans');
   nav.innerHTML = '';
-
-  // O candidato só tem a prova. Nada de canal, nada de categoria — e não é só
-  // a barra que esconde: o RLS também nega, então mostrar seria mentir.
-  if (!isOficial()) {
-    const box = el('div', 'nav-item');
-    box.append(el('h3', null, 'Admissão'));
-    navBtn(box, 'prova', 'Prova da Vanguarda', '◎', 'prova');
-    nav.append(box);
-    return;
-  }
 
   const { items, byCat } = topItems();
 
@@ -484,21 +478,23 @@ function drawChannels() {
     armaTopo(box);
   });
 
-  // Já aprovado, o oficial ainda alcança a própria prova: é onde está o
-  // parecer do comando sobre ele.
-  if (window.PROVA?.temTentativa?.()) {
+  // A prova fica à vista do candidato, que ainda vai prestá-la, e de quem já
+  // prestou — é onde está o parecer da administração sobre ele.
+  if (!isOficial() || window.PROVA?.temTentativa?.()) {
     const box = el('div', 'nav-item');
     box.append(el('h3', null, 'Admissão'));
-    navBtn(box, 'prova', 'Minha prova', '◎', 'prova');
+    navBtn(box, 'prova', 'prova-teórica', '◎', 'prova');
     nav.append(box);
   }
 
   if (isStaff()) {
     const box = el('div', 'nav-item');
-    box.append(el('h3', null, 'Comando'));
-    const b = navBtn(box, 'correcao', 'Correção de provas', '✓');
-    const n = window.PROVA?.pendentes?.() || 0;
-    if (n) b.append(el('span', 'pend', String(n)));
+    box.append(el('h3', null, 'Administração'));
+    if (isAdmin()) {
+      const b = navBtn(box, 'resultados', 'resultados', '✓');
+      const n = window.PROVA?.pendentes?.() || 0;
+      if (n) b.append(el('span', 'pend', String(n)));
+    }
     navBtn(box, 'exame', 'Banco de questões', '≡');
     if (isAdmin()) navBtn(box, 'contas', 'Contas', '⚙', 'gear');
     nav.append(box);
@@ -928,12 +924,19 @@ async function openChannel(key, jumpTo) {
   $('#find-btn').classList.toggle('hide', !isOficial());
   $('#ch-edit').classList.toggle('hide', !(isStaff() && key.startsWith('chan:')));
 
-  if (key === 'prova')    { mostraPainel('prova');    return window.PROVA?.abre?.(); }
-  if (key === 'correcao') { mostraPainel('correcao'); return window.PROVA?.abreCorrecao?.(); }
-  if (key === 'exame')    { mostraPainel('exame');    return window.PROVA?.abreBanco?.(); }
-  if (key === 'contas')   { mostraPainel('contas');   return window.MANAGE?.open?.(); }
+  if (key === 'prova')      { mostraPainel('prova');      return window.PROVA?.abre?.(); }
+  if (key === 'resultados') { mostraPainel('resultados'); return window.PROVA?.abreResultados?.(); }
+  if (key === 'exame')      { mostraPainel('exame');      return window.PROVA?.abreBanco?.(); }
+  if (key === 'contas')     { mostraPainel('contas');     return window.MANAGE?.open?.(); }
 
   mostraPainel('chat');
+
+  // Canal de leitura: o material do curso não é lugar de conversa. O banco
+  // recusaria a mensagem de qualquer jeito (ver pode_escrever no schema);
+  // esconder a caixa é para ninguém digitar à toa e levar um erro na cara.
+  const alvoCh = key.startsWith('chan:') ? chans[key.slice(5)] : null;
+  const soLeitura = !!alvoCh?.somente_leitura && !isStaff();
+  document.querySelector('#chat .composer')?.classList.toggle('hide', soLeitura);
 
   // só apaga a bolinha; quem carimba a data é o carregamento, com hora do
   // servidor. Carimbar aqui, com o relógio local adiantado, faria o carimbo de

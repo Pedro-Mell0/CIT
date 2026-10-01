@@ -7,6 +7,7 @@ coisas, **banco separado**. Nenhuma conta, nenhuma tabela e nenhum informe é
 compartilhado entre os dois.
 
 ```
+curso.sql    conteúdo do Curso de Modulação: canais, material e as questões
 index.html   estrutura
 style.css    visual (âmbar de painel, brasa de freio, xênon de farol)
 config.js    URL e chave anon do Supabase da VGD
@@ -28,8 +29,11 @@ schema.sql   banco de dados completo
    rode de novo a cada atualização do site, sem perder dados.
 4. **Project Settings → API**: copie *Project URL* e *anon public key* para o
    `config.js`.
-5. Cadastre os códigos de acesso (abaixo).
-6. No Vercel: *Add New Project* → importe este mesmo repositório →
+5. **SQL Editor**: cole o `curso.sql` e rode. Ele cria os canais do curso, o
+   material de estudo e a prova teórica. Também é idempotente — rodar de novo
+   atualiza as questões e refaz a lista de quem instrui, sem duplicar nada.
+6. Cadastre os códigos de acesso (abaixo).
+7. No Vercel: *Add New Project* → importe este mesmo repositório →
    **Root Directory: `vgd`** → Framework *Other*, sem build command.
 
 > A chave `anon` pode ficar no código: a segurança vem das regras de RLS do
@@ -80,26 +84,78 @@ select code from public.invite_codes where role = 'admin';
 
 Leia-o uma vez, crie sua conta e troque por um seu.
 
+## Quem vê o quê
+
+O candidato não é um oficial de segunda classe: ele é alguém de fora que
+precisa estudar. A porta que decide isso é a marca **"abrir também a
+candidatos"**, na categoria ou no canal (coluna `candidatos`).
+
+| Onde | Quem alcança |
+|------|--------------|
+| `#prova-teórica` | candidato e quem já prestou |
+| categoria **ACADEMIA** — páginas 1 a 4 do curso | todos, inclusive candidatos |
+| `#mural` e os canais da unidade | só a partir de OFICIAL |
+| categoria **INSTRUÇÃO** — prova prática, gabarito, critérios | COMANDO e ADMIN |
+| `#resultados` | ADMIN |
+
+O gabarito é o ponto sensível da coisa toda: ele vive na categoria INSTRUÇÃO,
+na coluna `correct` de `exam_questions` e na `rubrica` da mesma tabela. O
+candidato não alcança nenhum dos três — ele lê as questões pela view
+`exam_questions_public`, que não traz essas colunas. Nem depois de entregar o
+navegador dele recebe o gabarito.
+
+Os canais de material são **somente leitura**: só COMANDO e ADMIN publicam
+neles. É a coluna `somente_leitura`, com a regra em `pode_escrever()`.
+
+> O PDF do curso **não entra neste repositório** — ver o `.gitignore` da pasta.
+> As últimas páginas dele são o gabarito, e a pasta inteira vira URL na Vercel.
+
 ## A prova
 
-Mista: objetivas e dissertativas na mesma prova.
+A correção é automática e acontece na entrega, dentro do banco:
 
-- As **objetivas** são corrigidas na hora, dentro do banco. O gabarito mora na
-  coluna `correct` de `exam_questions`, que o candidato não alcança: ele lê as
-  questões pela view `exam_questions_public`, que não traz essa coluna. Nem
-  depois de entregar o navegador dele recebe o gabarito.
-- As **dissertativas** vão para o painel ✓ *Correção de provas*, onde o comando
-  dá os pontos de cada uma e bate o martelo.
-- O veredito é do comando, não da aritmética: a nota de corte é referência, e
-  aprovar ou reprovar é um botão à parte.
-- Cada candidato tem **uma tentativa**. Uma segunda exige *Liberar nova
-  tentativa*, no mesmo painel.
-- Enquanto a prova não é entregue, as respostas ficam no `localStorage` do
-  navegador do candidato: fechar a aba e voltar não perde nada. Elas só chegam
-  ao banco na entrega.
+- **Objetivas** — compara a alternativa marcada com o gabarito.
+- **Abertas** — roda a `rubrica` da questão sobre o texto, critério por
+  critério. A rubrica é a tradução literal do que o PDF descreve em prosa
+  ("abertura QAP Central, 1; unidade correta, 1; ID do P2 correto, 1; ..."):
+  cada critério tem um peso e uma expressão regular. O que bateu e o que não
+  bateu fica gravado em `exam_answers.criterios`, e o ADMIN vê a conta aberta
+  em vez de um número solto.
+- **Dissertativas** — continuam existindo para quem quiser criar uma pelo
+  painel; ficam em zero esperando a nota à mão.
+
+A prova sai da entrega como **aguardando**, com a nota já calculada. No canal
+`#resultados` aparece `Nota 79.17% — Recomendação: Aprovar`, e aí:
+
+- **Aprovar** → a conta vira OFICIAL, e o mural e os canais da unidade abrem.
+- **Reprovar** → **a conta é apagada**, com a prova e as respostas. Duas
+  exceções, para o botão não virar uma arma: conta de ADMIN nunca é removida, e
+  ninguém remove a si mesmo. O resultado é copiado para `exam_log` antes de
+  apagar, então a unidade não perde a memória de quem prestou e de quem
+  decidiu o quê.
+
+A nota é recomendação, não veredito: quem decide é o ADMIN, com as respostas e
+os critérios à frente.
+
+Cada candidato tem **uma tentativa**; uma segunda exige *Liberar nova
+tentativa*, no mesmo painel. Enquanto a prova não é entregue, as respostas
+ficam no `localStorage` do navegador dele — fechar a aba e voltar não perde
+nada, e elas só chegam ao banco na entrega.
 
 Montar a prova: painel ≡ *Banco de questões*. Questão desativada sai da prova
 sem apagar o histórico de quem já respondeu a ela.
+
+### A prova que veio do PDF
+
+O material entregue (*Curso de Modulação Policial*, DPP) está incompleto: diz
+ter 15 questões e traz 8 — faltam a 3, 5, 7, 9, 13, 14 e 15, e o gabarito lista
+8 letras para 10 objetivas. O `curso.sql` semeia as que existem, somando **48
+pontos**. O corte continua percentual (70%, como o curso manda), então a conta
+fecha mesmo com a prova mais curta; acrescentando as que faltam pelo Banco de
+Questões, o total sobe sozinho.
+
+O item b) da questão 11 foi reconstruído a partir do gabarito e da estação 2,
+que trazem os dados que faltavam no caderno do aluno.
 
 ## Identidade
 
