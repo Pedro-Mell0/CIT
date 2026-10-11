@@ -6,6 +6,7 @@
   const ROLES = { agent: 'AGENTE', command: 'COMANDO', admin: 'ADMIN', master: 'MASTER' };
   const ORDEM_CARGO = ['master', 'admin', 'command', 'agent'];
   let realNames = {};   // id -> nome real (só chega preenchido para MASTER)
+  let permanentes = new Set();   // ids que ninguém tira de MASTER (permanent_masters)
 
   // ---------------------------------------------------------------- usuários
   async function open() {
@@ -20,6 +21,8 @@
     if (isMaster()) {
       const { data } = await sb.from('real_names').select('*');
       (data || []).forEach(r => realNames[r.profile_id] = r.real_name);
+      const { data: perm } = await sb.from('permanent_masters').select('profile_id');
+      permanentes = new Set((perm || []).map(r => r.profile_id));
     }
 
     const head = el('header', 'mg-head');
@@ -68,6 +71,11 @@
         acts.append(btn('★ dar ADMIN', () => setRole(p, 'admin')));
       }
       if (p.role === 'admin') acts.append(btn('▼ tirar ADMIN', () => setRole(p, 'command')));
+      // Só MASTER concede ou retira MASTER (o banco confere de novo em set_role).
+      if (isMaster()) {
+        if (p.role !== 'master') acts.append(btn('✦ dar MASTER', () => setRole(p, 'master')));
+        else if (!permanentes.has(p.id)) acts.append(btn('▼ tirar MASTER', () => setRole(p, 'admin')));
+      }
     }
     acts.append(btn('✎ nome/cor', () => renomear(p)));
     acts.append(btn('⚿ senha', () => resetPass(p)));
@@ -83,7 +91,9 @@
   };
 
   async function setRole(p, role) {
-    if (!confirm(`Definir ${p.codename} como ${ROLES[role]}?`)) return;
+    const aviso = role === 'master'
+      ? '\n\nMASTER enxerga o nome real de todos e pode conceder MASTER a outras contas.' : '';
+    if (!confirm(`Definir ${p.codename} como ${ROLES[role]}?${aviso}`)) return;
     const { error } = await sb.rpc('set_role', { target: p.id, new_role: role });
     if (error) return toast(error.message, true);
     p.role = role;

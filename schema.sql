@@ -128,6 +128,21 @@ create table if not exists public.real_names (
   updated_at timestamptz not null default now()
 );
 
+-- ---------- MASTER permanente ----------
+-- Contas que ninguém tira de MASTER, nem outro MASTER. Guardadas pelo id, não
+-- pelo codinome: o codinome muda, e outro agente poderia assumir o antigo.
+-- A trava vale para qualquer caminho (RPC ou escrita direta), pelo gatilho
+-- trava_master_permanente mais abaixo. Para incluir outra conta:
+--   insert into public.permanent_masters (profile_id)
+--     select id from public.profiles where codename = '...';
+create table if not exists public.permanent_masters (
+  profile_id uuid primary key references public.profiles(id) on delete cascade
+);
+
+insert into public.permanent_masters (profile_id)
+select id from public.profiles where lower(codename) = 'hermes'
+on conflict do nothing;
+
 -- ---------- categorias ----------
 create table if not exists public.categories (
   id         uuid primary key default gen_random_uuid(),
@@ -500,20 +515,22 @@ create trigger on_auth_user_created after insert on auth.users
 -- 4. GERENCIAMENTO DE USUÁRIOS (RPC)
 -- ============================================================================
 
--- ADMIN concede/remove privilégio de comando.
+-- ADMIN concede/remove privilégio de comando. MASTER, além disso, concede e
+-- retira a própria credencial MASTER de outras contas.
 create or replace function public.set_role(target uuid, new_role text)
 returns void language plpgsql security definer set search_path = public as $fn$
 begin
   if not public.is_admin() then
     raise exception 'Apenas o ADMIN pode alterar privilégios.';
   end if;
-  if new_role not in ('agent','command','admin') then
+  if new_role not in ('agent','command','admin','master') then
     raise exception 'Cargo inválido.';
   end if;
-  if (select role from public.profiles where id = target) = 'master' then
-    raise exception 'A credencial MASTER não se altera por aqui.';
+  if (new_role = 'master' or (select role from public.profiles where id = target) = 'master')
+     and not public.is_master() then
+    raise exception 'Só a credencial MASTER concede ou retira MASTER.';
   end if;
-  if target = auth.uid() and new_role <> 'admin' then
+  if target = auth.uid() and new_role <> my_role() then
     raise exception 'Você não pode rebaixar a própria conta.';
   end if;
   update public.profiles set role = new_role where id = target;
@@ -889,6 +906,28 @@ create policy profiles_read   on public.profiles for select to authenticated usi
 create policy profiles_update on public.profiles for update to authenticated
   using (public.is_admin() and (role <> 'master' or public.is_master()))
   with check (public.is_admin() and (role <> 'master' or public.is_master()));
+
+-- ---------- MASTER permanente ----------
+-- Todos leem a lista (é só para o painel esconder o botão); ninguém escreve
+-- pela REST — só pelo SQL Editor.
+alter table public.permanent_masters enable row level security;
+drop policy if exists permanent_masters_read on public.permanent_masters;
+create policy permanent_masters_read on public.permanent_masters for select
+  to authenticated using (true);
+
+create or replace function public.trava_master_permanente()
+returns trigger language plpgsql set search_path = public as $fn$
+begin
+  if old.role = 'master' and new.role <> 'master'
+     and exists (select 1 from public.permanent_masters where profile_id = old.id) then
+    raise exception '% não pode deixar de ser MASTER.', old.codename;
+  end if;
+  return new;
+end $fn$;
+
+drop trigger if exists trava_master_permanente on public.profiles;
+create trigger trava_master_permanente before update of role on public.profiles
+  for each row execute function public.trava_master_permanente();
 
 -- ---------- nomes reais (RP) ----------
 -- Cada um lê a própria linha (para saber o que já gravou); só MASTER lê as
