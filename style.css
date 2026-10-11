@@ -70,6 +70,10 @@ small{color:var(--dim);font-size:.7rem}
 #chans button:hover{color:var(--text);background:var(--panel)}
 #chans button.on{color:var(--cyan);background:var(--panel);border-left:2px solid var(--cyan)}
 #chans button.sub{padding-left:1.2rem}
+/* canal sigiloso: acesso restrito a alguns agentes — vermelho, nome entre chaves */
+#chans button.sigiloso,#chans button.sigiloso.on{color:var(--dead)}
+#chans button.sigiloso.on{border-left-color:var(--dead)}
+#ch-title.sigiloso{color:var(--dead)}
 #chans button.gear .ic{color:var(--gold)}
 /* bolinha amarela: o canal tem mensagem que este agente ainda não viu */
 #chans button.new::after{content:"●";color:var(--gold);text-shadow:0 0 8px var(--gold);margin-left:auto}

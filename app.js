@@ -345,7 +345,8 @@ function chanInfo(key) {
     : (c.everyone ? 'todos' : `${(chanMem[c.id] || new Set()).size} agente(s)`);
   const trava = travaDoCanal(c);
   return {
-    label: c.name,
+    label: canalSigiloso(c) ? `{${c.name}}` : c.name,
+    sigiloso: canalSigiloso(c),
     icon: trava ? '⚿' : '#',
     hint: (c.topic ? c.topic + ' · ' : '') + 'acesso: ' + who + (trava ? ' · ⚿ trava de código' : ''),
     ch: c,
@@ -373,10 +374,22 @@ function grupoHead(id, label, n, filhos) {
 }
 
 /** Canal na barra: o botão, o aviso de trava e, para o comando, a engrenagem. */
+/**
+ * Canal sigiloso: só alguns agentes têm acesso. Vale a regra efetiva — a da
+ * categoria quando o canal herda dela, a do próprio canal quando não herda.
+ */
+function canalSigiloso(c) {
+  const herda = c.category_id && c.inherit_access && cats[c.category_id];
+  return !(herda ? cats[c.category_id].everyone : c.everyone);
+}
+
 function linhaCanal(box, c, cls) {
   const row = el('div', 'ch-row');
   const trava = travaDoCanal(c);
-  const b = navBtn(row, 'chan:' + c.id, c.name, trava ? '⚿' : '#', 'ch-nav' + (cls ? ' ' + cls : ''));
+  const sigiloso = canalSigiloso(c);
+  const b = navBtn(row, 'chan:' + c.id, sigiloso ? `{${c.name}}` : c.name, trava ? '⚿' : '#',
+    'ch-nav' + (cls ? ' ' + cls : '') + (sigiloso ? ' sigiloso' : ''));
+  if (sigiloso) b.title = 'Sigiloso: acesso restrito a alguns agentes';
   if (trava) {
     b.querySelector('.ic')?.classList.add('trava');
     b.title = mesmaTrava(trava, liberada)
@@ -1196,6 +1209,7 @@ async function openChannel(key, jumpTo) {
   liberada = alvo;
   chan = key;
   const info = chanInfo(key);
+  $('#ch-title').classList.toggle('sigiloso', !!info.sigiloso);
   window.FX?.decodifica($('#ch-title'), info.label, 380);
   $('#ch-hint').textContent = info.hint;
   drawChannels();
