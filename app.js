@@ -105,23 +105,29 @@ function mode(up) {
   signup = up;
   $('#t-in').classList.toggle('on', !up); $('#t-up').classList.toggle('on', up);
   $('#c').classList.toggle('hide', !up);
+  $('#d').classList.toggle('hide', !up);
+  $('#d-ajuda').classList.toggle('hide', !up);
   $('#go').textContent = up ? 'Criar acesso' : 'Entrar';
   $('#p').autocomplete = up ? 'new-password' : 'current-password';
   $('#err').textContent = '';
 }
 $('#t-in').onclick = () => mode(false);
 $('#t-up').onclick = () => mode(true);
-['#u', '#p', '#c'].forEach(s => $(s).addEventListener('keydown', e => e.key === 'Enter' && $('#go').click()));
+['#u', '#p', '#c', '#d'].forEach(s => $(s).addEventListener('keydown', e => e.key === 'Enter' && $('#go').click()));
 
 $('#go').onclick = async () => {
   const name = $('#u').value.trim(), pass = $('#p').value, code = $('#c').value.trim(), err = $('#err');
+  const discord = $('#d').value.trim();
   err.textContent = '';
   if (!/^[A-Za-z0-9_]{3,20}$/.test(name)) return err.textContent = 'Codinome: 3 a 20 caracteres (letras, números e _).';
   if (pass.length < 6) return err.textContent = 'Senha: mínimo de 6 caracteres.';
+  // O banco confere de novo, mas o erro dele chega genérico pelo cadastro
+  // ("Database error saving new user"); aqui a mensagem sai clara.
+  if (signup && !/^[0-9]{17,20}$/.test(discord)) return err.textContent = 'ID do Discord: só números, de 17 a 20 dígitos.';
   $('#go').disabled = true;
   const email = name.toLowerCase() + '.cit.paralela@gmail.com';
   const { error } = signup
-    ? await sb.auth.signUp({ email, password: pass, options: { data: { codename: name, code } } })
+    ? await sb.auth.signUp({ email, password: pass, options: { data: { codename: name, code, discord } } })
     : await sb.auth.signInWithPassword({ email, password: pass });
   $('#go').disabled = false;
   if (error) { console.error(error); err.textContent = error.message; }
@@ -542,8 +548,11 @@ function paletaPicker(parent, atual) {
 }
 
 // ---------- minhas configurações ----------
-// Único painel a que o AGENTE tem acesso: o próprio codinome e a própria cor.
-function abreConfig() {
+// Único painel a que o AGENTE tem acesso: o próprio codinome, a própria cor e
+// o ID do Discord que recebe os avisos de mensagem nova.
+async function abreConfig() {
+  const { data: dc } = await sb.from('discord_links').select('discord_id').eq('profile_id', me.id).maybeSingle();
+  const discordAntes = dc?.discord_id || '';
   const m = modal('MINHAS CONFIGURAÇÕES');
 
   const nome = field(m.body, 'Codinome', me.codename, { ph: '3 a 20 caracteres (letras, números e _)' });
@@ -557,6 +566,13 @@ function abreConfig() {
   m.body.append(prova);
   const cor = paletaPicker(m.body, me.color);
 
+  m.body.append(el('h4', 'form-block', 'AVISOS NO DISCORD'));
+  const discord = field(m.body, 'Seu ID do Discord', discordAntes, { ph: 'só números — deixe vazio para não receber' });
+  m.body.append(el('p', 'form-note',
+    'O bot avisa no seu privado quando chega mensagem nova num canal seu — nunca o conteúdo. ' +
+    'Para copiar o ID: Discord → Configurações → Avançado → Modo desenvolvedor; depois, clique com o botão direito no seu nome → Copiar ID do usuário. ' +
+    'Ninguém mais vê esse número.'));
+
   nome.addEventListener('input', () => { prova.textContent = nome.value.trim() || me.codename; });
 
   const save = el('button', 'primary', 'Salvar');
@@ -569,8 +585,12 @@ function abreConfig() {
     const novo = nome.value.trim();
     save.disabled = true;
     const { error } = await sb.rpc('update_me', { new_name: novo, new_color: cor.value });
+    if (error) { save.disabled = false; return toast(error.message, true); }
+    if (discord.value.trim() !== discordAntes) {
+      const { error: e2 } = await sb.rpc('set_discord_id', { p_id: discord.value });
+      if (e2) { save.disabled = false; return toast(e2.message, true); }
+    }
     save.disabled = false;
-    if (error) return toast(error.message, true);
     m.close();
     await loadPeople();
     me = people[me.id] || me;

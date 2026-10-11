@@ -18,6 +18,7 @@ ops.js       dossiês de operação (painel lateral direito)
 manage.js    gerenciar usuários (ADMIN) e criar canais/categorias (COMANDO)
 search.js    varredura global (Ctrl+F)
 schema.sql   banco de dados completo
+supabase/functions/sinal   Edge Function que manda o aviso no Discord
 ```
 
 ## Setup
@@ -179,6 +180,49 @@ com o nome novo e a mesma senha.
 
 O ADMIN também ajusta codinome e cor de qualquer conta, pelo ✎ nome/cor no
 painel ⚙.
+
+## Aviso no Discord
+
+A cada mensagem nova, quem tem acesso ao canal (menos o autor) recebe do bot,
+no privado do Discord:
+
+> Sinal interceptado.... realidade não catalogada... verifique o sistema
+> interno do CIT, uma nova mensagem lhe aguarda
+
+Nunca vai o conteúdo, o canal ou o autor. O ID do Discord é obrigatório no
+cadastro pelo código de acesso; depois, o agente troca em **minhas
+configurações** e o ADMIN em **⌁ discord**, no painel ⚙ (o ✓ marca quem já
+tem). Só o próprio agente e o ADMIN leem esse número. Para não virar enxurrada, cada pessoa recebe no máximo um
+aviso a cada 10 minutos.
+
+Não há servidor ligado: o gatilho `avisa_discord` (no `schema.sql`) escolhe os
+destinatários e chama a Edge Function [`sinal`](supabase/functions/sinal/index.ts),
+que fala com a API do Discord. Para ligar:
+
+1. **discord.com/developers/applications** → *New Application* → aba **Bot** →
+   *Reset Token* e guarde o token. Nenhum *Privileged Intent* é necessário.
+2. Aba **OAuth2 → URL Generator**: marque `bot`, abra a URL gerada e adicione o
+   bot ao servidor do RP. O Discord só deixa o bot abrir o privado de quem
+   divide um servidor com ele.
+3. Supabase → **Edge Functions** → *Deploy a new function* → *Via Editor*, nome
+   `sinal`, cole o `index.ts` e publique. A verificação de JWT pode ficar
+   ligada: o banco manda a chave anon junto.
+4. **Edge Functions → Secrets**: crie `DISCORD_TOKEN` (o token do passo 1) e
+   `SINAL_SECRET` (uma senha longa qualquer, inventada agora).
+5. Rode o `schema.sql` de novo e, no SQL Editor, aponte o banco para a função
+   com o mesmo segredo do passo 4 e a chave `anon` do `config.js`:
+
+```sql
+insert into discord_config (url, secret, anon_key)
+values ('https://ptpujanpmynxdepmautq.supabase.co/functions/v1/sinal', 'O_MESMO_SEGREDO',
+        'A_CHAVE_DO_CONFIG_JS')
+on conflict (id) do update
+  set url = excluded.url, secret = excluded.secret, anon_key = excluded.anon_key;
+```
+
+Trocar o intervalo: `update discord_config set intervalo = '2 minutes';`.
+Desligar tudo: `delete from discord_config;`. Envios e falhas aparecem em
+**Edge Functions → sinal → Logs**.
 
 ## Sessão
 

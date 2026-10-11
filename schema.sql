@@ -471,21 +471,29 @@ $fn$;
 -- ============================================================================
 -- O cargo vem do código de acesso digitado no cadastro; nunca do cliente.
 -- `cit.new_role` só é definido por admin_create_user(), dentro da transação.
+-- Quem se cadastra pelo código informa também o ID do Discord, que recebe os
+-- avisos de mensagem nova (seção 6); conta criada pelo ADMIN pode vir sem.
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $fn$
-declare r text; cn text;
+declare r text; cn text; dc text := btrim(coalesce(new.raw_user_meta_data->>'discord', ''));
 begin
   cn := coalesce(nullif(new.raw_user_meta_data->>'codename',''), split_part(new.email,'@',1));
   r  := nullif(current_setting('cit.new_role', true), '');
   if r is null then
     select role into r from public.invite_codes
       where code = new.raw_user_meta_data->>'code';
+    if r is not null and dc = '' then
+      raise exception 'Informe seu ID do Discord.';
+    end if;
   end if;
   if r is null then
     raise exception 'Código de acesso inválido.';
   end if;
   insert into public.profiles (id, codename, role, color)
     values (new.id, cn, r, public.cor_livre());
+  if dc <> '' then
+    perform public.grava_discord(new.id, dc);
+  end if;
   return new;
 end $fn$;
 
@@ -1031,7 +1039,180 @@ create policy ope_delete on public.operation_entries for delete to authenticated
          and (created_by = auth.uid() or public.is_staff()));
 
 -- ============================================================================
--- 6. REALTIME
+-- 6. AVISO NO DISCORD
+-- ============================================================================
+-- A cada mensagem nova, quem pode ler o canal (menos o autor) recebe do bot,
+-- no privado do Discord, o aviso de sinal interceptado — nunca o conteúdo.
+-- O caminho: gatilho avisa_discord → pg_net → Edge Function `sinal`
+-- (supabase/functions/sinal) → API do Discord. Sem linha em discord_config o
+-- gatilho não faz nada, e o site segue igual.
+create extension if not exists pg_net;
+
+-- ID do Discord de cada conta. Revela quem está por trás do codinome, então é
+-- tão reservado quanto o nome real: cada um lê só a própria linha e grava pelo
+-- RPC set_discord_id. `last_ping` é a data do último aviso, para o intervalo.
+create table if not exists public.discord_links (
+  profile_id uuid primary key references public.profiles(id) on delete cascade,
+  discord_id text not null check (discord_id ~ '^[0-9]{17,20}$'),
+  last_ping  timestamptz
+);
+
+-- Endereço da Edge Function e o segredo que ela confere. Linha única, sem
+-- policy nenhuma: invisível pela REST, só o SQL Editor lê e grava.
+-- `anon_key` é a chave pública do config.js: a porta das Edge Functions exige
+-- um JWT válido, e ela basta para passar. Quem protege a função é o `secret`.
+-- `intervalo` é o mínimo entre dois avisos à mesma pessoa — sem ele, um canal
+-- movimentado vira uma enxurrada de mensagens e o Discord bloqueia o bot.
+--   insert into public.discord_config (url, secret, anon_key)
+--   values ('https://<projeto>.supabase.co/functions/v1/sinal', '<segredo>', '<chave anon>')
+--   on conflict (id) do update
+--     set url = excluded.url, secret = excluded.secret, anon_key = excluded.anon_key;
+create table if not exists public.discord_config (
+  id        boolean primary key default true check (id),
+  url       text not null,
+  secret    text not null,
+  intervalo interval not null default interval '10 minutes'
+);
+alter table public.discord_config add column if not exists anon_key text;
+
+alter table public.discord_links  enable row level security;
+alter table public.discord_config enable row level security;
+-- O ADMIN também lê: é ele quem cadastra o ID de quem ainda não tem.
+drop policy if exists discord_read on public.discord_links;
+create policy discord_read on public.discord_links for select to authenticated
+  using (profile_id = auth.uid() or public.is_admin());
+
+-- Grava (ou apaga, se vier vazio) o ID do Discord de uma conta. Não confere
+-- quem pede: isso fica com quem chama — set_discord_id, admin_set_discord_id
+-- e o cadastro (handle_new_user). Por isso ninguém de fora a executa.
+create or replace function public.grava_discord(target uuid, p_id text)
+returns void language plpgsql security definer set search_path = public as $fn$
+declare v text := btrim(coalesce(p_id, ''));
+begin
+  if v = '' then
+    delete from public.discord_links where profile_id = target;
+    return;
+  end if;
+  if v !~ '^[0-9]{17,20}$' then
+    raise exception 'ID do Discord: só números, de 17 a 20 dígitos.';
+  end if;
+  insert into public.discord_links (profile_id, discord_id) values (target, v)
+  on conflict (profile_id) do update set discord_id = excluded.discord_id;
+end $fn$;
+revoke execute on function public.grava_discord(uuid, text) from public, anon, authenticated;
+
+-- Cada conta grava o próprio ID (minhas configurações).
+create or replace function public.set_discord_id(p_id text)
+returns void language plpgsql security definer set search_path = public as $fn$
+begin
+  if auth.uid() is null then
+    raise exception 'Sessão expirada. Entre de novo.';
+  end if;
+  perform public.grava_discord(auth.uid(), p_id);
+end $fn$;
+
+-- ADMIN grava o ID de qualquer conta (painel ⚙), com a mesma ressalva de
+-- sempre para MASTER: só a própria credencial mexe nela.
+create or replace function public.admin_set_discord_id(target uuid, p_id text)
+returns void language plpgsql security definer set search_path = public as $fn$
+begin
+  if not public.is_admin() then
+    raise exception 'Apenas o ADMIN pode alterar o Discord de outra conta.';
+  end if;
+  if target <> auth.uid() and (select role from public.profiles where id = target) = 'master' then
+    raise exception 'Só a própria credencial MASTER altera essa conta.';
+  end if;
+  perform public.grava_discord(target, p_id);
+end $fn$;
+
+-- Todas as contas que podem ler um canal. É a regra de can_read_channel vista
+-- do lado do canal: lá se pergunta "eu posso?", aqui "quem pode?". Mudou uma,
+-- muda a outra. A trava por código fica de fora — ela pede o código a cada
+-- sessão, mas quem está na lista de acesso continua sendo do canal.
+create or replace function public.leitores_do_canal(ch text)
+returns setof uuid language plpgsql stable security definer set search_path = public as $fn$
+declare cid uuid; cat uuid; inh boolean; ev boolean; aut uuid; cat_ev boolean;
+begin
+  if ch = 'geral' then
+    return query select id from public.profiles;
+    return;
+  end if;
+
+  if ch like 'agent:%' then
+    return query select id from public.profiles
+                  where role in ('command','admin','master') or 'agent:' || id::text = ch;
+    return;
+  end if;
+
+  if ch like 'chan:%' then
+    begin
+      cid := substring(ch from 6)::uuid;
+    exception when others then
+      return;
+    end;
+    select category_id, inherit_access, everyone, created_by into cat, inh, ev, aut
+      from public.channels where id = cid;
+    if not found then return; end if;
+
+    if cat is not null and inh then
+      select everyone into cat_ev from public.categories where id = cat;
+      return query select p.id from public.profiles p
+                    where p.role in ('admin','master') or p.id = aut or coalesce(cat_ev, false)
+                       or exists (select 1 from public.category_members m
+                                   where m.category_id = cat and m.profile_id = p.id);
+    else
+      return query select p.id from public.profiles p
+                    where p.role in ('admin','master') or p.id = aut or coalesce(ev, false)
+                       or exists (select 1 from public.channel_members m
+                                   where m.channel_id = cid and m.profile_id = p.id);
+    end if;
+  end if;
+end $fn$;
+
+-- Ninguém de fora precisa perguntar quem lê cada canal: só o gatilho usa.
+revoke execute on function public.leitores_do_canal(text) from public, anon, authenticated;
+
+-- Escolhe quem avisar, marca o horário e entrega a lista à Edge Function.
+-- pg_net é assíncrono: a mensagem não espera o Discord. E qualquer falha aqui
+-- vira só um aviso no log — o envio da mensagem nunca é barrado pelo bot.
+create or replace function public.avisa_discord()
+returns trigger language plpgsql security definer set search_path = public as $fn$
+declare cfg record; ids text[];
+begin
+  select * into cfg from public.discord_config where id;
+  if not found then return null; end if;
+
+  with alvo as (
+    update public.discord_links d set last_ping = now()
+     where d.profile_id in (select public.leitores_do_canal(new.channel))
+       and d.profile_id <> new.author_id
+       and (d.last_ping is null or d.last_ping < now() - cfg.intervalo)
+    returning d.discord_id
+  )
+  select array_agg(discord_id) into ids from alvo;
+  if ids is null then return null; end if;
+
+  perform net.http_post(
+    url     := cfg.url,
+    body    := jsonb_build_object('ids', to_jsonb(ids)),
+    headers := jsonb_build_object('Content-Type', 'application/json',
+                                  'x-sinal-secret', cfg.secret)
+               || case when cfg.anon_key is null then '{}'::jsonb
+                       else jsonb_build_object('Authorization', 'Bearer ' || cfg.anon_key,
+                                               'apikey', cfg.anon_key) end,
+    timeout_milliseconds := 30000);
+  return null;
+exception when others then
+  raise warning 'avisa_discord: %', sqlerrm;
+  return null;
+end $fn$;
+
+drop trigger if exists avisa_discord on public.messages;
+create trigger avisa_discord after insert on public.messages
+  for each row execute function public.avisa_discord();
+
+-- ============================================================================
+-- 7. REALTIME
 -- ============================================================================
 do $do$
 declare t text;
@@ -1058,7 +1239,7 @@ alter table public.operation_entries replica identity full;
 alter table public.sidebar_order     replica identity full;
 
 -- ============================================================================
--- 7. RECARGA DO CACHE
+-- 8. RECARGA DO CACHE
 -- ============================================================================
 -- O PostgREST guarda um retrato do schema; sem este aviso, uma tabela ou
 -- função recém-criada pode demorar a aparecer para o site, com o erro

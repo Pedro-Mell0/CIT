@@ -7,6 +7,7 @@
   const ORDEM_CARGO = ['master', 'admin', 'command', 'agent'];
   let realNames = {};   // id -> nome real (só chega preenchido para MASTER)
   let permanentes = new Set();   // ids que ninguém tira de MASTER (permanent_masters)
+  let discords = {};    // id -> ID do Discord que recebe os avisos (discord_links)
 
   // ---------------------------------------------------------------- usuários
   async function open() {
@@ -24,6 +25,9 @@
       const { data: perm } = await sb.from('permanent_masters').select('profile_id');
       permanentes = new Set((perm || []).map(r => r.profile_id));
     }
+    discords = {};
+    const { data: dc } = await sb.from('discord_links').select('profile_id, discord_id');
+    (dc || []).forEach(r => discords[r.profile_id] = r.discord_id);
 
     const head = el('header', 'mg-head');
     head.append(el('h3', null, 'GERENCIAMENTO DE USUÁRIOS'));
@@ -79,6 +83,7 @@
     }
     acts.append(btn('✎ nome/cor', () => renomear(p)));
     acts.append(btn('⚿ senha', () => resetPass(p)));
+    acts.append(btn(discords[p.id] ? '⌁ discord ✓' : '⌁ discord', () => vinculaDiscord(p)));
     if (!self) acts.append(btn('✕ excluir', () => removeUser(p), 'danger'));
     row.append(acts);
     return row;
@@ -164,6 +169,27 @@
       if (error) return toast(error.message, true);
       m.close();
       toast('Senha redefinida.');
+    };
+  }
+
+  function vinculaDiscord(p) {
+    const m = modal('DISCORD · ' + p.codename);
+    const id = field(m.body, 'ID do Discord', discords[p.id] || '', { ph: 'só números — vazio desliga os avisos' });
+    m.body.append(el('p', 'form-note',
+      'É para esse ID que o bot manda o aviso de mensagem nova. No Discord, com o Modo desenvolvedor ligado: botão direito no nome do agente → Copiar ID do usuário.'));
+    const save = el('button', 'primary', 'Salvar');
+    const cancel = el('button', 'ghost', 'Cancelar');
+    cancel.onclick = m.close;
+    m.foot.append(cancel, save);
+    id.focus();
+    save.onclick = async () => {
+      save.disabled = true;
+      const { error } = await sb.rpc('admin_set_discord_id', { target: p.id, p_id: id.value });
+      save.disabled = false;
+      if (error) return toast(error.message, true);
+      m.close();
+      open();
+      toast(id.value.trim() ? `Discord de ${p.codename} vinculado.` : `${p.codename} não recebe mais avisos.`);
     };
   }
 
