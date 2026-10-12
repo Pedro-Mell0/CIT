@@ -131,6 +131,7 @@ header .tools .ghost{padding:.4rem .6rem}
 .m .who{font-weight:600}
 .m time{color:var(--dim);font-size:.7rem}
 .m .ed{color:var(--dim);font-size:.65rem;font-style:italic}
+.m .fk-marca{font-size:.7rem;cursor:help;filter:drop-shadow(0 0 4px var(--violet))}
 .m .tag{font-size:.65rem;border:1px solid var(--violet);color:var(--violet);padding:0 .3rem}
 .m .tag.adm{border-color:var(--gold);color:var(--gold)}
 .m .act{background:none;border:0;color:var(--dim);opacity:0;padding:0 .25rem;font-size:.8rem}

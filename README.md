@@ -184,8 +184,10 @@ painel ⚙.
 
 ## Aviso no Discord
 
-A cada mensagem nova, quem tem acesso ao canal (menos o autor) recebe do bot,
-no privado do Discord:
+Mensagem que começa com **`/fukurou`** chama o bot: quem tem acesso ao canal
+(menos o autor) recebe dele, no privado do Discord, o aviso abaixo (o texto se
+troca na página do Fukurou). O prefixo sai da mensagem, que fica marcada com
+🦉 no chat. Sem ele, ninguém é avisado.
 
 > Sinal interceptado.... realidade não catalogada... verifique o sistema
 > interno do CIT, uma nova mensagem lhe aguarda

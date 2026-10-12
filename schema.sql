@@ -453,6 +453,29 @@ drop trigger if exists messages_touch on public.messages;
 create trigger messages_touch before update on public.messages
   for each row execute function public.touch_message();
 
+-- /fukurou no começo da mensagem convoca o bot (seção 6): o prefixo sai do
+-- texto e a mensagem fica marcada. Quem decide é o banco, nunca o cliente —
+-- `fukurou` vindo pronto no INSERT é sobrescrito aqui. Só vale ao criar:
+-- editar depois para pôr o prefixo não chama ninguém.
+alter table public.messages add column if not exists fukurou boolean not null default false;
+
+create or replace function public.marca_fukurou()
+returns trigger language plpgsql set search_path = public as $fn$
+begin
+  new.fukurou := new.body ~* '^\s*/fukurou(\s|$)';
+  if new.fukurou then
+    new.body := regexp_replace(new.body, '^\s*/fukurou\s*', '', 'i');
+    if btrim(new.body) = '' then
+      raise exception 'Escreva a mensagem depois de /fukurou.';
+    end if;
+  end if;
+  return new;
+end $fn$;
+
+drop trigger if exists marca_fukurou on public.messages;
+create trigger marca_fukurou before insert on public.messages
+  for each row execute function public.marca_fukurou();
+
 -- Data da mensagem mais recente de cada canal. Serve ao aviso de não lida: o
 -- site compara estas datas com a da última visita que ele guarda por conta.
 -- O agrupamento pertence ao banco — trazer as mensagens só para achar o máximo
@@ -1041,8 +1064,8 @@ create policy ope_delete on public.operation_entries for delete to authenticated
 -- ============================================================================
 -- 6. AVISO NO DISCORD
 -- ============================================================================
--- A cada mensagem nova, quem pode ler o canal (menos o autor) recebe do bot,
--- no privado do Discord, o aviso de sinal interceptado — nunca o conteúdo.
+-- Mensagem que começa com /fukurou chama o bot: quem pode ler o canal (menos
+-- o autor) recebe dele, no privado do Discord, o aviso — nunca o conteúdo.
 -- O caminho: gatilho avisa_discord → pg_net → Edge Function `sinal`
 -- (supabase/functions/sinal) → API do Discord. Sem linha em discord_config o
 -- gatilho não faz nada, e o site segue igual.
@@ -1244,13 +1267,15 @@ begin
 end $fn$;
 revoke execute on function public.chama_sinal(jsonb) from public, anon, authenticated;
 
--- Escolhe quem avisar, marca o horário e entrega a lista à Edge Function, com
--- o texto atual do aviso. Qualquer falha aqui vira só um aviso no log — o
--- envio da mensagem nunca é barrado pelo bot.
+-- Só mensagem que começou com /fukurou (marca_fukurou) chama o bot. Escolhe
+-- quem avisar, marca o horário e entrega a lista à Edge Function, com o texto
+-- atual do aviso. Qualquer falha aqui vira só um aviso no log — o envio da
+-- mensagem nunca é barrado pelo bot.
 create or replace function public.avisa_discord()
 returns trigger language plpgsql security definer set search_path = public as $fn$
 declare espera interval; ids text[]; texto text;
 begin
+  if not new.fukurou then return null; end if;
   select intervalo into espera from public.discord_config where id;
   if not found then return null; end if;
 

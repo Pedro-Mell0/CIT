@@ -1309,6 +1309,11 @@ function buildMsg(m) {
   head.append(who);
   // sem etiqueta de cargo: ninguém deve deduzir pelo chat quem é comando ou admin
   head.append(el('time', null, new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })));
+  if (m.fukurou) {
+    const f = el('span', 'fk-marca', '🦉');
+    f.title = 'Enviada com /fukurou: o bot avisou no Discord quem tem acesso ao canal';
+    head.append(f);
+  }
   if (m.edited_at) {
     const e = el('span', 'ed', '(editada)');
     const by = people[m.edited_by];
@@ -1421,6 +1426,8 @@ async function send() {
   const ta = $('#msg');
   const body = ta.value.trim();
   if (!body) return;
+  // o banco também barra, mas assim o texto nem sai da caixa
+  if (/^\/fukurou$/i.test(body)) return toast('Escreva a mensagem depois de /fukurou.', true);
   ta.value = ''; grow();
   $('#caret-hint')?.classList.remove('hide');
   window.FX?.som.envio();
