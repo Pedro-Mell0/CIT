@@ -195,8 +195,8 @@ troca na página do Fukurou). O prefixo sai da mensagem, que fica marcada com
 Nunca vai o conteúdo, o canal ou o autor. O ID do Discord é obrigatório no
 cadastro pelo código de acesso; depois, o agente troca em **minhas
 configurações** e o ADMIN em **⌁ discord**, no painel ⚙ (o ✓ marca quem já
-tem). Só o próprio agente e o ADMIN leem esse número. Para não virar enxurrada, cada pessoa recebe no máximo um
-aviso a cada 10 minutos.
+tem). Só o próprio agente e o ADMIN leem esse número. Cada `/fukurou` avisa
+de novo, sem intervalo mínimo entre um e outro.
 
 Não há servidor ligado: o gatilho `avisa_discord` (no `schema.sql`) escolhe os
 destinatários e chama a Edge Function [`sinal`](supabase/functions/sinal/index.ts),
@@ -223,7 +223,6 @@ on conflict (id) do update
   set url = excluded.url, secret = excluded.secret, anon_key = excluded.anon_key;
 ```
 
-Trocar o intervalo: `update discord_config set intervalo = '2 minutes';`.
 Desligar tudo: `delete from discord_config;`. Envios e falhas aparecem em
 **Edge Functions → sinal → Logs**.
 

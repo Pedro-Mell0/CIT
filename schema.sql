@@ -1073,7 +1073,8 @@ create extension if not exists pg_net;
 
 -- ID do Discord de cada conta. Revela quem está por trás do codinome, então é
 -- tão reservado quanto o nome real: cada um lê só a própria linha e grava pelo
--- RPC set_discord_id. `last_ping` é a data do último aviso, para o intervalo.
+-- RPC set_discord_id. `last_ping` é a data do último aviso: é por ela que a
+-- escuta do Fukurou descobre quem já recebeu algo do bot.
 create table if not exists public.discord_links (
   profile_id uuid primary key references public.profiles(id) on delete cascade,
   discord_id text not null check (discord_id ~ '^[0-9]{17,20}$'),
@@ -1084,8 +1085,6 @@ create table if not exists public.discord_links (
 -- policy nenhuma: invisível pela REST, só o SQL Editor lê e grava.
 -- `anon_key` é a chave pública do config.js: a porta das Edge Functions exige
 -- um JWT válido, e ela basta para passar. Quem protege a função é o `secret`.
--- `intervalo` é o mínimo entre dois avisos à mesma pessoa — sem ele, um canal
--- movimentado vira uma enxurrada de mensagens e o Discord bloqueia o bot.
 --   insert into public.discord_config (url, secret, anon_key)
 --   values ('https://<projeto>.supabase.co/functions/v1/sinal', '<segredo>', '<chave anon>')
 --   on conflict (id) do update
@@ -1093,10 +1092,12 @@ create table if not exists public.discord_links (
 create table if not exists public.discord_config (
   id        boolean primary key default true check (id),
   url       text not null,
-  secret    text not null,
-  intervalo interval not null default interval '10 minutes'
+  secret    text not null
 );
 alter table public.discord_config add column if not exists anon_key text;
+-- Havia um intervalo mínimo entre dois avisos à mesma pessoa. Saiu quando o
+-- aviso passou a exigir /fukurou: quem chama o bot quer que ele vá, toda vez.
+alter table public.discord_config drop column if exists intervalo;
 
 alter table public.discord_links  enable row level security;
 alter table public.discord_config enable row level security;
@@ -1273,17 +1274,15 @@ revoke execute on function public.chama_sinal(jsonb) from public, anon, authenti
 -- mensagem nunca é barrado pelo bot.
 create or replace function public.avisa_discord()
 returns trigger language plpgsql security definer set search_path = public as $fn$
-declare espera interval; ids text[]; texto text;
+declare ids text[]; texto text;
 begin
   if not new.fukurou then return null; end if;
-  select intervalo into espera from public.discord_config where id;
-  if not found then return null; end if;
+  if not exists (select 1 from public.discord_config where id) then return null; end if;
 
   with alvo as (
     update public.discord_links d set last_ping = now()
      where d.profile_id in (select public.leitores_do_canal(new.channel))
        and d.profile_id <> new.author_id
-       and (d.last_ping is null or d.last_ping < now() - espera)
     returning d.discord_id
   )
   select array_agg(discord_id) into ids from alvo;

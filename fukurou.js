@@ -239,7 +239,7 @@
     if (error) return toast(error.message, true);
 
     box.append(el('p', 'form-note',
-      'Vai no privado de quem tem acesso ao canal onde chegou a mensagem — no máximo um aviso a cada 10 minutos por pessoa. ' +
+      'Vai no privado de quem tem acesso ao canal, a cada mensagem enviada com /fukurou. ' +
       'Nunca leva o conteúdo, o canal ou o autor. A mudança vale para o próximo aviso.'));
     const campo = field(box, 'Texto do aviso', data?.aviso || '', { area: true });
     campo.maxLength = 2000;
