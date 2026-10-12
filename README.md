@@ -17,6 +17,7 @@ app.js       acesso, barra de canais, mensagens e edição
 ops.js       dossiês de operação (painel lateral direito)
 manage.js    gerenciar usuários (ADMIN) e criar canais/categorias (COMANDO)
 search.js    varredura global (Ctrl+F)
+fukurou.js   página do bot (Fukurou), só para MASTER
 schema.sql   banco de dados completo
 supabase/functions/sinal   Edge Function que manda o aviso no Discord
 ```
@@ -223,6 +224,27 @@ on conflict (id) do update
 Trocar o intervalo: `update discord_config set intervalo = '2 minutes';`.
 Desligar tudo: `delete from discord_config;`. Envios e falhas aparecem em
 **Edge Functions → sinal → Logs**.
+
+### Fukurou
+
+Fukurou é o bot visto de dentro. Para MASTER, o botão 🦉 **Fukurou** aparece
+logo abaixo de *Gerenciar usuários* e abre, depois da coruja, uma página só
+dele:
+
+- **na barra**, cada pessoa com quem o bot já falou no privado (nome no
+  Discord, @usuário, ID e, se houver vínculo, o codinome no CIT);
+- **em cada conversa**, o espelho do privado, das duas direções. O que você
+  escreve ali chega no Discord como se fosse o Fukurou, e fica marcado no
+  espelho com o seu codinome;
+- **⚙ mensagem padrão**, o texto do aviso de mensagem nova, com uma prévia de
+  como ele chega no Discord.
+
+O Discord não avisa quando alguém responde ao bot (só entregaria isso a um
+programa conectado o tempo todo), então o banco pergunta: o `pg_cron` chama a
+função a cada 10 segundos, e uma resposta leva até isso para aparecer. São
+cerca de 260 mil chamadas por mês, dentro das 500 mil do plano gratuito. Para
+pausar: `select cron.unschedule('fukurou-escuta');` — rodar o schema de novo
+religa.
 
 ## Sessão
 

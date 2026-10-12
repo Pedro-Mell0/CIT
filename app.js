@@ -351,7 +351,7 @@ function chanInfo(key) {
     : (c.everyone ? 'todos' : `${(chanMem[c.id] || new Set()).size} agente(s)`);
   const trava = travaDoCanal(c);
   return {
-    label: canalSigiloso(c) ? `{${c.name}}` : c.name,
+    label: c.name,
     sigiloso: canalSigiloso(c),
     icon: trava ? '⚿' : '#',
     hint: (c.topic ? c.topic + ' · ' : '') + 'acesso: ' + who + (trava ? ' · ⚿ trava de código' : ''),
@@ -393,9 +393,11 @@ function linhaCanal(box, c, cls) {
   const row = el('div', 'ch-row');
   const trava = travaDoCanal(c);
   const sigiloso = canalSigiloso(c);
-  const b = navBtn(row, 'chan:' + c.id, sigiloso ? `{${c.name}}` : c.name, trava ? '⚿' : '#',
-    'ch-nav' + (cls ? ' ' + cls : '') + (sigiloso ? ' sigiloso' : ''));
-  if (sigiloso) b.title = 'Sigiloso: acesso restrito a alguns agentes';
+  const b = navBtn(row, 'chan:' + c.id, c.name, trava ? '⚿' : '#', 'ch-nav' + (cls ? ' ' + cls : ''));
+  if (sigiloso) {
+    b.querySelector('.nm').after(el('span', 'sig', '{sigiloso}'));
+    b.title = 'Sigiloso: acesso restrito a alguns agentes';
+  }
   if (trava) {
     b.querySelector('.ic')?.classList.add('trava');
     b.title = mesmaTrava(trava, liberada)
@@ -505,6 +507,13 @@ function drawChannels() {
     const box = el('div', 'nav-item');
     box.append(el('h3', null, 'Administração'));
     navBtn(box, 'manage', 'Gerenciar usuários', '⚙', 'gear');
+    // Não é canal da sala: abre a página do bot por cima dela (fukurou.js).
+    if (isMaster()) {
+      const b = el('button', 'fukurou-nav');
+      b.append(el('span', 'ic', '🦉'), el('span', 'nm', 'Fukurou'));
+      b.onclick = () => { window.FUKUROU?.open(); if (innerWidth <= 760) $('#side').classList.remove('open'); };
+      box.append(b);
+    }
     nav.append(box);
   }
 }

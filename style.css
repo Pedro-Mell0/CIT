@@ -70,10 +70,9 @@ small{color:var(--dim);font-size:.7rem}
 #chans button:hover{color:var(--text);background:var(--panel)}
 #chans button.on{color:var(--cyan);background:var(--panel);border-left:2px solid var(--cyan)}
 #chans button.sub{padding-left:1.2rem}
-/* canal sigiloso: acesso restrito a alguns agentes — vermelho, nome entre chaves */
-#chans button.sigiloso,#chans button.sigiloso.on{color:var(--dead)}
-#chans button.sigiloso.on{border-left-color:var(--dead)}
-#ch-title.sigiloso{color:var(--dead)}
+/* canal sigiloso: acesso restrito a alguns agentes — selo vermelho ao lado do nome */
+#chans button .sig{flex:none;color:var(--dead);font-size:.85em}
+#ch-title.sigiloso::after{content:" {sigiloso}";color:var(--dead);font-size:.75em}
 #chans button.gear .ic{color:var(--gold)}
 /* bolinha amarela: o canal tem mensagem que este agente ainda não viu */
 #chans button.new::after{content:"●";color:var(--gold);text-shadow:0 0 8px var(--gold);margin-left:auto}
@@ -735,3 +734,68 @@ mark{background:#45e3ff33;color:var(--cyan);padding:0 .1rem}
   68%,100%{transform:scale(1);opacity:.9}
 }
 @media(prefers-reduced-motion:reduce){#egg .coracao{animation:none}}
+
+/* ---------- Fukurou (só MASTER) ---------- */
+/* Página do bot por cima da sala: abaixo do modal (50), da busca e do aviso. */
+#chans button.fukurou-nav{color:var(--violet)}
+#chans button.fukurou-nav:hover{color:var(--text);text-shadow:0 0 10px var(--violet)}
+.fk{position:fixed;inset:0;z-index:40;display:flex;background:var(--void)}
+.fk-side{width:var(--side-w);flex:none;background:var(--ink);border-right:1px solid var(--violet);display:flex;flex-direction:column;padding:1rem;gap:1rem;min-height:0;box-shadow:0 0 40px #9b5cff22}
+.fk-brand{display:flex;gap:.7rem;align-items:center}
+.fk-brand .logo{color:var(--violet);filter:drop-shadow(0 0 10px var(--violet))}
+.fk-brand b{display:block;color:var(--violet);font-family:'Chakra Petch',sans-serif;letter-spacing:.3em}
+.fk-brand span{font-size:.7rem;color:var(--dim)}
+.fk-nav{flex:1;overflow:auto;display:grid;gap:.15rem;align-content:start}
+.fk-nav h3{font-size:.68rem;color:var(--dim);font-weight:400;margin:.9rem 0 .2rem;letter-spacing:.1em;text-transform:uppercase}
+.fk-nav button{text-align:left;background:none;border:1px solid transparent;color:var(--dim);padding:.5rem .6rem;width:100%;display:grid;grid-template-columns:1fr auto;gap:0 .45rem;align-items:center}
+.fk-nav button:hover{color:var(--text);background:var(--panel)}
+.fk-nav button.on{color:var(--violet);background:var(--panel);border-left:2px solid var(--violet)}
+.fk-nav button.new .nm::after{content:" ●";color:var(--gold);text-shadow:0 0 8px var(--gold)}
+.fk-cfg-btn{display:flex!important;gap:.45rem}
+.fk-cfg-btn .ic{color:var(--gold)}
+.fk-chat .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fk-chat .fk-sub{grid-column:1/-1;font-size:.62rem;opacity:.7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fk-chat .fk-cit{grid-row:1;grid-column:2;font-size:.65rem}
+.fk-vazio{color:var(--dim);font-size:.75rem}
+.fk-room{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
+.fk-head .fk-title{color:var(--violet)}
+.fk-hint{color:var(--dim);font-size:.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fk-msgs{flex:1;overflow:auto;padding:.9rem 1rem;display:flex;flex-direction:column;gap:.5rem}
+.fk-msgs .txt,.fk-prova .txt{white-space:pre-wrap}
+.fk-m .who{color:var(--cyan)}
+.fk-m.fk-bot{align-self:flex-end;border-right:2px solid var(--violet);padding-right:.6rem}
+.fk-m.fk-bot .who{color:var(--violet)}
+.fk-cfg{flex:1;overflow:auto;padding:1.2rem;display:grid;gap:.7rem;align-content:start;max-width:720px}
+.fk-cfg .primary{justify-self:start}
+.fk-prova{background:#313338;color:#dbdee1;border-radius:6px;padding:.8rem 1rem;font-family:'gg sans','Segoe UI',sans-serif}
+.fk-prova .head{display:flex;gap:.4rem;align-items:center;margin-bottom:.2rem}
+.fk-prova .who{color:#fff;font-weight:600}
+.fk-tag{background:#5865f2;color:#fff;font-size:.6rem;padding:0 .3rem;border-radius:3px}
+@media(max-width:760px){
+  .fk{flex-direction:column}
+  .fk-side{width:auto;max-height:40vh;border-right:0;border-bottom:1px solid var(--violet)}
+}
+
+/* Transição: a coruja pousa, abre os olhos e o voo mergulha num deles — é
+   aí, no escuro do mergulho, que a página troca. Na volta, só pisca e some. */
+.fk-trans{position:fixed;inset:0;z-index:90;display:grid;place-items:center;align-content:center;gap:1.2rem;
+  background:radial-gradient(circle at 50% 45%,#1a0f45 0%,var(--void) 65%);animation:fk-escuro 1.7s ease forwards;pointer-events:all}
+.fk-owl{width:min(34vmin,260px);height:min(34vmin,260px);color:var(--violet);
+  filter:drop-shadow(0 0 14px var(--violet)) drop-shadow(0 0 40px #9b5cff88);
+  animation:fk-pouso .6s cubic-bezier(.2,.8,.3,1.15) both,fk-mergulho .55s .95s cubic-bezier(.6,0,.9,.4) forwards;
+  transform-origin:34% 47%}
+.fk-olho{fill:var(--cyan);transform-box:fill-box;transform-origin:center;animation:fk-olhos .5s .45s ease-out both}
+.fk-trans-nome{font-family:'Chakra Petch',sans-serif;letter-spacing:.6em;text-indent:.6em;color:var(--violet);font-size:1.2rem;
+  text-shadow:0 0 12px var(--violet);animation:fk-nome 1.7s ease both}
+@keyframes fk-escuro{0%{opacity:0}12%,72%{opacity:1}100%{opacity:0}}
+@keyframes fk-pouso{from{transform:translateY(-45vh) scale(.35) rotate(-14deg);opacity:0}to{transform:none;opacity:1}}
+@keyframes fk-olhos{from{transform:scaleY(.05)}60%{transform:scaleY(1.25);filter:drop-shadow(0 0 6px var(--cyan))}to{transform:scaleY(1);filter:drop-shadow(0 0 10px var(--cyan))}}
+@keyframes fk-mergulho{to{transform:scale(28);opacity:0}}
+@keyframes fk-nome{0%,25%{opacity:0;transform:translateY(6px)}40%,62%{opacity:1;transform:none}75%,100%{opacity:0}}
+.fk-trans.volta{animation-duration:.8s}
+.fk-trans.volta .fk-owl{animation:fk-some .8s ease forwards}
+.fk-trans.volta .fk-olho{animation:fk-pisca .4s .1s both}
+.fk-trans.volta .fk-trans-nome{display:none}
+@keyframes fk-some{0%{transform:scale(1.4);opacity:0}30%,60%{transform:none;opacity:1}100%{transform:translateY(-30vh) scale(.4);opacity:0}}
+@keyframes fk-pisca{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.05)}}
+.fk-trans.calmo,.fk-trans.calmo *{animation:none!important}

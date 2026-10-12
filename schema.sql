@@ -1172,35 +1172,100 @@ end $fn$;
 -- Ninguém de fora precisa perguntar quem lê cada canal: só o gatilho usa.
 revoke execute on function public.leitores_do_canal(text) from public, anon, authenticated;
 
--- Escolhe quem avisar, marca o horário e entrega a lista à Edge Function.
--- pg_net é assíncrono: a mensagem não espera o Discord. E qualquer falha aqui
--- vira só um aviso no log — o envio da mensagem nunca é barrado pelo bot.
-create or replace function public.avisa_discord()
-returns trigger language plpgsql security definer set search_path = public as $fn$
-declare cfg record; ids text[];
+-- ---------- Fukurou ----------
+-- Fukurou é o bot visto de dentro: a página só de MASTER que espelha cada
+-- conversa dele no Discord, deixa responder em nome dele e define o texto do
+-- aviso. Quem escreve nas duas primeiras tabelas é só a Edge Function, com a
+-- chave de serviço (que passa por cima do RLS); o site apenas lê.
+
+-- Uma linha por pessoa com quem o bot já falou. `last_msg_id` marca até onde
+-- o espelho já buscou; `updated_at` é a última atividade e ordena a barra.
+create table if not exists public.fukurou_chats (
+  discord_id    text primary key,
+  dm_channel_id text not null,
+  username      text,
+  display_name  text,
+  last_msg_id   text,
+  updated_at    timestamptz not null default now()
+);
+
+-- Cada mensagem da conversa, das duas direções. O id é o do próprio Discord,
+-- o que torna inofensivo buscar a mesma mensagem duas vezes. `sent_by` é o
+-- MASTER que escreveu pelo site, quando foi o caso.
+create table if not exists public.fukurou_msgs (
+  id         text primary key,
+  discord_id text not null references public.fukurou_chats(discord_id) on delete cascade,
+  from_bot   boolean not null,
+  body       text not null default '',
+  sent_by    uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null
+);
+create index if not exists fukurou_msgs_chat_idx on public.fukurou_msgs (discord_id, created_at);
+
+-- O texto do aviso de mensagem nova. Rodar o schema de novo não o sobrescreve.
+create table if not exists public.fukurou_settings (
+  id    boolean primary key default true check (id),
+  aviso text not null check (length(btrim(aviso)) between 1 and 2000)
+);
+insert into public.fukurou_settings (aviso)
+values ('Sinal interceptado.... realidade não catalogada... verifique o sistema interno do CIT, uma nova mensagem lhe aguarda')
+on conflict (id) do nothing;
+
+alter table public.fukurou_chats    enable row level security;
+alter table public.fukurou_msgs     enable row level security;
+alter table public.fukurou_settings enable row level security;
+drop policy if exists fukurou_chats_read on public.fukurou_chats;
+drop policy if exists fukurou_msgs_read  on public.fukurou_msgs;
+drop policy if exists fukurou_cfg_read   on public.fukurou_settings;
+drop policy if exists fukurou_cfg_write  on public.fukurou_settings;
+create policy fukurou_chats_read on public.fukurou_chats    for select to authenticated using (public.is_master());
+create policy fukurou_msgs_read  on public.fukurou_msgs     for select to authenticated using (public.is_master());
+create policy fukurou_cfg_read   on public.fukurou_settings for select to authenticated using (public.is_master());
+create policy fukurou_cfg_write  on public.fukurou_settings for update to authenticated
+  using (public.is_master()) with check (public.is_master());
+
+-- Chama a Edge Function `sinal` com o pedido recebido. pg_net é assíncrono:
+-- quem chama não espera o Discord. Sem discord_config, não faz nada.
+create or replace function public.chama_sinal(pedido jsonb)
+returns void language plpgsql security definer set search_path = public as $fn$
+declare cfg record;
 begin
   select * into cfg from public.discord_config where id;
-  if not found then return null; end if;
-
-  with alvo as (
-    update public.discord_links d set last_ping = now()
-     where d.profile_id in (select public.leitores_do_canal(new.channel))
-       and d.profile_id <> new.author_id
-       and (d.last_ping is null or d.last_ping < now() - cfg.intervalo)
-    returning d.discord_id
-  )
-  select array_agg(discord_id) into ids from alvo;
-  if ids is null then return null; end if;
-
+  if not found then return; end if;
   perform net.http_post(
     url     := cfg.url,
-    body    := jsonb_build_object('ids', to_jsonb(ids)),
+    body    := pedido,
     headers := jsonb_build_object('Content-Type', 'application/json',
                                   'x-sinal-secret', cfg.secret)
                || case when cfg.anon_key is null then '{}'::jsonb
                        else jsonb_build_object('Authorization', 'Bearer ' || cfg.anon_key,
                                                'apikey', cfg.anon_key) end,
     timeout_milliseconds := 30000);
+end $fn$;
+revoke execute on function public.chama_sinal(jsonb) from public, anon, authenticated;
+
+-- Escolhe quem avisar, marca o horário e entrega a lista à Edge Function, com
+-- o texto atual do aviso. Qualquer falha aqui vira só um aviso no log — o
+-- envio da mensagem nunca é barrado pelo bot.
+create or replace function public.avisa_discord()
+returns trigger language plpgsql security definer set search_path = public as $fn$
+declare espera interval; ids text[]; texto text;
+begin
+  select intervalo into espera from public.discord_config where id;
+  if not found then return null; end if;
+
+  with alvo as (
+    update public.discord_links d set last_ping = now()
+     where d.profile_id in (select public.leitores_do_canal(new.channel))
+       and d.profile_id <> new.author_id
+       and (d.last_ping is null or d.last_ping < now() - espera)
+    returning d.discord_id
+  )
+  select array_agg(discord_id) into ids from alvo;
+  if ids is null then return null; end if;
+
+  select aviso into texto from public.fukurou_settings where id;
+  perform public.chama_sinal(jsonb_build_object('acao', 'avisar', 'ids', to_jsonb(ids), 'texto', texto));
   return null;
 exception when others then
   raise warning 'avisa_discord: %', sqlerrm;
@@ -1211,6 +1276,19 @@ drop trigger if exists avisa_discord on public.messages;
 create trigger avisa_discord after insert on public.messages
   for each row execute function public.avisa_discord();
 
+-- O Discord não avisa quando alguém responde ao bot — só entregaria a um
+-- programa conectado o tempo todo, e aqui não há nenhum. Então o banco
+-- pergunta: a cada 10 segundos a função busca o que chegou em cada conversa.
+-- Sem pg_cron disponível, o resto segue funcionando, só sem as respostas.
+do $do$
+begin
+  create extension if not exists pg_cron;
+  perform cron.schedule('fukurou-escuta', '10 seconds',
+                        $$select public.chama_sinal('{"acao":"escutar"}')$$);
+exception when others then
+  raise warning 'fukurou-escuta não agendada: %', sqlerrm;
+end $do$;
+
 -- ============================================================================
 -- 7. REALTIME
 -- ============================================================================
@@ -1219,7 +1297,8 @@ declare t text;
 begin
   foreach t in array array['profiles','messages','categories','channels',
                            'category_members','channel_members',
-                           'operations','operation_entries','sidebar_order']
+                           'operations','operation_entries','sidebar_order',
+                           'fukurou_chats','fukurou_msgs']
   loop
     begin
       execute format('alter publication supabase_realtime add table public.%I', t);
