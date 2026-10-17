@@ -298,7 +298,7 @@ async function start() {
   if (!me) return $('#err').textContent = 'Perfil não encontrado. Fale com o comando.';
   await loadTree();
   carregaLido();
-  if (isOficial()) await varreNaoLidas();
+  await varreNaoLidas();   // o candidato também tem canais, e informe novo neles
 
   $('#auth').classList.add('hide'); $('#app').classList.remove('hide');
   window.FX?.road?.visivel(false);   // a estrada fica só na tela de acesso
@@ -951,9 +951,14 @@ function mostraPainel(qual) {
   Object.entries(PAINEIS).forEach(([k, sel]) => $(sel)?.classList.toggle('hide', k !== qual));
 }
 
+// Destinos que a credencial de candidato não alcança. Canal de verdade não
+// entra nesta lista: o que ele pode abrir já foi decidido pelo RLS, que só
+// devolveu os canais liberados a ele — bloquear de novo aqui, pelo cargo,
+// trancaria a ACADEMIA justamente para quem ela existe.
+const SO_OFICIAL = new Set(['mural', 'resultados', 'exame', 'contas']);
+
 async function openChannel(key, jumpTo) {
-  // Candidato só tem a prova; qualquer outro destino cai de volta nela.
-  if (!isOficial() && key !== 'prova') key = 'prova';
+  if (!isOficial() && SO_OFICIAL.has(key)) key = 'prova';
 
   // Entrar numa seção travada pede o código toda vez. A liberação só é trocada
   // depois que o código passa: quem desiste no meio continua onde estava.
@@ -969,7 +974,6 @@ async function openChannel(key, jumpTo) {
 
   const eCanal = key === 'mural' || key.startsWith('chan:');
   $('#members').classList.toggle('hide', !eCanal);
-  $('#find-btn').classList.toggle('hide', !isOficial());
   $('#ch-edit').classList.toggle('hide', !(isStaff() && key.startsWith('chan:')));
 
   if (key === 'prova')      { mostraPainel('prova');      return window.PROVA?.abre?.(); }

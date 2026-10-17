@@ -6,7 +6,8 @@
   let timer, seq = 0, results = [];
 
   function openFind() {
-    if (!isOficial()) return;          // candidato não tem o que varrer
+    // Vale para todo mundo, candidato inclusive: o RLS já decide o que volta,
+    // e quem tem a ACADEMIA para ler tem o que procurar nela.
     $('#find').classList.remove('hide');
     const i = $('#find-q');
     i.focus(); i.select();
