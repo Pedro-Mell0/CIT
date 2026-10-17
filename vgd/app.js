@@ -123,6 +123,12 @@ const isStaff   = () => me && (me.role === 'comando' || me.role === 'admin');
 const isAdmin   = () => me && me.role === 'admin';
 const isOficial = () => me && me.role !== 'candidato';
 
+// Corrigir prova é o único poder que um cargo concede — o resto deles é porta
+// de canal. A conta é a mesma que o banco faz em pode_corrigir(); se as duas
+// discordarem, quem manda é a do banco, e a tela só mostra um botão que vai
+// dar erro ao ser usado.
+const podeCorrigir = () => !!me && (isAdmin() || cargosDe(me.id).some(c => c.corrige_prova));
+
 function el(tag, cls, text) {
   const n = document.createElement(tag);
   if (cls) n.className = cls;
@@ -524,15 +530,15 @@ function drawChannels() {
     nav.append(box);
   }
 
-  if (isStaff()) {
+  if (isStaff() || podeCorrigir()) {
     const box = el('div', 'nav-item');
     box.append(el('h3', null, 'Administração'));
-    if (isAdmin()) {
+    if (podeCorrigir()) {
       const b = navBtn(box, 'resultados', 'resultados', '✓');
       const n = window.PROVA?.pendentes?.() || 0;
       if (n) b.append(el('span', 'pend', String(n)));
     }
-    navBtn(box, 'exame', 'Banco de questões', '≡');
+    if (isStaff()) navBtn(box, 'exame', 'Banco de questões', '≡');
     if (isAdmin()) navBtn(box, 'contas', 'Contas', '⚙', 'gear');
     nav.append(box);
   }
@@ -951,14 +957,22 @@ function mostraPainel(qual) {
   Object.entries(PAINEIS).forEach(([k, sel]) => $(sel)?.classList.toggle('hide', k !== qual));
 }
 
-// Destinos que a credencial de candidato não alcança. Canal de verdade não
-// entra nesta lista: o que ele pode abrir já foi decidido pelo RLS, que só
-// devolveu os canais liberados a ele — bloquear de novo aqui, pelo cargo,
-// trancaria a ACADEMIA justamente para quem ela existe.
-const SO_OFICIAL = new Set(['mural', 'resultados', 'exame', 'contas']);
+/**
+ * Se este destino está ao alcance de quem está logado. Vale só para os painéis
+ * fixos: canal de verdade não passa por aqui, porque o que ele pode abrir já
+ * foi decidido pelo RLS — filtrar de novo no cliente, pela credencial,
+ * trancaria a ACADEMIA justamente para quem ela existe.
+ */
+function podeAbrir(key) {
+  if (key === 'mural')      return isOficial();
+  if (key === 'resultados') return podeCorrigir();
+  if (key === 'exame')      return isStaff();
+  if (key === 'contas')     return isAdmin();
+  return true;
+}
 
 async function openChannel(key, jumpTo) {
-  if (!isOficial() && SO_OFICIAL.has(key)) key = 'prova';
+  if (!podeAbrir(key)) key = isOficial() ? 'mural' : 'prova';
 
   // Entrar numa seção travada pede o código toda vez. A liberação só é trocada
   // depois que o código passa: quem desiste no meio continua onde estava.

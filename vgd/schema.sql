@@ -180,6 +180,19 @@ create table if not exists public.cargos (
   created_at timestamptz not null default now()
 );
 create unique index if not exists cargos_nome_idx on public.cargos (lower(nome));
+
+-- Um cargo pode carregar poder, e não só acesso: marcado aqui, quem o tiver
+-- corrige provas e decide resultados, mesmo sem credencial de comando. A
+-- permissão mora numa coluna e não no nome do cargo de propósito — renomear
+-- "Instrutor" para outra coisa não pode derrubar quem estava corrigindo.
+alter table public.cargos add column if not exists corrige_prova boolean not null default false;
+
+-- Só a primeira vez: enquanto nenhum cargo corrigir provas, o Instrutor que
+-- já existe recebe a marca. Depois que a unidade organizar isso do seu jeito,
+-- este arquivo para de opinar.
+update public.cargos set corrige_prova = true
+ where lower(nome) = 'instrutor'
+   and not exists (select 1 from public.cargos where corrige_prova);
 alter table public.cargos drop constraint if exists cargos_cor_check;
 alter table public.cargos add constraint cargos_cor_check
   check (cor is null or cor ~ '^#[0-9a-fA-F]{6}$');
@@ -420,6 +433,19 @@ returns boolean language sql stable security definer set search_path = public as
     select 1 from public.category_cargos cc
       join public.cargo_membros m on m.cargo_id = cc.cargo_id
      where cc.category_id = cat and m.profile_id = auth.uid());
+$fn$;
+
+/**
+ * Quem pode corrigir prova e bater o martelo: o ADMIN, sempre, e quem tiver
+ * um cargo marcado para isso. É o único poder que um cargo concede — o resto
+ * deles é só porta de canal.
+ */
+create or replace function public.pode_corrigir()
+returns boolean language sql stable security definer set search_path = public as $fn$
+  select public.is_admin()
+      or exists (select 1 from public.cargo_membros m
+                   join public.cargos c on c.id = m.cargo_id
+                  where m.profile_id = auth.uid() and c.corrige_prova);
 $fn$;
 
 create or replace function public.tem_cargo_no_canal(cid uuid)
@@ -1046,8 +1072,8 @@ declare
   t record; n jsonb; dis int := 0; obj int := 0; maxp int; pct numeric;
   alvo record; quem text; remover boolean := false;
 begin
-  if not public.is_admin() then
-    raise exception 'Apenas o ADMIN decide o resultado de uma prova.';
+  if not public.pode_corrigir() then
+    raise exception 'Sem permissão para decidir o resultado de uma prova.';
   end if;
   select * into t from public.exam_attempts where id = p_attempt;
   if not found then
@@ -1055,6 +1081,14 @@ begin
   end if;
   if t.status = 'em_andamento' then
     raise exception 'Esta prova ainda não foi entregue.';
+  end if;
+  -- Quem corrige por cargo mexe na fila, não no passado. Sem esta trava, um
+  -- instrutor poderia reabrir a prova já aprovada de um oficial antigo e
+  -- clicar em reprovar — e, como reprovar apaga a conta, o poder de corrigir
+  -- viraria por tabela o poder de remover quase qualquer um. Rever veredito
+  -- dado continua sendo do ADMIN.
+  if t.status <> 'aguardando' and not public.is_admin() then
+    raise exception 'Esta prova já foi decidida. Só o ADMIN pode rever um resultado.';
   end if;
 
   for n in select e.value from jsonb_array_elements(coalesce(p_notas, '[]'::jsonb)) as e(value) loop
@@ -1112,8 +1146,8 @@ end $fn$;
 create or replace function public.liberar_nova_tentativa(target uuid)
 returns void language plpgsql security definer set search_path = public as $fn$
 begin
-  if not public.is_staff() then
-    raise exception 'Apenas COMANDO ou ADMIN liberam nova tentativa.';
+  if not public.pode_corrigir() then
+    raise exception 'Sem permissão para liberar nova tentativa.';
   end if;
   update public.exam_attempts set arquivada = true
    where profile_id = target and not arquivada;
@@ -1233,16 +1267,21 @@ create policy cfg_write on public.exam_config for all    to authenticated
 -- questões pela view exam_questions_public, que não traz `correct`.
 create policy q_staff on public.exam_questions for all to authenticated
   using (public.is_staff()) with check (public.is_staff());
+-- quem corrige precisa enxergar o gabarito para saber o que era certo; montar
+-- a prova continua sendo assunto do comando
+create policy q_corrige on public.exam_questions for select to authenticated
+  using (public.pode_corrigir());
 
 -- A tentativa nasce e se transforma pelos RPCs (security definer); aqui é só
 -- leitura: cada um vê a própria, o comando vê todas.
 create policy at_read on public.exam_attempts for select to authenticated
-  using (profile_id = auth.uid() or public.is_staff());
+  using (profile_id = auth.uid() or public.is_staff() or public.pode_corrigir());
 
 create policy an_read on public.exam_answers for select to authenticated
   using (exists (select 1 from public.exam_attempts t
                   where t.id = attempt_id
-                    and (t.profile_id = auth.uid() or public.is_staff())));
+                    and (t.profile_id = auth.uid() or public.is_staff()
+                         or public.pode_corrigir())));
 
 -- ---------- cargos ----------
 -- O cargo é etiqueta visível: aparece ao lado do nome, como a cor. Quem cria,
@@ -1272,7 +1311,7 @@ create policy chcargo_write on public.channel_cargos for all to authenticated
 -- O histórico de vereditos é do ADMIN. Ele guarda nome e nota de gente que já
 -- não tem conta; não é coisa para circular na unidade.
 create policy log_read on public.exam_log for select to authenticated
-  using (public.is_admin());
+  using (public.pode_corrigir());
 
 -- ============================================================================
 -- 9. REALTIME

@@ -29,7 +29,7 @@
     ]);
     if (c.data) cfg = c.data;
     minha = t.data?.[0] || null;
-    if (isStaff()) {
+    if (podeCorrigir()) {
       const { count } = await sb.from('exam_attempts')
         .select('id', { count: 'exact', head: true })
         .eq('status', 'aguardando').eq('arquivada', false);
@@ -252,7 +252,7 @@
   async function abreResultados() {
     const root = $('#resultados');
     root.innerHTML = '';
-    if (!isAdmin()) { root.append(el('p', 'empty', '> acesso restrito à administração.')); return; }
+    if (!podeCorrigir()) { root.append(el('p', 'empty', '> acesso restrito a quem corrige provas.')); return; }
 
     const box = el('div', 'pane-scroll');
     root.append(box);
@@ -481,11 +481,19 @@
       abreResultados();
     };
 
-    const rep = el('button', 'ghost danger', apaga ? '✕ REPROVAR E REMOVER' : '✕ REPROVAR');
-    rep.onclick = () => mandar(false);
-    const apr = el('button', 'primary', '✔ APROVAR');
-    apr.onclick = () => mandar(true);
-    foot.append(rep, apr);
+    // Rever um veredito já dado é do ADMIN. Para quem corrige por cargo, a
+    // tela mostra o resultado e para por aí — é a mesma regra que o banco
+    // aplica em corrigir_prova(), repetida aqui só para não oferecer um botão
+    // que vai responder com erro.
+    if (t.status !== 'aguardando' && !isAdmin()) {
+      foot.append(el('span', 'form-note', 'Prova já decidida. Rever o resultado é com o ADMIN.'));
+    } else {
+      const rep = el('button', 'ghost danger', apaga ? '✕ REPROVAR E REMOVER' : '✕ REPROVAR');
+      rep.onclick = () => mandar(false);
+      const apr = el('button', 'primary', '✔ APROVAR');
+      apr.onclick = () => mandar(true);
+      foot.append(rep, apr);
+    }
 
     if (t.status !== 'aguardando') {
       const nova = el('button', 'ghost', '↺ Liberar nova tentativa');

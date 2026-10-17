@@ -69,6 +69,11 @@
       const tag = el('span', 'cargo-tag', c.nome);
       if (c.cor) { tag.style.color = c.cor; tag.style.borderColor = c.cor; }
       chip.append(tag, el('span', 'cargo-n', n + (n === 1 ? ' conta' : ' contas')));
+      if (c.corrige_prova) {
+        const poder = el('span', 'cargo-poder', '✓ corrige provas');
+        poder.title = 'Quem tem este cargo decide resultados de prova';
+        chip.append(poder);
+      }
       chip.title = 'Configurar o cargo ' + c.nome;
       chip.onclick = () => cargoForm(c);
       lista.append(chip);
@@ -85,6 +90,12 @@
     m.body.append(prova);
     const cor = paletaPicker(m.body, c?.cor);
     nome.addEventListener('input', () => { prova.textContent = nome.value.trim() || 'Instrutor'; });
+
+    m.body.append(el('h4', 'form-block', 'PODERES'));
+    const corrige = marcador(m.body, 'Corrigir provas e decidir resultados',
+      'Abre o canal de resultados para quem tiver este cargo, mesmo sem credencial de comando. '
+      + 'Inclui o botão de reprovar — e reprovar apaga a conta do candidato.',
+      c?.corrige_prova);
 
     const save = el('button', 'primary', c ? 'Salvar' : 'Criar');
     const cancel = el('button', 'ghost', 'Cancelar');
@@ -107,7 +118,7 @@
       const nm = nome.value.trim();
       if (!nm) { nome.focus(); return toast('Dê um nome ao cargo.', true); }
       save.disabled = true;
-      const linha = { nome: nm, cor: cor.value };
+      const linha = { nome: nm, cor: cor.value, corrige_prova: corrige.value };
       const { error } = c
         ? await sb.from('cargos').update(linha).eq('id', c.id)
         : await sb.from('cargos').insert({ ...linha, position: Object.keys(cargos).length });
@@ -224,11 +235,12 @@
     if (!eu) {
       if (p.role === 'candidato') acts.append(btn('▲ aprovar direto', () => setRole(p, 'oficial')));
       if (p.role === 'oficial')   acts.append(btn('▲ dar COMANDO', () => setRole(p, 'comando')));
-      if (p.role === 'comando') {
-        acts.append(btn('▼ tirar COMANDO', () => setRole(p, 'oficial')));
-        acts.append(btn('★ dar ADMIN', () => setRole(p, 'admin')));
-      }
-      if (p.role === 'admin') acts.append(btn('▼ tirar ADMIN', () => setRole(p, 'comando')));
+      if (p.role === 'comando')   acts.append(btn('▼ tirar COMANDO', () => setRole(p, 'oficial')));
+      // Promover a ADMIN sai de qualquer degrau, e não só de COMANDO: quem
+      // decide quem é admin é um admin, e obrigá-lo a subir a escada em duas
+      // etapas não protegia nada.
+      if (p.role !== 'admin') acts.append(btn('★ dar ADMIN', () => setRole(p, 'admin')));
+      else acts.append(btn('▼ tirar ADMIN', () => setRole(p, 'comando')));
     }
     acts.append(btn('◈ cargos', () => cargosDaConta(p)));
     acts.append(btn('✎ nome/cor', () => renomear(p)));

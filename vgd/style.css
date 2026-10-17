@@ -339,6 +339,7 @@ body.dragging-v #msg-grip{background:linear-gradient(180deg,transparent 2px,var(
   padding:.35rem .5rem .35rem .15rem;color:var(--text)}
 .cargo-chip:hover{border-color:var(--amber);background:var(--panel)}
 .cargo-n{color:var(--dim);font-size:.62rem}
+.cargo-poder{color:var(--lime);font-size:.58rem;border-left:1px solid var(--line);padding-left:.45rem;white-space:nowrap}
 .access-item .cargo-tag{margin-left:0}
 
 .badge{font-size:.62rem;border:1px solid var(--dim);color:var(--dim);padding:0 .35rem;justify-self:start;letter-spacing:.06em}
