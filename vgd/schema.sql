@@ -359,7 +359,7 @@ create table if not exists public.exam_log (
   pontos_max  int not null default 0,
   veredito    text not null,
   parecer     text not null default '',
-  removido    boolean not null default false,
+  removido    boolean not null default false,   -- histórico: hoje sempre falso
   decidido_por text,
   decidido_em timestamptz not null default now()
 );
@@ -1059,18 +1059,20 @@ end $fn$;
  * Aprovação promove o candidato a OFICIAL, que é o que abre o mural e os
  * canais da unidade.
  *
- * Reprovação APAGA A CONTA do candidato, por regra da unidade. Duas exceções
- * de segurança, para a função não virar uma arma: conta de ADMIN nunca é
- * removida, e ninguém remove a si mesmo. Antes de apagar, o resultado é
- * copiado para `exam_log`, que não cai na cascata — a unidade continua
- * sabendo quem prestou e quem decidiu o quê.
+ * Reprovação é só o veredito: a conta continua existindo, como candidata, e
+ * pode receber nova tentativa. Excluir conta é assunto do painel de contas,
+ * numa decisão separada e explícita.
+ *
+ * De toda forma o resultado é copiado para `exam_log`, que não cai na cascata
+ * de uma exclusão: se a conta for removida depois, pelo painel, a unidade
+ * continua sabendo quem prestou e quem decidiu o quê.
  */
 create or replace function public.corrigir_prova(
   p_attempt uuid, p_notas jsonb, p_aprovar boolean, p_parecer text default '')
 returns void language plpgsql security definer set search_path = public, auth as $fn$
 declare
   t record; n jsonb; dis int := 0; obj int := 0; maxp int; pct numeric;
-  alvo record; quem text; remover boolean := false;
+  alvo record; quem text;
 begin
   if not public.pode_corrigir() then
     raise exception 'Sem permissão para decidir o resultado de uma prova.';
@@ -1081,14 +1083,6 @@ begin
   end if;
   if t.status = 'em_andamento' then
     raise exception 'Esta prova ainda não foi entregue.';
-  end if;
-  -- Quem corrige por cargo mexe na fila, não no passado. Sem esta trava, um
-  -- instrutor poderia reabrir a prova já aprovada de um oficial antigo e
-  -- clicar em reprovar — e, como reprovar apaga a conta, o poder de corrigir
-  -- viraria por tabela o poder de remover quase qualquer um. Rever veredito
-  -- dado continua sendo do ADMIN.
-  if t.status <> 'aguardando' and not public.is_admin() then
-    raise exception 'Esta prova já foi decidida. Só o ADMIN pode rever um resultado.';
   end if;
 
   for n in select e.value from jsonb_array_elements(coalesce(p_notas, '[]'::jsonb)) as e(value) loop
@@ -1114,12 +1108,6 @@ begin
 
   select * into alvo from public.profiles where id = t.profile_id;
   select name into quem from public.profiles where id = auth.uid();
-  -- o coalesce fecha o caso de `p_aprovar` chegar nulo: sem ele `remover`
-  -- sairia nulo e o INSERT no exam_log quebraria na coluna NOT NULL
-  remover := coalesce(not p_aprovar
-                      and alvo.id is not null
-                      and alvo.role <> 'admin'
-                      and alvo.id <> auth.uid(), false);
 
   update public.exam_attempts
      set status = case when p_aprovar then 'aprovado' else 'reprovado' end,
@@ -1131,14 +1119,11 @@ begin
   insert into public.exam_log (nome, nota, pontos, pontos_max, veredito, parecer, removido, decidido_por)
        values (coalesce(alvo.name, '[removido]'), pct, obj + dis, maxp,
                case when p_aprovar then 'aprovado' else 'reprovado' end,
-               coalesce(btrim(p_parecer), ''), remover, quem);
+               coalesce(btrim(p_parecer), ''), false, quem);
 
   if p_aprovar then
     update public.profiles set role = 'oficial'
      where id = t.profile_id and role = 'candidato';
-  elsif remover then
-    -- a cascata leva o perfil, a tentativa e as respostas; o exam_log fica
-    delete from auth.users where id = alvo.id;
   end if;
 end $fn$;
 

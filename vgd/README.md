@@ -147,14 +147,20 @@ A prova sai da entrega como **aguardando**, com a nota já calculada. No canal
 `#resultados` aparece `Nota 79.17% — Recomendação: Aprovar`, e aí:
 
 - **Aprovar** → a conta vira OFICIAL, e o mural e os canais da unidade abrem.
-- **Reprovar** → **a conta é apagada**, com a prova e as respostas. Duas
-  exceções, para o botão não virar uma arma: conta de ADMIN nunca é removida, e
-  ninguém remove a si mesmo. O resultado é copiado para `exam_log` antes de
-  apagar, então a unidade não perde a memória de quem prestou e de quem
-  decidiu o quê.
+- **Reprovar** → fica só o veredito. A conta continua existindo, como
+  candidata, e pode receber uma nova tentativa. Excluir conta é decisão
+  separada, no painel ⚙ *Contas*.
 
-A nota é recomendação, não veredito: quem decide é o ADMIN, com as respostas e
+Todo veredito é copiado para `exam_log`, que não cai na cascata de uma
+exclusão: se a conta for removida depois, pelo painel, a prova e as respostas
+somem junto, mas a memória de quem prestou e de quem decidiu o quê fica.
+
+A nota é recomendação, não veredito: quem decide é gente, com as respostas e
 os critérios à frente.
+
+Quem decide é o ADMIN e quem tiver um **cargo marcado para corrigir provas**
+(ver acima). Montar a prova continua sendo do comando; gerenciar contas, do
+admin.
 
 Cada candidato tem **uma tentativa**; uma segunda exige *Liberar nova
 tentativa*, no mesmo painel. Enquanto a prova não é entregue, as respostas

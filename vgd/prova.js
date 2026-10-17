@@ -294,7 +294,7 @@
     if (!data?.length) return;
     box.append(el('h4', 'form-block', 'HISTÓRICO DE VEREDITOS'));
     box.append(el('p', 'pane-note',
-      'Registro que sobrevive à conta: reprovar apaga o candidato do site, e é aqui que fica a memória do que foi decidido.'));
+      'Registro que sobrevive à conta: se alguém for excluído pelo painel de contas, a prova e as respostas somem junto, mas o que foi decidido fica aqui.'));
     const lista = el('div', 'cor-lista');
     data.forEach(l => {
       const row = el('div', 'cor-row');
@@ -456,18 +456,11 @@
     const foot = el('div', 'prova-foot');
     foot.append(el('span', 'form-note', `Nota de corte do curso: ${cfg.min_percent}%.`));
 
-    const euMesmo = t.profile_id === me.id;
-    const admin = t.profiles?.role === 'admin';
-    const apaga = !euMesmo && !admin;
-
     const mandar = async aprovar => {
       const quem = t.profiles?.name || 'o candidato';
-      const aviso = aprovar
+      if (!confirma(aprovar
         ? `Aprovar ${quem}? A conta passa a OFICIAL e o mural e os canais da unidade abrem na hora.`
-        : apaga
-          ? `Reprovar ${quem}?\n\nA CONTA DELE SERÁ APAGADA do site, junto com a prova e as respostas. Não há volta. O resultado fica no histórico.`
-          : `Reprovar ${quem}? A conta não será apagada: ${admin ? 'contas de ADMIN nunca são removidas' : 'você não pode remover a própria conta'}.`;
-      if (!confirma(aviso)) return;
+        : `Reprovar ${quem}? A conta continua existindo, como candidata, e você pode liberar uma nova tentativa.`)) return;
 
       const notasArr = Object.entries(notas).map(([q, pontos]) => ({ q, pontos: +pontos || 0 }));
       const { error } = await sb.rpc('corrigir_prova', {
@@ -475,25 +468,17 @@
       });
       if (error) return toast(error.message, true);
       window.FX?.som[aprovar ? 'permitido' : 'negado']();
-      toast(aprovar ? `${quem} aprovado.` : apaga ? `${quem} reprovado e removido.` : `${quem} reprovado.`);
+      toast(`${quem} ${aprovar ? 'aprovado' : 'reprovado'}.`);
       await carrega();
       drawChannels();
       abreResultados();
     };
 
-    // Rever um veredito já dado é do ADMIN. Para quem corrige por cargo, a
-    // tela mostra o resultado e para por aí — é a mesma regra que o banco
-    // aplica em corrigir_prova(), repetida aqui só para não oferecer um botão
-    // que vai responder com erro.
-    if (t.status !== 'aguardando' && !isAdmin()) {
-      foot.append(el('span', 'form-note', 'Prova já decidida. Rever o resultado é com o ADMIN.'));
-    } else {
-      const rep = el('button', 'ghost danger', apaga ? '✕ REPROVAR E REMOVER' : '✕ REPROVAR');
-      rep.onclick = () => mandar(false);
-      const apr = el('button', 'primary', '✔ APROVAR');
-      apr.onclick = () => mandar(true);
-      foot.append(rep, apr);
-    }
+    const rep = el('button', 'ghost danger', '✕ REPROVAR');
+    rep.onclick = () => mandar(false);
+    const apr = el('button', 'primary', '✔ APROVAR');
+    apr.onclick = () => mandar(true);
+    foot.append(rep, apr);
 
     if (t.status !== 'aguardando') {
       const nova = el('button', 'ghost', '↺ Liberar nova tentativa');

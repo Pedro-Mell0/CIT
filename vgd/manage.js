@@ -93,8 +93,8 @@
 
     m.body.append(el('h4', 'form-block', 'PODERES'));
     const corrige = marcador(m.body, 'Corrigir provas e decidir resultados',
-      'Abre o canal de resultados para quem tiver este cargo, mesmo sem credencial de comando. '
-      + 'Inclui o botão de reprovar — e reprovar apaga a conta do candidato.',
+      'Abre o canal de resultados para quem tiver este cargo, mesmo sem credencial de comando: '
+      + 'ele passa a ver as tentativas, as respostas e o gabarito, e a aprovar ou reprovar.',
       c?.corrige_prova);
 
     const save = el('button', 'primary', c ? 'Salvar' : 'Criar');
