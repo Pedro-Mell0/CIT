@@ -1787,6 +1787,166 @@ create policy teia_acc_read  on public.teia_geral_access for select to authentic
 create policy teia_acc_write on public.teia_geral_access for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
 
+
+-- ----------------------------------------------------------------------------
+-- CONEXÕES DETECTADAS E AVISOS
+-- ----------------------------------------------------------------------------
+-- Quando a mesma entidade passa a estar ligada a duas operações, as duas
+-- investigações se tocam. A Teia Geral mostra isso sozinha (a entidade vira nó
+-- com aresta para cada operação, ver teia.js), e aqui nasce o aviso para quem
+-- precisa saber.
+--
+-- O QUE O AVISO NÃO DIZ: nome da entidade, nome da operação, foto, resumo. A
+-- linha guarda `entity_id` — que o destinatário já podia ver, porque ele
+-- alcança alguma operação dela — e um `pair_key`, que é o md5 do par de
+-- operações. O hash existe só para o mesmo aviso não sair duas vezes; ele não
+-- entrega id de operação nenhuma. Guardar os dois ids aqui seria entregar a
+-- existência da operação sigilosa a quem não a alcança, que é justamente o que
+-- o aviso foi desenhado para não fazer.
+
+create table if not exists public.notices (
+  id         uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references public.profiles(id) on delete cascade,
+  kind       text not null default 'conexao',
+  entity_id  uuid references public.entities(id) on delete cascade,
+  pair_key   text not null default '',
+  seen_at    timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create unique index if not exists notices_unico_idx
+  on public.notices (profile_id, kind, entity_id, pair_key);
+create index if not exists notices_dono_idx
+  on public.notices (profile_id, created_at desc);
+
+-- ---------- o estado da conexão ----------
+-- Quem alcança as DUAS operações pode confirmar, ignorar ou anotar o que achou.
+-- Quem alcança só uma recebe o aviso, mas não resolve a conexão: resolver exige
+-- enxergar os dois lados.
+create table if not exists public.auto_connections (
+  entity_id  uuid not null references public.entities(id) on delete cascade,
+  op_a       uuid not null references public.operations(id) on delete cascade,
+  op_b       uuid not null references public.operations(id) on delete cascade,
+  state      text not null default 'nova',
+  note       text not null default '',
+  updated_by uuid references public.profiles(id) on delete set null,
+  updated_at timestamptz not null default now(),
+  primary key (entity_id, op_a, op_b)
+);
+
+alter table public.auto_connections drop constraint if exists auto_connections_state_check;
+alter table public.auto_connections add constraint auto_connections_state_check
+  check (state in ('nova','confirmada','ignorada'));
+
+-- ---------- a detecção ----------
+-- Dispara ao vincular uma entidade a uma operação — que é o momento em que o
+-- dossiê é salvo. Para cada operação que a entidade JÁ tinha, nasce um par.
+-- Entrando uma terceira operação, só os pares novos dela são avisados: os
+-- antigos já têm linha e o índice único os barra.
+create or replace function public.detecta_conexao()
+returns trigger language plpgsql security definer set search_path = public as $fn$
+declare
+  canal_novo text;
+  outra      record;
+  chave      text;
+  autor      uuid := auth.uid();
+begin
+  select channel into canal_novo from public.operations where id = new.operation_id;
+  if canal_novo is null then return new; end if;
+
+  for outra in
+    select eo.operation_id as id, o.channel
+      from public.entity_operations eo
+      join public.operations o on o.id = eo.operation_id
+     where eo.entity_id = new.entity_id
+       and eo.operation_id <> new.operation_id
+  loop
+    chave := md5(least(new.operation_id::text, outra.id::text) ||
+                 greatest(new.operation_id::text, outra.id::text));
+
+    insert into public.auto_connections (entity_id, op_a, op_b)
+    values (new.entity_id,
+            least(new.operation_id, outra.id),
+            greatest(new.operation_id, outra.id))
+    on conflict do nothing;
+
+    -- Vai para quem alcança QUALQUER uma das duas operações: para esse agente
+    -- a conexão é novidade, mesmo que ele só enxergue um dos lados. Quem
+    -- acabou de criar o vínculo não é avisado — ele já viu acontecer.
+    insert into public.notices (profile_id, kind, entity_id, pair_key)
+    select q.p, 'conexao', new.entity_id, chave
+      from (select public.leitores_do_canal(canal_novo) as p
+            union
+            select public.leitores_do_canal(outra.channel)) q
+     where q.p is not null
+       and (autor is null or q.p <> autor)
+    on conflict do nothing;
+  end loop;
+
+  return new;
+end $fn$;
+
+drop trigger if exists entity_operations_detecta on public.entity_operations;
+create trigger entity_operations_detecta
+  after insert on public.entity_operations
+  for each row execute function public.detecta_conexao();
+
+-- Desfeito o vínculo, a conexão daquele par deixa de existir. A aresta some
+-- sozinha da Teia Geral (ela é derivada), e aqui some o estado dela. O aviso
+-- já dado fica: ele é histórico do que foi visto, não o estado atual.
+create or replace function public.desfaz_conexao()
+returns trigger language plpgsql security definer set search_path = public as $fn$
+begin
+  delete from public.auto_connections
+   where entity_id = old.entity_id
+     and (op_a = old.operation_id or op_b = old.operation_id);
+  return old;
+end $fn$;
+
+drop trigger if exists entity_operations_desfaz on public.entity_operations;
+create trigger entity_operations_desfaz
+  after delete on public.entity_operations
+  for each row execute function public.desfaz_conexao();
+
+-- ---------- RLS dos avisos ----------
+alter table public.notices          enable row level security;
+alter table public.auto_connections enable row level security;
+
+do $do$
+declare t text; p text;
+begin
+  foreach t in array array['notices','auto_connections'] loop
+    for p in select policyname from pg_policies
+              where schemaname = 'public' and tablename = t loop
+      execute format('drop policy %I on public.%I', p, t);
+    end loop;
+  end loop;
+end $do$;
+
+-- O aviso é de quem recebeu, e de mais ninguém. Nem o ADMIN lê a caixa alheia.
+create policy aviso_read   on public.notices for select to authenticated
+  using (profile_id = auth.uid());
+create policy aviso_update on public.notices for update to authenticated
+  using (profile_id = auth.uid()) with check (profile_id = auth.uid());
+create policy aviso_delete on public.notices for delete to authenticated
+  using (profile_id = auth.uid());
+-- Ninguém escreve aviso pelo site: quem insere é o gatilho, como definer.
+
+create policy conex_read on public.auto_connections for select to authenticated
+  using (exists (select 1 from public.operations o
+                  where o.id = op_a and public.can_read_channel(o.channel))
+     and exists (select 1 from public.operations o
+                  where o.id = op_b and public.can_read_channel(o.channel)));
+create policy conex_update on public.auto_connections for update to authenticated
+  using (exists (select 1 from public.operations o
+                  where o.id = op_a and public.can_read_channel(o.channel))
+     and exists (select 1 from public.operations o
+                  where o.id = op_b and public.can_read_channel(o.channel)))
+  with check (exists (select 1 from public.operations o
+                       where o.id = op_a and public.can_read_channel(o.channel))
+          and exists (select 1 from public.operations o
+                       where o.id = op_b and public.can_read_channel(o.channel)));
+
 -- ============================================================================
 -- 8. REALTIME
 -- ============================================================================
@@ -1798,7 +1958,8 @@ begin
                            'operations','operation_entries','sidebar_order',
                            'fukurou_chats','fukurou_msgs',
                            'entities','entity_aliases','entity_operations',
-                           'links','node_positions','teia_geral_access']
+                           'links','node_positions','teia_geral_access',
+                           'notices','auto_connections']
   loop
     begin
       execute format('alter publication supabase_realtime add table public.%I', t);
@@ -1822,6 +1983,8 @@ alter table public.entity_operations replica identity full;
 alter table public.links             replica identity full;
 alter table public.node_positions    replica identity full;
 alter table public.teia_geral_access replica identity full;
+alter table public.notices           replica identity full;
+alter table public.auto_connections  replica identity full;
 
 -- ============================================================================
 -- 9. RECARGA DO CACHE

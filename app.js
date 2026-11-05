@@ -135,6 +135,7 @@ $('#go').onclick = async () => {
 };
 
 $('#out').onclick = async () => { await sb.auth.signOut(); location.reload(); };
+$('#avisos').onclick = () => window.AVISOS?.abre?.();
 
 // ---------- janelas ----------
 function modal(title, { onClose, closable = true } = {}) {
@@ -235,6 +236,7 @@ async function start() {
   // Depois de abrir a sala: a barra lateral ganha a seção da teia assim que
   // a lista de operações visíveis chega, sem segurar a entrada do agente.
   window.TEIA?.prepara?.();
+  window.AVISOS?.carrega?.();
 
   if (!isMaster()) await garanteNomeReal();
 }
@@ -337,6 +339,8 @@ function listen() {
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'links' }, () => window.TEIA?.recarrega?.())
     .on('postgres_changes', { event: '*', schema: 'public', table: 'teia_geral_access' }, () => window.TEIA?.prepara?.())
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notices' }, () => window.AVISOS?.chegou?.())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'auto_connections' }, () => window.TEIA?.recarrega?.())
     .subscribe();
 }
 

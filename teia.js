@@ -36,7 +36,7 @@
   let root = null, cy = null;
   let vista = 'geral';          // 'geral' ou o id da operação
   let selecionado = null;
-  let dados = { ops: [], vincs: [], links: [], pos: {}, fotos: {} };
+  let dados = { ops: [], vincs: [], links: [], pos: {}, fotos: {}, conexoes: [] };
   let carregando = false;
 
   const chaveVista = () => (vista === 'geral' ? 'geral' : 'op:' + vista);
@@ -137,15 +137,19 @@
     if (carregando) return;
     carregando = true;
     try {
-      const [o, eo, ln, ps] = await Promise.all([
+      const [o, eo, ln, ps, cx] = await Promise.all([
         sb.from('operations').select('id,title,channel,status,images,entities_at'),
         sb.from('entity_operations').select('*'),
         sb.from('links').select('*'),
         sb.from('node_positions').select('*'),
+        // Só vem o que o agente alcança dos DOIS lados: resolver uma conexão
+        // exige enxergar as duas operações.
+        sb.from('auto_connections').select('*'),
       ]);
       dados.ops = o.data || [];
       dados.vincs = eo.data || [];
       dados.links = ln.data || [];
+      dados.conexoes = cx.data || [];
       dados.pos = {};
       (ps.data || []).forEach(p => {
         (dados.pos[p.view_key] = dados.pos[p.view_key] || {})[p.node_kind + ':' + p.node_id] =
@@ -583,10 +587,7 @@
         box.append(b);
       });
       corpo.append(box);
-      if (nomes.length > 1) {
-        corpo.append(el('p', 'tw-p-alerta',
-          '⚠ aparece em mais de uma operação — conexão detectada automaticamente.'));
-      }
+      if (nomes.length > 1) conexoesDa(corpo, entId);
     }
 
     relacionamentos(corpo, ligacoes, noEnt(entId));
@@ -610,6 +611,66 @@
       pe.append(rm);
     }
     corpo.append(pe);
+  }
+
+  /**
+   * As conexões automáticas desta entidade. Aparecem só para quem alcança as
+   * duas operações do par — é o próprio RLS que decide isso, e por isso o
+   * agente que enxerga um lado só recebe o aviso mas não vê par nenhum aqui.
+   */
+  function conexoesDa(corpo, entId) {
+    const minhas = dados.conexoes.filter(c => c.entity_id === entId);
+    corpo.append(el('p', 'tw-p-alerta',
+      '⚠ aparece em mais de uma operação — conexão detectada automaticamente.'));
+    if (!minhas.length) return;
+
+    const ESTADO = { nova: 'não avaliada', confirmada: 'confirmada', ignorada: 'ignorada' };
+    const box = el('div', 'tw-p-conex');
+    minhas.forEach(c => {
+      const a = dados.ops.find(o => o.id === c.op_a);
+      const b = dados.ops.find(o => o.id === c.op_b);
+      if (!a || !b) return;
+      const linha = el('div', 'tw-conex ' + c.state);
+      linha.append(el('b', null, a.title + '  ⟷  ' + b.title));
+      linha.append(el('span', 'est', ESTADO[c.state] || c.state));
+      if (c.note) linha.append(el('p', 'obs', c.note));
+
+      const acoes = el('div', 'acoes');
+      const grava = async campos => {
+        const { error } = await sb.from('auto_connections')
+          .update({ ...campos, updated_by: me.id, updated_at: new Date().toISOString() })
+          .eq('entity_id', entId).eq('op_a', c.op_a).eq('op_b', c.op_b);
+        if (error) return toast('Falha: ' + error.message, true);
+        await recarrega();
+        selecionaSeExiste(noEnt(entId));
+      };
+
+      if (c.state !== 'confirmada') {
+        const ok = el('button', 'ghost sm', '✓ confirmar');
+        ok.onclick = () => grava({ state: 'confirmada' });
+        acoes.append(ok);
+      }
+      if (c.state !== 'ignorada') {
+        const nao = el('button', 'ghost sm', '✕ ignorar');
+        nao.onclick = () => grava({ state: 'ignorada' });
+        acoes.append(nao);
+      }
+      const obs = el('button', 'ghost sm', '✎ observação');
+      obs.onclick = () => {
+        const m = modal('OBSERVAÇÃO DA CONEXÃO');
+        m.body.append(el('p', 'form-note', a.title + '  ⟷  ' + b.title));
+        const t = field(m.body, 'Observação', c.note, { area: true });
+        const sv = el('button', 'primary', 'Salvar');
+        const cl = el('button', 'ghost', 'Cancelar');
+        cl.onclick = m.close;
+        sv.onclick = async () => { m.close(); await grava({ note: t.value.trim() }); };
+        m.foot.append(cl, sv);
+      };
+      acoes.append(obs);
+      linha.append(acoes);
+      box.append(linha);
+    });
+    corpo.append(box);
   }
 
   // --------------------------------------------------- criar e editar

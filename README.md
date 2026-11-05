@@ -18,6 +18,7 @@ ops.js       dossiês de operação (painel lateral direito)
 entidades.js cadastro de entidades, seletor do dossiê e conversão do texto livre
 manage.js    gerenciar usuários (ADMIN) e criar canais/categorias (COMANDO)
 teia.js      Teia de Vínculos: o grafo geral e o de cada operação
+avisos.js    caixa de avisos (conexões encontradas entre operações)
 search.js    varredura global (Ctrl+F)
 fukurou.js   página do bot (Fukurou), só para MASTER
 schema.sql   banco de dados completo
@@ -491,6 +492,44 @@ tirando a entidade do dossiê, em ✎ Editar.
 **EXCLUIR NÓ**, na ficha da entidade, apaga o cadastro de todas as operações e
 desfaz os vínculos dela de uma vez. É do autor e do COMANDO/ADMIN, e não há
 desfazer.
+
+
+### Conexões entre operações
+
+Sempre que a **mesma entidade** passa a estar ligada a uma segunda operação,
+as duas investigações se tocam. Isso aparece sozinho na Teia Geral — a entidade
+vira nó com uma linha para cada operação, tracejada em dourado — e gera um
+**aviso** para quem precisa saber.
+
+O sino **⚑**, ao lado do seu codinome, acende com a contagem do que chegou. O
+aviso diz:
+
+> ⚠ CONEXÃO ENCONTRADA
+> Um alvo de interesse foi identificado em outra operação.
+> *Visualizar no grafo →*
+
+E só. **Não diz o nome da entidade, nem as operações, nem traz foto ou resumo.**
+É assim de propósito: o aviso vai para quem alcança *qualquer uma* das duas
+operações, inclusive quem enxerga só um lado, e nomear o outro lado entregaria
+a existência de uma operação sigilosa a quem não tem acesso a ela. O botão leva
+ao grafo, e lá o RLS mostra exatamente o que aquele agente já podia ver. Quem
+tem a Teia Geral cai nela com o nó selecionado; quem não tem cai na teia da
+operação que alcança.
+
+Regras:
+
+- **Nunca duas vezes pela mesma conexão.** Entrando uma terceira operação, só
+  os pares novos dela são avisados.
+- **Quem criou o vínculo não é avisado** — ele viu acontecer.
+- **Desfeito o vínculo**, a conexão some da Teia Geral (a linha é derivada, não
+  gravada) e o estado dela é apagado. O aviso já dado fica: a caixa é histórico
+  do que foi visto, não o estado atual.
+- **Resolver exige os dois lados.** Na ficha da entidade, quem alcança as duas
+  operações pode marcar a conexão como **confirmada** ou **ignorada** e deixar
+  uma **observação**. Quem alcança só uma recebe o aviso, mas não vê o par.
+
+A caixa de avisos é de quem recebeu e de mais ninguém — nem o ADMIN lê a caixa
+alheia.
 
 ## Busca
 

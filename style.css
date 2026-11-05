@@ -990,3 +990,32 @@ button.ent-chip-n:hover{color:var(--cyan);text-decoration:underline}
 .tw-v-de{display:flex;align-items:baseline;gap:.3rem;flex-wrap:wrap;color:var(--dim);font-size:.82rem}
 .tw-v-de b{color:var(--cyan)}
 .tw-tools .primary.sm{white-space:nowrap}
+
+/* ---------- avisos ---------- */
+#avisos{flex:none;padding:.3rem .45rem;font-size:.9rem;position:relative;margin-left:auto}
+#avisos+#me-cfg{margin-left:.1rem}
+#avisos.tem{color:var(--gold);border-color:var(--gold);box-shadow:0 0 12px #ffc74d33}
+#avisos.tem::after{content:attr(data-n);position:absolute;top:-5px;right:-5px;min-width:14px;
+  height:14px;padding:0 3px;border-radius:8px;background:var(--gold);color:#04020c;
+  font-size:.58rem;line-height:14px;text-align:center;font-weight:700}
+
+.av-lista{display:grid;gap:.5rem}
+.av-card{border:1px solid var(--line);border-left:2px solid var(--line);padding:.6rem .7rem;
+  display:grid;gap:.4rem;justify-items:start}
+.av-card.novo{border-left-color:var(--gold);background:#ffc74d0d}
+.av-card header{display:flex;align-items:baseline;gap:.6rem;padding:0;border:0;background:none}
+.av-card header b{font-size:.72rem;letter-spacing:.06em;color:var(--gold)}
+.av-card header time{margin-left:auto;font-size:.66rem;color:var(--dim)}
+.av-txt{font-size:.82rem;color:var(--text)}
+
+/* ---------- conexão detectada ---------- */
+.tw-p-conex{display:grid;gap:.4rem}
+.tw-conex{border:1px solid var(--line);border-left:2px solid var(--gold);padding:.4rem .5rem;
+  display:grid;gap:.3rem}
+.tw-conex.confirmada{border-left-color:var(--live)}
+.tw-conex.ignorada{border-left-color:var(--dim);opacity:.6}
+.tw-conex b{font-size:.72rem;color:var(--text);word-break:break-word}
+.tw-conex .est{font-size:.62rem;color:var(--dim);letter-spacing:.06em;text-transform:uppercase}
+.tw-conex .obs{font-size:.72rem;color:var(--dim);font-style:italic}
+.tw-conex .acoes{display:flex;gap:.3rem;flex-wrap:wrap}
+.tw-conex .acoes .ghost{padding:.18rem .4rem;font-size:.66rem}
