@@ -383,12 +383,12 @@ function chanInfo(key) {
 }
 
 /** Cabeçalho recolhível, usado pelas categorias e pelos canais individuais. */
-function grupoHead(id, label, n, filhos) {
+function grupoHead(id, label, n, filhos, nome = 'os canais') {
   const fechado = collapsed.has(id);
   const h = el('h3', 'cat' + (fechado ? ' fechada' : ''));
   const tw = el('button', 'cat-tw');
   tw.setAttribute('aria-expanded', String(!fechado));
-  tw.title = fechado ? 'Mostrar os canais' : 'Esconder os canais';
+  tw.title = (fechado ? 'Mostrar ' : 'Esconder ') + nome;
   tw.append(el('span', 'arw', fechado ? '▸' : '▾'), el('span', 'cat-nm', label));
   if (n) tw.append(el('span', 'cat-n', n));
   // recolhido, o grupo avisa por dentro o que chegou e o que está aberto
@@ -533,12 +533,19 @@ function drawChannels() {
   const teiaOps = window.TEIA?.abas?.() || [];
   if (window.TEIA && (window.TEIA.podeGeral() || teiaOps.length)) {
     const box = el('div', 'nav-item teia-sec');
-    box.append(el('h3', null, 'Teia de Vínculos'));
-    if (window.TEIA.podeGeral()) navBtn(box, 'teia:geral', 'GERAL · FUKUROU', '◉', 'teia-geral');
-    teiaOps.forEach(o => {
-      const b = navBtn(box, 'teia:' + o.id, o.title, '⬡', 'sub');
-      if (chanInfo(o.channel).sigiloso) b.append(el('span', 'sig', '{sigiloso}'));
-    });
+    const geral = window.TEIA.podeGeral();
+    const chaves = teiaOps.map(o => 'teia:' + o.id);
+    if (geral) chaves.unshift('teia:geral');
+    // Recolhe como as categorias, e pelo mesmo caminho: a seção é longa quando
+    // há muita operação, e fica no topo da barra.
+    box.append(grupoHead('teia', 'Teia de Vínculos', chaves.length, chaves, 'as teias'));
+    if (!collapsed.has('teia')) {
+      if (geral) navBtn(box, 'teia:geral', 'GERAL · FUKUROU', '◉', 'teia-geral');
+      teiaOps.forEach(o => {
+        const b = navBtn(box, 'teia:' + o.id, o.title, '⬡', 'sub');
+        if (chanInfo(o.channel).sigiloso) b.append(el('span', 'sig', '{sigiloso}'));
+      });
+    }
     nav.prepend(box);
   }
 

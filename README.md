@@ -440,6 +440,9 @@ agente e o comando é anotação pessoal: não ganha aba, não aparece na Teia
 Geral e não oferece o botão de converter em entidades. A regra vale no
 servidor — a policy `ento_insert` recusa ligar entidade a um dossiê desses.
 
+A seção recolhe como as categorias de canal, e o estado fica guardado junto
+com o delas.
+
 A Teia Geral é **restrita**: ADMIN e MASTER entram sempre, os demais só por
 concessão, feita no botão **ACESSO** dentro da própria página. A concessão abre
 a porta, não derruba a parede — lá dentro o RLS continua valendo nó por nó, e
@@ -464,10 +467,11 @@ operação que você alcança.
 - **Arrastar o nó** muda o lugar dele, e o lugar fica gravado para todo mundo
   que abre a mesma aba — é quadro de investigação, não arrumação pessoal.
 - **Rolar** dá zoom; **arrastar o fundo** move a tela.
-- **Clicar no nó** abre a ficha dele à direita (foto, galeria, resumo,
-  apelidos, operações em que aparece e a lista de relacionamentos) e destaca
-  todos os vínculos daquele nó, esmaecendo o resto do grafo. Clicar em um nome
-  da lista de relacionamentos salta para aquele nó.
+- **Clicar no nó** faz a ficha dele entrar pela direita, de cima a baixo do
+  palco (foto, galeria, resumo, apelidos, operações em que aparece e a lista
+  de relacionamentos), e destaca todos os vínculos daquele nó, esmaecendo o
+  resto do grafo. Clicar em um nome da lista de relacionamentos salta para
+  aquele nó.
 - **Duplo clique num nó de operação**, na Teia Geral, abre a aba dela.
 - **Clicar no fundo** desfaz a seleção.
 

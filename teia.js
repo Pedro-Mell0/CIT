@@ -68,7 +68,11 @@
    * no retângulo, no hexágono e no losango — as formas que a teia usa. Sem isso,
    * o que serve ao círculo vaza pela ponta do losango.
    */
+  const cacheSvg = {};
+
   function svgNo(kind, cor) {
+    const chave = kind + cor;
+    if (cacheSvg[chave]) return cacheSvg[chave];
     const c = escapaXml(cor);
     const corpo = {
       operacao:
@@ -108,7 +112,7 @@
     const svg =
       `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80">` +
       `<rect width="80" height="80" fill="${FUNDO}"/>${corpo}</svg>`;
-    return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+    return (cacheSvg[chave] = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg));
   }
 
   function svgCoruja() {
@@ -141,8 +145,8 @@
       'shape': 'data(forma)',
       'width': 'data(tam)',
       'height': 'data(tam)',
-      'transition-property': 'opacity, border-width',
-      'transition-duration': '140ms',
+      'transition-property': 'opacity',
+      'transition-duration': '120ms',
     } },
     { selector: 'node.fukurou', style: {
       'border-width': 3, 'font-size': 11, 'color': '#45e3ff',
@@ -163,8 +167,8 @@
       'text-background-color': '#04020c',
       'text-background-opacity': .8,
       'text-background-padding': 2,
-      'transition-property': 'opacity, width',
-      'transition-duration': '140ms',
+      'transition-property': 'opacity',
+      'transition-duration': '120ms',
     } },
     // Suposto é tracejado, provável é pontilhado curto, confirmado é cheio:
     // o nível de confiança tem que se ler sem clicar em nada.
@@ -353,7 +357,7 @@
       <div class="tw-caixa hide"></div>
       <div class="tw-palco">
         <div class="tw-grafo"></div>
-        <aside class="tw-painel hide" aria-label="Dossiê do nó"></aside>
+        <aside class="tw-painel" aria-label="Dossiê do nó"></aside>
         <div class="tw-legenda"></div>
         <div class="tw-vazio hide"></div>
       </div>`;
@@ -425,6 +429,14 @@
       minZoom: .2,
       maxZoom: 3,
       wheelSensitivity: .22,
+      // Em tela retina o canvas sai no dobro da resolução e cada quadro custa
+      // quatro vezes mais. Preso em 1, o arrasto fica fluido e a diferença no
+      // desenho não aparece neste tamanho de nó.
+      pixelRatio: 1,
+      // Durante o pan e o zoom o grafo vira uma textura única e volta a ser
+      // desenhado quando a mão para: é o que tira o arrastão do movimento.
+      textureOnViewport: true,
+      motionBlur: false,
       layout: todasSalvas
         ? { name: 'preset', positions: n => salvas[n.id()] || { x: 0, y: 0 }, fit: true, padding: 60 }
         : vista === 'geral'
@@ -477,8 +489,10 @@
   // ------------------------------------------------------------ seleção
   function limpaSelecao() {
     selecionado = null;
-    cy?.elements().removeClass('apagado foco');
-    root.querySelector('.tw-painel').classList.add('hide');
+    cy?.batch(() => cy.elements().removeClass('apagado foco'));
+    // Fecha deslizando: a gaveta sai de cena pelo transform, não por display,
+    // senão não haveria o que animar.
+    root.querySelector('.tw-painel').classList.remove('aberto');
     root.querySelector('.tw-dica').textContent =
       'clique no nó → abre a ficha e destaca os vínculos · duplo clique na operação → abre a aba dela';
   }
@@ -490,9 +504,13 @@
 
     // Destaca o nó e tudo que sai dele; o resto do grafo esmaece, para a
     // ramificação ficar legível no meio de dezenas de linhas.
+    // Em lote: sem isto são dois recalculos de estilo sobre o grafo inteiro,
+    // e com dezenas de nós o clique trava antes de a ficha abrir.
     const vizinhos = no.closedNeighborhood();
-    cy.elements().addClass('apagado').removeClass('foco');
-    vizinhos.removeClass('apagado').addClass('foco');
+    cy.batch(() => {
+      cy.elements().addClass('apagado').removeClass('foco');
+      vizinhos.removeClass('apagado').addClass('foco');
+    });
 
     const ligacoes = no.connectedEdges();
     root.querySelector('.tw-dica').textContent =
@@ -503,7 +521,7 @@
   function painelDoNo(id, ligacoes) {
     const painel = root.querySelector('.tw-painel');
     painel.innerHTML = '';
-    painel.classList.remove('hide');
+    painel.classList.add('aberto');
 
     const head = el('header', 'tw-p-head');
     head.append(el('b', null, '« FICHA DO NÓ'));
@@ -1035,13 +1053,15 @@
       desenhou sozinho — entidade ligada à operação — se desfaz no dossiê. */
   function selecionaVinculo(aresta) {
     selecionado = null;
-    cy.elements().addClass('apagado').removeClass('foco');
-    aresta.removeClass('apagado').addClass('foco');
-    aresta.connectedNodes().removeClass('apagado');
+    cy.batch(() => {
+      cy.elements().addClass('apagado').removeClass('foco');
+      aresta.removeClass('apagado').addClass('foco');
+      aresta.connectedNodes().removeClass('apagado');
+    });
 
     const painel = root.querySelector('.tw-painel');
     painel.innerHTML = '';
-    painel.classList.remove('hide');
+    painel.classList.add('aberto');
 
     const head = el('header', 'tw-p-head');
     head.append(el('b', null, '« VÍNCULO'));
@@ -1224,10 +1244,23 @@
     if (guardado && cy?.getElementById(guardado).length) seleciona(guardado);
   }
 
+  /**
+   * O realtime chega em rajada: converter um dossiê insere uma linha de
+   * `entity_operations` por entidade, e cada uma acordaria cinco consultas e
+   * um grafo inteiro refeito. Uma espera curta junta a rajada num só
+   * recarregamento. Quem chama de dentro continua usando `recarrega`, que é
+   * imediato — ali a tela precisa estar pronta na linha seguinte.
+   */
+  let timerRecarga = null;
+  function recarregaLogo() {
+    clearTimeout(timerRecarga);
+    timerRecarga = setTimeout(() => { timerRecarga = null; recarrega(); }, 240);
+  }
+
   window.TEIA = {
     open: abre,
     close: fecha,
-    recarrega,
+    recarrega: recarregaLogo,
     abas,
     podeGeral: () => podeGeral,
     confereAcesso,

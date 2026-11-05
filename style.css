@@ -75,7 +75,7 @@ small{color:var(--dim);font-size:.7rem}
 #ch-title.sigiloso::after{content:" {sigiloso}";color:var(--dead);font-size:.75em}
 #chans button.gear .ic{color:var(--gold)}
 /* bolinha amarela: o canal tem mensagem que este agente ainda não viu */
-#chans button.new::after{content:"●";color:var(--gold);text-shadow:0 0 8px var(--gold);margin-left:auto}
+#chans button.new:not(.cat-tw)::after{content:"●";color:var(--gold);text-shadow:0 0 8px var(--gold);margin-left:auto}
 #chans h3{font-size:.68rem;color:var(--dim);font-weight:400;margin:.9rem 0 .2rem;letter-spacing:.1em;text-transform:uppercase}
 #chans h3.cat{display:flex;align-items:center;margin:.9rem 0 .1rem}
 .cat-tw{background:none;border:0;color:var(--dim);font:inherit;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;display:flex;gap:.35rem;align-items:center;padding:.2rem .2rem;flex:1;text-align:left;border-radius:2px}
@@ -89,9 +89,9 @@ small{color:var(--dim);font-size:.7rem}
 /* recolhido, o grupo avisa o que está escondido lá dentro */
 .cat-tw.dentro{color:var(--cyan)}
 .cat-tw.dentro .arw{color:var(--cyan)}
+/* recolhido com novidade dentro: a pastilha da contagem acende, e só ela */
 .cat-tw.new .cat-n{border-color:var(--gold);color:var(--gold);
-  box-shadow:0 0 8px #ffc74d55}
-.cat-tw.new .cat-n::after{content:" ●";font-size:.5rem;vertical-align:middle}
+  background:#ffc74d1a;box-shadow:0 0 8px #ffc74d44}
 h3.cat.fechada{opacity:.85}
 .cat-ed{background:none;border:0;color:var(--dim);opacity:.45;padding:0 .2rem}
 h3.cat:hover .cat-ed{opacity:1}
@@ -929,14 +929,26 @@ button.ent-chip-n:hover{color:var(--cyan);text-decoration:underline}
 .tw-leg i{width:14px;height:2px;display:block;border-radius:2px}
 
 /* ---------- ficha do nó ---------- */
-.tw-painel{position:absolute;top:.8rem;right:.8rem;width:min(21rem,calc(100% - 1.6rem));
-  max-height:calc(100% - 1.6rem);display:flex;flex-direction:column;
-  background:#0a0620f2;border:1px solid var(--cyan);box-shadow:0 0 40px #45e3ff22;z-index:3}
+/* Gaveta: entra pela direita e ocupa a altura toda do palco. Fechada ela
+   continua no documento, só fora de cena pelo transform — com display:none
+   não haveria o que animar. `visibility` espera o fim do deslize para sumir. */
+.tw-painel{position:absolute;top:0;right:0;bottom:0;width:min(34rem,100%);
+  display:flex;flex-direction:column;z-index:3;
+  background:#0a0620f7;border-left:1px solid var(--cyan);
+  box-shadow:-18px 0 36px #04020ccc;
+  transform:translateX(100%);visibility:hidden;will-change:transform;
+  transition:transform .24s cubic-bezier(.22,.61,.36,1),visibility 0s linear .24s}
+.tw-painel.aberto{transform:none;visibility:visible;
+  transition:transform .24s cubic-bezier(.22,.61,.36,1)}
+@media (prefers-reduced-motion:reduce){
+  .tw-painel,.tw-painel.aberto{transition:none}
+}
 .tw-p-head{display:flex;align-items:center;gap:.5rem;padding:.45rem .6rem;flex:none;
   border-bottom:1px solid var(--line)}
 .tw-p-head b{font-size:.64rem;letter-spacing:.14em;color:var(--dim)}
 .tw-p-head .ghost{margin-left:auto;border:0;padding:.1rem .35rem}
-.tw-p-corpo{padding:.7rem .8rem;overflow:auto;display:grid;gap:.55rem;align-content:start}
+.tw-p-corpo{padding:.9rem 1rem;overflow:auto;display:grid;gap:.6rem;align-content:start;
+  flex:1;min-height:0}
 
 .tw-p-topo{display:flex;gap:.7rem;align-items:flex-start}
 .tw-p-topo .ent-foto{width:3.4rem;height:3.4rem}
@@ -980,7 +992,7 @@ button.ent-chip-n:hover{color:var(--cyan);text-decoration:underline}
 #chans .teia-sec button .sig{margin-left:auto}
 
 @media(max-width:900px){
-  .tw-painel{position:static;width:auto;max-height:42vh;margin:.5rem}
+  .tw-painel{width:100%}
   .tw-palco{display:flex;flex-direction:column}
   .tw-grafo{position:relative;flex:1;min-height:14rem}
   .tw-legenda{position:static;padding:.4rem 1rem}
