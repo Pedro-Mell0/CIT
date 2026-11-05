@@ -1334,7 +1334,7 @@ create extension if not exists pg_trgm with schema extensions;
 -- Caminho de anexo é texto: um pedaço que não seja uuid não pode derrubar a
 -- policy inteira com erro de conversão.
 create or replace function public.uuid_ou_nulo(t text)
-returns uuid language plpgsql immutable as $fn$
+returns uuid language plpgsql immutable set search_path = '' as $fn$
 begin
   return t::uuid;
 exception when others then
