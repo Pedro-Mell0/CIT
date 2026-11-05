@@ -19,7 +19,12 @@
   const dot = st => el('span', 'op-dot ' + st);
   const LONG = new Set(['f_report', 'f_suspects', 'f_agents', 'f_witnesses', 'f_victims']);
 
-  let curChan = null, ops = [], sel = null, entries = [];
+  // Campos que deixaram de ser texto livre: no dossiê já convertido eles são
+  // desenhados a partir das entidades vinculadas (ver entidades.js).
+  const SLOT_DO_CAMPO = { f_place: 'place', f_suspects: 'suspects',
+    f_agents: 'agents', f_witnesses: 'witnesses', f_victims: 'victims' };
+
+  let curChan = null, ops = [], sel = null, entries = [], vincs = [];
 
   // ---------- dados ----------
   async function load() {
@@ -34,9 +39,13 @@
   }
 
   async function loadEntries() {
-    if (!sel) { entries = []; return; }
-    const { data } = await sb.from('operation_entries').select('*').eq('operation_id', sel).order('created_at');
+    if (!sel) { entries = []; vincs = []; return; }
+    const [{ data }, ligacoes] = await Promise.all([
+      sb.from('operation_entries').select('*').eq('operation_id', sel).order('created_at'),
+      window.ENT ? window.ENT.vinculosDa(sel) : Promise.resolve([]),
+    ]);
     entries = data || [];
+    vincs = ligacoes;
   }
 
   // ---------- desenho ----------
@@ -89,6 +98,14 @@
     pdf.title = 'Exportar dossiê em PDF';
     pdf.onclick = () => exportPdf(op);
     bar.append(edit, add, pdf);
+    // Dossiê antigo, ainda com suspeitos e local digitados à mão: o convite
+    // para transformá-los em entidades fica aqui, e não some até ser feito.
+    if (!op.entities_at && window.ENT) {
+      const conv = el('button', 'ghost conv', '⇄ CONVERTER EM ENTIDADES');
+      conv.title = 'Transformar o texto livre deste dossiê em entidades com id próprio';
+      conv.onclick = () => window.ENT.revisar(op, () => load());
+      bar.append(conv);
+    }
     if (op.created_by === me.id || isStaff()) {
       const del = el('button', 'ghost danger', 'Excluir');
       del.onclick = async () => {
@@ -143,13 +160,46 @@
     pintaAnexos();
   }
 
-  function blockView(b, row, onlyFilled) {
+  /** Os envolvidos de um dossiê convertido, como fichas clicáveis. */
+  function chipsView(slot) {
+    const lista = vincs.filter(v => v.slot === slot);
+    if (!lista.length) return el('span', 'val blank');
+    const box = el('div', 'ent-chips vista');
+    lista.forEach(v => {
+      const ent = window.ENT?.cache?.[v.entity_id];
+      const chip = el('button', 'ent-chip k-' + (ent?.kind || 'pessoa'));
+      chip.type = 'button';
+      if (window.ENT) chip.append(window.ENT.miniatura(ent, 'xs'));
+      chip.append(el('span', 'ent-chip-n', ent?.name || '[entidade]'));
+      if (v.role) chip.append(el('span', 'ent-chip-r', v.role));
+      chip.title = 'Abrir na Teia de Vínculos';
+      chip.onclick = () => {
+        if (window.TEIA?.abrirNo) window.TEIA.abrirNo('ent', v.entity_id);
+        else if (ent) window.ENT?.form(ent, () => load());
+      };
+      box.append(chip);
+    });
+    window.ENT?.pintaFotos?.();
+    return box;
+  }
+
+  function blockView(b, row, onlyFilled, paraPdf) {
     const sec = el('section', 'op-block');
     const filled = b.items.filter(([k]) => (row[k] || '').trim());
     if (onlyFilled && !filled.length) return sec;
     sec.append(el('h4', null, b.title));
     (onlyFilled ? filled : b.items).forEach(([k, label]) => {
       const v = (row[k] || '').trim();
+      // No PDF o campo sai como texto — o espelho gravado no banco — para o
+      // documento continuar sendo texto selecionável, e não um amontoado de
+      // miniaturas que o papel não abre.
+      if (row.entities_at && SLOT_DO_CAMPO[k] && !paraPdf) {
+        const line = el('div', 'op-line');
+        line.append(el('span', 'lbl', label + ':'));
+        line.append(chipsView(SLOT_DO_CAMPO[k]));
+        sec.append(line);
+        return;
+      }
       if (k === 'status') {
         const st = statusOf(row);
         const line = el('div', 'op-line');
@@ -390,7 +440,7 @@
       `${new Date(op.created_at).toLocaleString('pt-BR')} · ` +
       `última atualização ${new Date(op.updated_at).toLocaleString('pt-BR')}`));
 
-    BLOCKS.forEach(b => root.append(blockView(b, op, false)));
+    BLOCKS.forEach(b => root.append(blockView(b, op, false, true)));
     if (op.images?.length) {
       const sec = el('section', 'op-block');
       sec.append(el('h4', null, 'ANEXOS'));
@@ -452,11 +502,14 @@
     return s;
   }
 
-  function fieldsInto(body, blocks, row = {}) {
+  function fieldsInto(body, blocks, row = {}, custom) {
     const inputs = {};
     blocks.forEach(b => {
       body.append(el('h4', 'form-block', b.title));
       b.items.forEach(([k, label]) => {
+        // `custom` desenha o campo no lugar do texto e devolve true — é por
+        // aqui que os envolvidos viram seletor de entidade.
+        if (custom && custom(body, k, label)) return;
         inputs[k] = k === 'status'
           ? statusField(body, statusOf(row))
           : field(body, label, row[k] || '', { area: LONG.has(k), ph: LONG.has(k) ? 'aceita formatação: **negrito**, - tópicos...' : '' });
@@ -467,11 +520,25 @@
 
   function create() { form(null); }
 
-  function form(op) {
+  async function form(op) {
+    // Operação nova já nasce com entidades; a antiga só passa a usá-las
+    // depois de convertida, para o texto que está lá não sumir da tela.
+    const comEntidades = !!window.ENT && (!op || !!op.entities_at);
+    const ligacoes = comEntidades && op ? await window.ENT.vinculosDa(op.id) : [];
+
     const m = modal(op ? 'EDITAR OPERAÇÃO' : 'NOVA OPERAÇÃO');
     m.body.append(el('h4', 'form-block', 'TÍTULO DA OPERAÇÃO'));
     const title = field(m.body, 'Título', op?.title || '', { ph: 'ex.: ECO NEGRO' });
-    const inputs = fieldsInto(m.body, BLOCKS, op || {});
+
+    const pickers = {};
+    const inputs = fieldsInto(m.body, BLOCKS, op || {}, (body, k, label) => {
+      const slot = comEntidades && SLOT_DO_CAMPO[k];
+      if (!slot) return false;
+      pickers[slot] = window.ENT.picker(body, slot, label,
+        slot === 'place' ? 'local' : 'pessoa',
+        ligacoes.filter(l => l.slot === slot));
+      return true;
+    });
     const anexos = anexosField(m, op?.images);
 
     const save = el('button', 'primary', op ? 'Salvar' : 'Publicar dossiê');
@@ -484,7 +551,9 @@
       const t = title.value.trim();
       if (!t) { title.focus(); return toast('A operação precisa de um título.', true); }
       const row = { title: t, status: inputs.status.value };
-      KEYS.forEach(k => row[k] = inputs[k].value.trim());
+      // Os campos virados em seletor não são enviados: quem os reescreve é o
+      // gatilho do banco, a partir das entidades vinculadas.
+      KEYS.forEach(k => { if (inputs[k]) row[k] = inputs[k].value.trim(); });
       save.disabled = true;
       // o id sai daqui para os anexos poderem subir antes do registro existir
       const id = op?.id || crypto.randomUUID();
@@ -495,10 +564,15 @@
       if (op) ({ error } = await sb.from('operations').update(row).eq('id', op.id));
       else {
         row.id = id; row.channel = curChan; row.created_by = me.id;
+        if (comEntidades) row.entities_at = new Date().toISOString();
         ({ error } = await sb.from('operations').insert(row));
       }
+      if (error) { save.disabled = false; return toast('Falha ao salvar: ' + error.message, true); }
+
+      // Só depois de a operação existir: a ligação tem chave estrangeira nela.
+      try { for (const pk of Object.values(pickers)) await pk.commit(id); }
+      catch (e) { save.disabled = false; return toast(e.message, true); }
       save.disabled = false;
-      if (error) return toast('Falha ao salvar: ' + error.message, true);
       m.close();
       sel = id;
       autoCol('dossier'); autoCol('entries');
@@ -556,6 +630,8 @@
       if (table === 'operations') { if (row.channel === curChan) load(); }
       else if (row.operation_id === sel) loadEntries().then(() => draw());
     },
+    /** Alguém mexeu numa entidade deste dossiê noutra aba ou noutro agente. */
+    entidadeMudou() { if (sel) loadEntries().then(() => draw()); },
     async focus(opId) {
       sel = opId;
       autoCol('dossier'); autoCol('entries');

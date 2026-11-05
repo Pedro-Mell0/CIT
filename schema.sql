@@ -1314,7 +1314,296 @@ exception when others then
 end $do$;
 
 -- ============================================================================
--- 7. REALTIME
+-- 7. TEIA DE VÍNCULOS — ENTIDADES
+-- ============================================================================
+-- Tudo que a apuração consegue identificar deixa de ser texto solto no dossiê e
+-- passa a ser uma entidade com id próprio: a mesma pessoa, o mesmo local e o
+-- mesmo veículo são sempre a mesma linha, apareçam em quantas operações
+-- aparecerem. É isso que deixa cruzar operações com segurança — e é disso que a
+-- teia é desenhada.
+--
+-- O texto antigo não é jogado fora. As colunas f_suspects, f_agents,
+-- f_witnesses, f_victims e f_place continuam existindo e, no dossiê já
+-- convertido, viram espelho das entidades ligadas a ele (ver
+-- `espelha_envolvidos` mais abaixo): assim a busca do Ctrl+F e o PDF seguem
+-- funcionando sem saber que o modelo mudou, e um banco convertido pela metade
+-- nunca mostra dossiê em branco.
+
+create extension if not exists pg_trgm with schema extensions;
+
+-- Caminho de anexo é texto: um pedaço que não seja uuid não pode derrubar a
+-- policy inteira com erro de conversão.
+create or replace function public.uuid_ou_nulo(t text)
+returns uuid language plpgsql immutable as $fn$
+begin
+  return t::uuid;
+exception when others then
+  return null;
+end $fn$;
+
+-- ---------- a entidade ----------
+-- `kind` é o que a coisa é; o papel dela numa investigação ("chefe do
+-- MOTOCLUB", "testemunha") não mora aqui, mora na ligação com a operação —
+-- a mesma pessoa é chefe numa e testemunha em outra sem virar dois cadastros.
+create table if not exists public.entities (
+  id         uuid primary key default gen_random_uuid(),
+  kind       text not null default 'pessoa',
+  name       text not null,
+  abbr       text not null default '',   -- a sigla do nó no grafo (MC, BD, C-B)
+  summary    text not null default '',
+  tags       text[] not null default '{}',
+  images     text[] not null default '{}',
+  created_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.entities drop constraint if exists entities_kind_check;
+alter table public.entities add constraint entities_kind_check
+  check (kind in ('pessoa','local','veiculo','organizacao','informacao'));
+
+create index if not exists entities_name_trgm
+  on public.entities using gin (name extensions.gin_trgm_ops);
+
+drop trigger if exists entities_touch on public.entities;
+create trigger entities_touch before update on public.entities
+  for each row execute function public.touch_updated_at();
+
+-- ---------- apelidos e nomes alternativos ----------
+create table if not exists public.entity_aliases (
+  entity_id uuid not null references public.entities(id) on delete cascade,
+  alias     text not null,
+  primary key (entity_id, alias)
+);
+
+create index if not exists entity_aliases_trgm
+  on public.entity_aliases using gin (alias extensions.gin_trgm_ops);
+
+-- ---------- entidade × operação ----------
+-- A linha que faz todo o resto existir: é contando as operações de uma mesma
+-- entidade que se descobre que ela liga duas investigações.
+--   `slot` diz em que campo do dossiê a entidade aparece (e qual coluna de
+--   texto ela espelha);  `role` é o rótulo humano mostrado na teia.
+create table if not exists public.entity_operations (
+  entity_id    uuid not null references public.entities(id)   on delete cascade,
+  operation_id uuid not null references public.operations(id) on delete cascade,
+  slot         text not null default 'other',
+  role         text not null default '',
+  created_by   uuid references public.profiles(id) on delete set null,
+  created_at   timestamptz not null default now(),
+  primary key (entity_id, operation_id)
+);
+
+alter table public.entity_operations drop constraint if exists entity_operations_slot_check;
+alter table public.entity_operations add constraint entity_operations_slot_check
+  check (slot in ('suspects','agents','witnesses','victims','place','other'));
+
+create index if not exists entity_operations_op_idx on public.entity_operations (operation_id);
+
+-- Marca o dossiê já convertido para entidades. Nulo = ainda só texto livre,
+-- e enquanto for nulo o espelho não encosta nas colunas antigas.
+alter table public.operations add column if not exists entities_at timestamptz;
+
+-- ---------- quem enxerga a entidade ----------
+-- A entidade herda o sigilo das operações em que aparece: quem alcança
+-- qualquer uma delas, a enxerga. Entidade ainda sem operação nenhuma é
+-- rascunho de quem a cadastrou.
+create or replace function public.can_see_entity(e uuid)
+returns boolean language plpgsql stable security definer set search_path = public as $fn$
+declare dono uuid;
+begin
+  if e is null or auth.uid() is null then return false; end if;
+  if public.is_admin() then return true; end if;
+
+  if exists (select 1
+               from public.entity_operations eo
+               join public.operations o on o.id = eo.operation_id
+              where eo.entity_id = e
+                and public.can_read_channel(o.channel)) then
+    return true;
+  end if;
+
+  if not exists (select 1 from public.entity_operations where entity_id = e) then
+    select created_by into dono from public.entities where id = e;
+    return dono = auth.uid() or public.is_staff();
+  end if;
+
+  return false;
+end $fn$;
+
+-- ---------- espelho nas colunas de texto ----------
+create or replace function public.lista_slot(op uuid, s text)
+returns text language sql stable security definer set search_path = public as $fn$
+  select coalesce(string_agg(
+           e.name || case when btrim(eo.role) <> '' then ' (' || eo.role || ')' else '' end,
+           ', ' order by e.name), '')
+    from public.entity_operations eo
+    join public.entities e on e.id = eo.entity_id
+   where eo.operation_id = op and eo.slot = s
+$fn$;
+
+-- Reescreve os campos antigos a partir das entidades ligadas — só no dossiê já
+-- convertido. No que ainda não foi, o texto original fica intacto.
+create or replace function public.espelha_envolvidos(op uuid)
+returns void language plpgsql security definer set search_path = public as $fn$
+declare convertida boolean;
+begin
+  select entities_at is not null into convertida from public.operations where id = op;
+  if not coalesce(convertida, false) then return; end if;
+
+  update public.operations set
+    f_suspects  = public.lista_slot(op, 'suspects'),
+    f_agents    = public.lista_slot(op, 'agents'),
+    f_witnesses = public.lista_slot(op, 'witnesses'),
+    f_victims   = public.lista_slot(op, 'victims'),
+    f_place     = public.lista_slot(op, 'place')
+   where id = op;
+end $fn$;
+
+create or replace function public.ao_mudar_vinculo_operacao()
+returns trigger language plpgsql security definer set search_path = public as $fn$
+begin
+  if tg_op = 'UPDATE' and old.operation_id is distinct from new.operation_id then
+    perform public.espelha_envolvidos(old.operation_id);
+  end if;
+  perform public.espelha_envolvidos(coalesce(new.operation_id, old.operation_id));
+  return coalesce(new, old);
+end $fn$;
+
+drop trigger if exists entity_operations_espelho on public.entity_operations;
+create trigger entity_operations_espelho
+  after insert or update or delete on public.entity_operations
+  for each row execute function public.ao_mudar_vinculo_operacao();
+
+-- Renomear a entidade reescreve o espelho de todos os dossiês dela.
+create or replace function public.ao_renomear_entidade()
+returns trigger language plpgsql security definer set search_path = public as $fn$
+begin
+  if new.name is distinct from old.name then
+    perform public.espelha_envolvidos(operation_id)
+       from public.entity_operations where entity_id = new.id;
+  end if;
+  return new;
+end $fn$;
+
+drop trigger if exists entities_espelho on public.entities;
+create trigger entities_espelho after update on public.entities
+  for each row execute function public.ao_renomear_entidade();
+
+-- ---------- possível duplicata ----------
+-- Procura em TODO o registro, de propósito: dois cadastros para a mesma pessoa
+-- quebram justamente o cruzamento que a teia existe para fazer. Por isso é
+-- `security definer` — passa por cima do RLS. O que ela devolve é só nome,
+-- apelido e tipo: nunca a operação onde a entidade aparece, nunca a foto, nunca
+-- o resumo. Saber que um nome já está no registro não entrega investigação
+-- nenhuma; dizer em qual delas, sim — e isso aqui não diz.
+create or replace function public.entidades_parecidas(p_name text, p_ignore uuid default null)
+returns table (id uuid, kind text, name text, aliases text[], score real)
+language sql stable security definer set search_path = public as $fn$
+  select c.id, c.kind, c.name, c.aliases, c.score
+    from (
+      select e.id, e.kind, e.name,
+             coalesce(array_agg(a.alias) filter (where a.alias is not null), '{}'::text[]) as aliases,
+             greatest(
+               extensions.similarity(lower(e.name), lower(btrim(p_name))),
+               coalesce(max(extensions.similarity(lower(a.alias), lower(btrim(p_name)))), 0)
+             )::real as score
+        from public.entities e
+        left join public.entity_aliases a on a.entity_id = e.id
+       where btrim(coalesce(p_name, '')) <> ''
+         and (p_ignore is null or e.id <> p_ignore)
+       group by e.id, e.kind, e.name
+    ) c
+   where c.score >= 0.42
+   order by c.score desc, c.name
+   limit 8
+$fn$;
+
+-- `security definer` passa por cima do RLS, então quem pode chamar importa:
+-- sem isto, a chave `anon` que vive no config.js varreria o registro inteiro
+-- sem sequer entrar no site.
+revoke execute on function public.entidades_parecidas(text, uuid) from public, anon;
+grant  execute on function public.entidades_parecidas(text, uuid) to authenticated;
+
+-- Estas duas só são chamadas por gatilho; ninguém precisa alcançá-las de fora.
+revoke execute on function public.lista_slot(uuid, text)       from public, anon, authenticated;
+revoke execute on function public.espelha_envolvidos(uuid)     from public, anon, authenticated;
+
+-- ---------- fotos das entidades ----------
+-- Bucket próprio: a policy de `operacoes` casa o primeiro pedaço do caminho com
+-- operations.id, e uma foto de entidade nunca casaria ali.
+insert into storage.buckets (id, name, public)
+  values ('entidades', 'entidades', false)
+  on conflict (id) do nothing;
+
+drop policy if exists ent_anexo_read   on storage.objects;
+drop policy if exists ent_anexo_insert on storage.objects;
+drop policy if exists ent_anexo_delete on storage.objects;
+
+create policy ent_anexo_read on storage.objects for select to authenticated
+using (
+  bucket_id = 'entidades'
+  and public.can_see_entity(public.uuid_ou_nulo(split_part(name, '/', 1)))
+);
+
+-- A foto sobe antes de a entidade existir, então aqui basta ser o dono.
+create policy ent_anexo_insert on storage.objects for insert to authenticated
+with check (bucket_id = 'entidades' and owner = auth.uid());
+
+create policy ent_anexo_delete on storage.objects for delete to authenticated
+using (bucket_id = 'entidades' and (owner = auth.uid() or public.is_staff()));
+
+-- ---------- RLS ----------
+alter table public.entities          enable row level security;
+alter table public.entity_aliases    enable row level security;
+alter table public.entity_operations enable row level security;
+
+do $do$
+declare t text; p text;
+begin
+  foreach t in array array['entities','entity_aliases','entity_operations'] loop
+    for p in select policyname from pg_policies
+              where schemaname = 'public' and tablename = t loop
+      execute format('drop policy %I on public.%I', p, t);
+    end loop;
+  end loop;
+end $do$;
+
+create policy ent_read   on public.entities for select to authenticated
+  using (public.can_see_entity(id));
+create policy ent_insert on public.entities for insert to authenticated
+  with check (created_by = auth.uid());
+create policy ent_update on public.entities for update to authenticated
+  using (public.can_see_entity(id)) with check (public.can_see_entity(id));
+create policy ent_delete on public.entities for delete to authenticated
+  using (public.can_see_entity(id) and (created_by = auth.uid() or public.is_staff()));
+
+create policy enta_read  on public.entity_aliases for select to authenticated
+  using (public.can_see_entity(entity_id));
+create policy enta_write on public.entity_aliases for all to authenticated
+  using (public.can_see_entity(entity_id)) with check (public.can_see_entity(entity_id));
+
+-- Esta é a parede que esconde o "também aparece em TROIA": a ligação só é
+-- legível para quem alcança o canal daquela operação. Quem não alcança enxerga
+-- a entidade, mas não as operações alheias dela.
+create policy ento_read on public.entity_operations for select to authenticated
+  using (exists (select 1 from public.operations o
+                  where o.id = operation_id and public.can_read_channel(o.channel)));
+create policy ento_insert on public.entity_operations for insert to authenticated
+  with check (created_by = auth.uid()
+              and exists (select 1 from public.operations o
+                           where o.id = operation_id and public.can_read_channel(o.channel)));
+create policy ento_update on public.entity_operations for update to authenticated
+  using (exists (select 1 from public.operations o
+                  where o.id = operation_id and public.can_read_channel(o.channel)))
+  with check (exists (select 1 from public.operations o
+                       where o.id = operation_id and public.can_read_channel(o.channel)));
+create policy ento_delete on public.entity_operations for delete to authenticated
+  using (exists (select 1 from public.operations o
+                  where o.id = operation_id and public.can_read_channel(o.channel)));
+
+-- ============================================================================
+-- 8. REALTIME
 -- ============================================================================
 do $do$
 declare t text;
@@ -1322,7 +1611,8 @@ begin
   foreach t in array array['profiles','messages','categories','channels',
                            'category_members','channel_members',
                            'operations','operation_entries','sidebar_order',
-                           'fukurou_chats','fukurou_msgs']
+                           'fukurou_chats','fukurou_msgs',
+                           'entities','entity_aliases','entity_operations']
   loop
     begin
       execute format('alter publication supabase_realtime add table public.%I', t);
@@ -1340,9 +1630,12 @@ alter table public.messages          replica identity full;
 alter table public.operations        replica identity full;
 alter table public.operation_entries replica identity full;
 alter table public.sidebar_order     replica identity full;
+alter table public.entities          replica identity full;
+alter table public.entity_aliases    replica identity full;
+alter table public.entity_operations replica identity full;
 
 -- ============================================================================
--- 8. RECARGA DO CACHE
+-- 9. RECARGA DO CACHE
 -- ============================================================================
 -- O PostgREST guarda um retrato do schema; sem este aviso, uma tabela ou
 -- função recém-criada pode demorar a aparecer para o site, com o erro

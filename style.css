@@ -800,3 +800,91 @@ mark{background:#45e3ff33;color:var(--cyan);padding:0 .1rem}
 @keyframes fk-some{0%{transform:scale(1.4);opacity:0}30%,60%{transform:none;opacity:1}100%{transform:translateY(-30vh) scale(.4);opacity:0}}
 @keyframes fk-pisca{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.05)}}
 .fk-trans.calmo,.fk-trans.calmo *{animation:none!important}
+
+/* ---------- entidades ---------- */
+/* A cor diz o tipo, no chip e no nó do grafo: é a mesma leitura nos dois
+   lugares, para quem viu a ficha reconhecer a bolinha na teia. */
+.k-pessoa{--k:var(--violet)}
+.k-local{--k:var(--gold)}
+.k-veiculo{--k:var(--blue)}
+.k-organizacao{--k:var(--cyan)}
+.k-informacao{--k:var(--dim)}
+.k-operacao{--k:var(--cyan)}
+
+.ent-foto{width:2.2rem;height:2.2rem;flex:none;display:grid;place-items:center;overflow:hidden;
+  background:#0a0622;border:1px solid var(--k,var(--line));border-radius:2px;position:relative}
+.ent-foto.xs{width:1.45rem;height:1.45rem;border-radius:50%}
+.ent-foto img{width:100%;height:100%;object-fit:cover;display:block}
+.ent-ini{font-family:'Chakra Petch',sans-serif;font-size:.6rem;letter-spacing:.04em;
+  color:var(--k,var(--dim));line-height:1}
+.ent-foto.xs .ent-ini{font-size:.5rem}
+.ent-foto.quebrado img{display:none}
+
+/* aviso de possível duplicata, logo abaixo do nome no cadastro */
+.ent-dup{border:1px solid var(--gold);border-left-width:2px;background:#ffc74d10;
+  padding:.6rem .7rem;display:grid;gap:.4rem}
+.ent-dup>b{color:var(--gold);font-size:.78rem;letter-spacing:.04em}
+.ent-dup-l{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;
+  border-top:1px dashed var(--line);padding-top:.4rem}
+.ent-dup-l:first-of-type{border-top:0;padding-top:0}
+.ent-dup-k{font-size:.6rem;color:var(--dim);border:1px solid var(--line);padding:0 .3rem;flex:none}
+.ent-dup-n{color:var(--text);font-weight:600}
+.ent-dup-a{color:var(--dim);font-size:.72rem;font-style:italic}
+.ent-dup-l .ghost{margin-left:auto}
+.ghost.sm{padding:.3rem .55rem;font-size:.72rem}
+
+/* o campo do dossiê que deixou de ser caixa de texto */
+.ent-campo{display:grid;gap:.35rem;margin:.2rem 0 .1rem}
+.ent-campo-l{font-size:.72rem;color:var(--dim);letter-spacing:.04em}
+.ent-chips{display:flex;flex-wrap:wrap;gap:.35rem}
+.ent-chip{display:inline-flex;align-items:center;gap:.4rem;background:var(--panel);
+  border:1px solid var(--line);border-left:2px solid var(--k,var(--line));
+  padding:.2rem .45rem .2rem .25rem;max-width:100%;min-width:0;text-align:left;color:var(--text)}
+.ent-chip:hover{border-color:var(--k,var(--cyan))}
+.ent-chip-n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:none;border:0;
+  color:inherit;padding:0;font:inherit;text-align:left;min-width:0}
+button.ent-chip-n:hover{color:var(--cyan);text-decoration:underline}
+.ent-chip-r{font-size:.64rem;color:var(--k,var(--dim));border:1px solid currentColor;
+  padding:0 .28rem;flex:none;opacity:.85}
+.ent-chip-p{width:7.5rem;flex:none;padding:.12rem .3rem;font-size:.68rem;background:var(--void)}
+.ent-chip-x{background:none;border:0;color:var(--dim);padding:0 .1rem;font-size:.72rem;flex:none}
+.ent-chip-x:hover{color:var(--danger)}
+.ent-chips.vista .ent-chip{cursor:pointer}
+
+/* busca do seletor */
+.ent-busca{position:relative}
+.ent-busca input{padding:.45rem .6rem;font-size:.8rem}
+.ent-res{position:absolute;left:0;right:0;top:calc(100% + 2px);z-index:5;max-height:15rem;
+  overflow:auto;background:var(--ink);border:1px solid var(--cyan);box-shadow:0 8px 30px #04020ccc}
+.ent-res-l{display:flex;align-items:center;gap:.5rem;width:100%;background:none;border:0;
+  border-bottom:1px solid var(--line);color:var(--text);padding:.4rem .5rem;text-align:left}
+.ent-res-l:last-child{border-bottom:0}
+.ent-res-l:hover{background:var(--panel);color:var(--cyan)}
+.ent-res-n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ent-res-k{margin-left:auto;font-size:.6rem;color:var(--dim);flex:none}
+.ent-res-l.nova{color:var(--cyan);font-size:.78rem;border-top:1px dashed var(--line)}
+
+/* tela de conversão do texto livre */
+.ent-rev{display:grid;gap:.5rem}
+.ent-rev-l{border:1px solid var(--line);border-left:2px solid var(--violet);
+  padding:.5rem .6rem;display:grid;gap:.4rem}
+.ent-rev-l.ignorada{opacity:.45;border-left-color:var(--dim)}
+.ent-rev-t{display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap}
+.ent-rev-c{font-size:.62rem;color:var(--dim);border:1px solid var(--line);padding:0 .3rem;flex:none}
+.ent-rev-x{color:var(--text);word-break:break-word}
+.ent-rev-o{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap}
+.ent-rev-o select{width:auto;flex:1;min-width:11rem;padding:.3rem .4rem;font-size:.75rem}
+.ent-rev-p{width:9rem;flex:none;padding:.3rem .4rem;font-size:.75rem}
+.ent-rev-e{font-size:.66rem;color:var(--gold)}
+
+/* miniatura de capa no cadastro de imagens */
+.anexo.capa{outline:1px solid var(--cyan);outline-offset:-1px}
+.anexo.capa::before{content:"capa";position:absolute;bottom:0;left:0;right:0;z-index:1;
+  background:#04020ccc;color:var(--cyan);font-size:.55rem;text-align:center;letter-spacing:.06em}
+.anexo-capa{position:absolute;bottom:2px;left:2px;background:#04020ccc;border:1px solid var(--line);
+  color:var(--dim);font-size:.6rem;line-height:1;padding:.15rem .3rem;cursor:pointer}
+.anexo-capa:hover{color:var(--gold);border-color:var(--gold)}
+
+/* o convite para converter o dossiê antigo não passa despercebido */
+.op-bar .ghost.conv{color:var(--gold);border-color:var(--gold);border-style:dashed}
+.op-bar .ghost.conv:hover{background:#ffc74d14;color:var(--gold);border-color:var(--gold)}

@@ -323,6 +323,15 @@ function listen() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'sidebar_order' }, reload)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'operations' }, p => window.OPS?.realtime?.('operations', p))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'operation_entries' }, p => window.OPS?.realtime?.('operation_entries', p))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'entities' }, () => {
+      window.ENT?.cache && Object.keys(window.ENT.cache).forEach(k => delete window.ENT.cache[k]);
+      window.OPS?.entidadeMudou?.();
+      window.TEIA?.recarrega?.();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'entity_operations' }, () => {
+      window.OPS?.entidadeMudou?.();
+      window.TEIA?.recarrega?.();
+    })
     .subscribe();
 }
 
