@@ -985,3 +985,8 @@ button.ent-chip-n:hover{color:var(--cyan);text-decoration:underline}
   .tw-grafo{position:relative;flex:1;min-height:14rem}
   .tw-legenda{position:static;padding:.4rem 1rem}
 }
+
+/* pontas do vínculo, no formulário */
+.tw-v-de{display:flex;align-items:baseline;gap:.3rem;flex-wrap:wrap;color:var(--dim);font-size:.82rem}
+.tw-v-de b{color:var(--cyan)}
+.tw-tools .primary.sm{white-space:nowrap}

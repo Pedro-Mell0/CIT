@@ -469,6 +469,29 @@ alcança. As demais não entram na consulta, então não há o que esconder ali.
 No dossiê, cada entidade vira uma ficha clicável nos campos de envolvidos:
 clicar nela leva direto ao nó dela na teia.
 
+
+### Criar e editar na própria teia
+
+**⬢ CRIAR NÓ**, no cabeçalho, cadastra a entidade e já a amarra a uma operação
+— na aba de uma operação, àquela; na Teia Geral, à que você escolher. Nó não
+nasce solto de propósito: entidade sem operação nenhuma é rascunho que só o
+autor enxerga, e é do vínculo com a operação que ele herda o sigilo.
+
+**+ VÍNCULO**, na ficha de qualquer nó, liga dois nós da vista atual — e só
+eles, porque o que está na tela é, por definição, o que você alcança. O vínculo
+tem **tipo**, **rótulo** opcional e **nível de confiança**. O mesmo par não
+entra duas vezes: tentar ligar de novo avisa que já existe e manda editar o que
+está lá.
+
+**Clicar numa linha** abre a ficha do vínculo, com observação, quem o criou e os
+botões de editar e excluir (do autor e do COMANDO/ADMIN). Linha que o sistema
+desenhou sozinho — entidade ligada à operação — não se edita ali: ela se desfaz
+tirando a entidade do dossiê, em ✎ Editar.
+
+**EXCLUIR NÓ**, na ficha da entidade, apaga o cadastro de todas as operações e
+desfaz os vínculos dela de uma vez. É do autor e do COMANDO/ADMIN, e não há
+desfazer.
+
 ## Busca
 
 **Ctrl+F** (ou o botão ⌕) varre mensagens, dossiês e relatos de **todos os canais que

@@ -275,6 +275,7 @@
         <div class="tw-tools">
           <button class="ghost tw-volta hide">← VOLTAR À TEIA GERAL</button>
           <button class="ghost tw-acesso hide" title="Quem pode abrir a Teia Geral">ACESSO</button>
+          <button class="primary sm tw-novo">⬢ CRIAR NÓ</button>
         </div>
       </header>
       <div class="tw-stat">
@@ -291,6 +292,7 @@
 
     root.querySelector('.tw-volta').onclick = () => openChannel('teia:geral');
     root.querySelector('.tw-acesso').onclick = painelAcesso;
+    root.querySelector('.tw-novo').onclick = criaNo;
   }
 
   function legenda() {
@@ -369,6 +371,7 @@
     }
 
     cy.on('tap', 'node', e => seleciona(e.target.id()));
+    cy.on('tap', 'edge', e => selecionaVinculo(e.target));
     cy.on('tap', evt => { if (evt.target === cy) limpaSelecao(); });
     cy.on('dbltap', 'node', e => {
       const id = e.target.id();
@@ -518,7 +521,9 @@
       await openChannel(op.channel);
       window.OPS?.focus?.(opId);
     };
-    pe.append(dossie);
+    const vinc = el('button', 'ghost sm', '+ VÍNCULO');
+    vinc.onclick = () => formVinculo(noOp(opId), null);
+    pe.append(dossie, vinc);
     corpo.append(pe);
   }
 
@@ -587,9 +592,263 @@
     relacionamentos(corpo, ligacoes, noEnt(entId));
 
     const pe = el('div', 'tw-p-pe');
-    const editar = el('button', 'ghost sm', 'ABRIR FICHA');
+    const editar = el('button', 'ghost sm', '✎ FICHA');
     editar.onclick = () => window.ENT.form(e, () => recarrega());
-    pe.append(editar);
+    const vinc = el('button', 'ghost sm', '+ VÍNCULO');
+    vinc.onclick = () => formVinculo(noEnt(entId), null);
+    pe.append(editar, vinc);
+    if (e.created_by === me.id || isStaff()) {
+      const rm = el('button', 'ghost sm danger', 'EXCLUIR NÓ');
+      rm.title = 'Apaga a entidade de todas as operações e desfaz os vínculos dela';
+      rm.onclick = async () => {
+        if (!confirm(`Excluir "${e.name}" de todas as operações, com os vínculos dela?`)) return;
+        const { error } = await sb.from('entities').delete().eq('id', entId);
+        if (error) return toast('Não foi possível excluir: ' + error.message, true);
+        limpaSelecao();
+        recarrega();
+      };
+      pe.append(rm);
+    }
+    corpo.append(pe);
+  }
+
+  // --------------------------------------------------- criar e editar
+  /**
+   * Nó novo. Ele não pode nascer solto: uma entidade sem operação nenhuma é
+   * rascunho que só o autor enxerga e que não aparece em teia alguma. Então
+   * aqui ela já sai amarrada a uma operação — a da aba, ou a escolhida na
+   * Teia Geral.
+   */
+  function criaNo() {
+    const escolhiveis = vista === 'geral' ? dados.ops : dados.ops.filter(o => o.id === vista);
+    if (!escolhiveis.length) {
+      return toast('Não há operação alcançável para receber o nó.', true);
+    }
+
+    const amarra = async (ent, opId, papel) => {
+      const { error } = await sb.from('entity_operations').insert({
+        entity_id: ent.id, operation_id: opId, slot: ent.kind === 'local' ? 'place' : 'other',
+        role: (papel || '').trim(), created_by: me.id,
+      });
+      if (error && error.code !== '23505') return toast('Falha ao vincular: ' + error.message, true);
+      await recarrega();
+      selecionaSeExiste(noEnt(ent.id));
+    };
+
+    if (escolhiveis.length === 1) {
+      return window.ENT.form(null, ent => amarra(ent, escolhiveis[0].id, ''));
+    }
+
+    // Na Teia Geral pergunta primeiro a que investigação o nó pertence: é o
+    // vínculo com a operação que decide quem vai poder enxergá-lo.
+    const m = modal('NÓ NOVO — EM QUE OPERAÇÃO?');
+    m.body.append(el('p', 'form-note',
+      'O nó nasce dentro de uma operação, e é dela que ele herda o sigilo. ' +
+      'Depois dá para ligá-lo a outras — e aí ele vira nó compartilhado.'));
+    const w = el('label', 'fld');
+    w.append(el('span', null, 'Operação'));
+    const sel = el('select');
+    escolhiveis.slice().sort((a, b) => a.title.localeCompare(b.title)).forEach(o => {
+      const op = el('option', null, o.title);
+      op.value = o.id;
+      sel.append(op);
+    });
+    w.append(sel);
+    m.body.append(w);
+    const papel = field(m.body, 'Papel nesta operação (opcional)', '', { ph: 'ex.: chefe, ponto de encontro' });
+
+    const seguir = el('button', 'primary', 'Continuar');
+    const cancelar = el('button', 'ghost', 'Cancelar');
+    cancelar.onclick = m.close;
+    m.foot.append(cancelar, seguir);
+    seguir.onclick = () => {
+      const opId = sel.value, pap = papel.value;
+      m.close();
+      window.ENT.form(null, ent => amarra(ent, opId, pap));
+    };
+  }
+
+  const selecionaSeExiste = id => { if (cy?.getElementById(id).length) seleciona(id); };
+
+  /** O formulário do vínculo manual. A outra ponta só pode ser um nó desta
+      vista — o que já está na tela é, por definição, o que o agente alcança. */
+  function formVinculo(deId, link) {
+    if (!cy) return;
+    const m = modal(link ? 'EDITAR VÍNCULO' : 'NOVO VÍNCULO');
+
+    const de = cy.getElementById(deId);
+    m.body.append(el('h4', 'form-block', 'PONTAS'));
+    const linha = el('p', 'tw-v-de');
+    linha.append(el('b', null, de.data('nome')), el('span', null, ' ⟷ '));
+    const alvoNome = el('b', null, '—');
+    linha.append(alvoNome);
+    m.body.append(linha);
+
+    let alvo = null;
+    if (link) {
+      const outro = link.source().id() === deId ? link.target() : link.source();
+      alvo = outro.id();
+      alvoNome.textContent = outro.data('nome');
+    } else {
+      const w = el('label', 'fld');
+      w.append(el('span', null, 'Ligar a'));
+      const sel = el('select');
+      const vazio = el('option', null, '— escolha o outro nó —');
+      vazio.value = '';
+      sel.append(vazio);
+      cy.nodes()
+        .filter(n => n.id() !== deId && n.id() !== 'fukurou')
+        .sort((a, b) => a.data('nome').localeCompare(b.data('nome')))
+        .forEach(n => {
+          const o = el('option', null, n.data('nome'));
+          o.value = n.id();
+          sel.append(o);
+        });
+      sel.onchange = () => {
+        alvo = sel.value || null;
+        alvoNome.textContent = alvo ? cy.getElementById(alvo).data('nome') : '—';
+      };
+      w.append(sel);
+      m.body.append(w);
+    }
+
+    m.body.append(el('h4', 'form-block', 'NATUREZA'));
+    const wTipo = el('label', 'fld');
+    wTipo.append(el('span', null, 'Tipo'));
+    const selTipo = el('select');
+    Object.entries(TIPO_VINC).forEach(([v, t]) => {
+      const o = el('option', null, t.nome.toUpperCase());
+      o.value = v;
+      selTipo.append(o);
+    });
+    selTipo.value = link?.data('tipo') || 'outro';
+    wTipo.append(selTipo);
+    m.body.append(wTipo);
+
+    const rotulo = field(m.body, 'Rótulo (opcional)', link?.data('rotulo') || '',
+      { ph: 'o que aparece na linha: "irmão", "sócio"...' });
+
+    const wConf = el('label', 'fld');
+    wConf.append(el('span', null, 'Nível de confiança'));
+    const selConf = el('select');
+    Object.entries(CONF).forEach(([v, t]) => {
+      const o = el('option', null, t.toUpperCase());
+      o.value = v;
+      selConf.append(o);
+    });
+    selConf.value = link?.data('conf') || 'provavel';
+    wConf.append(selConf);
+    m.body.append(wConf);
+
+    const atual = link?.data('linkId') && dados.links.find(l => l.id === link.data('linkId'));
+    const nota = field(m.body, 'Observação', atual?.note || '', { area: true });
+
+    const salvar = el('button', 'primary', link ? 'Salvar' : 'Criar vínculo');
+    const cancelar = el('button', 'ghost', 'Cancelar');
+    cancelar.onclick = m.close;
+    m.foot.append(cancelar, salvar);
+
+    salvar.onclick = async () => {
+      if (!alvo) return toast('Escolha o outro nó do vínculo.', true);
+      salvar.disabled = true;
+      const campos = {
+        type: selTipo.value, label: rotulo.value.trim(),
+        confidence: selConf.value, note: nota.value.trim(),
+      };
+      let error;
+      if (atual) {
+        ({ error } = await sb.from('links').update(campos).eq('id', atual.id));
+      } else {
+        // Ordem fixa das pontas: é o que faz o índice único valer e impede o
+        // mesmo par entrar duas vezes, uma em cada sentido.
+        const [a, b] = ordena(parte(deId), parte(alvo));
+        ({ error } = await sb.from('links').insert({
+          a_kind: a.kind, a_id: a.id, b_kind: b.kind, b_id: b.id,
+          created_by: me.id, ...campos,
+        }));
+      }
+      salvar.disabled = false;
+      if (error) {
+        return toast(error.code === '23505'
+          ? 'Esses dois nós já estão ligados. Edite o vínculo que existe.'
+          : 'Falha ao salvar: ' + error.message, true);
+      }
+      m.close();
+      await recarrega();
+      selecionaSeExiste(deId);
+    };
+  }
+
+  /** Ficha da aresta: só o vínculo digitado tem o que editar. O que o sistema
+      desenhou sozinho — entidade ligada à operação — se desfaz no dossiê. */
+  function selecionaVinculo(aresta) {
+    selecionado = null;
+    cy.elements().addClass('apagado').removeClass('foco');
+    aresta.removeClass('apagado').addClass('foco');
+    aresta.connectedNodes().removeClass('apagado');
+
+    const painel = root.querySelector('.tw-painel');
+    painel.innerHTML = '';
+    painel.classList.remove('hide');
+
+    const head = el('header', 'tw-p-head');
+    head.append(el('b', null, '« VÍNCULO'));
+    const x = el('button', 'ghost', '✕');
+    x.setAttribute('aria-label', 'Fechar');
+    x.onclick = limpaSelecao;
+    head.append(x);
+    painel.append(head);
+
+    const corpo = el('div', 'tw-p-corpo');
+    painel.append(corpo);
+
+    const a = aresta.source(), b = aresta.target();
+    const par = el('p', 'tw-p-nome');
+    par.textContent = a.data('nome') + '  ⟷  ' + b.data('nome');
+    corpo.append(par);
+
+    const linkId = aresta.data('linkId');
+    const bruto = linkId && dados.links.find(l => l.id === linkId);
+
+    if (!bruto) {
+      corpo.append(el('p', 'tw-p-sub', 'DETECTADO AUTOMATICAMENTE'));
+      corpo.append(el('p', 'tw-p-res', aresta.data('tipo') === 'operacao'
+        ? 'A entidade está vinculada a esta operação pelo dossiê. Para desfazer, ' +
+          'tire-a do dossiê em ✎ Editar.'
+        : 'Ligação da operação com o centro da teia.'));
+      if (aresta.hasClass('compartilhado')) {
+        corpo.append(el('p', 'tw-p-alerta',
+          '⚠ esta entidade aparece em mais de uma operação que você alcança.'));
+      }
+      return;
+    }
+
+    corpo.append(el('p', 'tw-p-sub',
+      (TIPO_VINC[bruto.type]?.nome || bruto.type) + ' · ' + (CONF[bruto.confidence] || bruto.confidence)));
+    if (bruto.label) corpo.append(el('p', 'tw-p-ape', '“' + bruto.label + '”'));
+    if (bruto.note) {
+      const d = el('div', 'tw-p-res md');
+      d.append(MD.render(bruto.note));
+      corpo.append(d);
+    }
+    corpo.append(el('p', 'tw-p-sub',
+      'por ' + (people[bruto.created_by]?.codename || '[removido]')));
+
+    const pe = el('div', 'tw-p-pe');
+    const ed = el('button', 'ghost sm', '✎ EDITAR');
+    ed.onclick = () => formVinculo(a.id(), aresta);
+    pe.append(ed);
+    if (bruto.created_by === me.id || isStaff()) {
+      const rm = el('button', 'ghost sm danger', 'EXCLUIR');
+      rm.onclick = async () => {
+        if (!confirm('Excluir este vínculo?')) return;
+        const { error } = await sb.from('links').delete().eq('id', bruto.id);
+        if (error) return toast('Não foi possível excluir: ' + error.message, true);
+        limpaSelecao();
+        recarrega();
+      };
+      pe.append(rm);
+    }
     corpo.append(pe);
   }
 
