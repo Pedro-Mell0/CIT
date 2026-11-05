@@ -1893,9 +1893,9 @@ begin
     -- acabou de criar o vínculo não é avisado — ele já viu acontecer.
     insert into public.notices (profile_id, kind, entity_id, pair_key)
     select q.p, 'conexao', new.entity_id, chave
-      from (select public.leitores_do_canal(canal_novo) as p
+      from (select p from public.leitores_do_canal(canal_novo) p
             union
-            select public.leitores_do_canal(outra.channel)) q
+            select p from public.leitores_do_canal(outra.channel) p) q
      where q.p is not null
        and (autor is null or q.p <> autor)
     on conflict do nothing;
