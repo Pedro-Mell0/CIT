@@ -1314,7 +1314,7 @@ exception when others then
 end $do$;
 
 -- ============================================================================
--- 7. TEIA DE VÍNCULOS — ENTIDADES
+-- 7. TEIA DE VÍNCULOS
 -- ============================================================================
 -- Tudo que a apuração consegue identificar deixa de ser texto solto no dossiê e
 -- passa a ser uma entidade com id próprio: a mesma pessoa, o mesmo local e o
@@ -1602,6 +1602,191 @@ create policy ento_delete on public.entity_operations for delete to authenticate
   using (exists (select 1 from public.operations o
                   where o.id = operation_id and public.can_read_channel(o.channel)));
 
+
+-- ----------------------------------------------------------------------------
+-- O GRAFO
+-- ----------------------------------------------------------------------------
+-- O nó da teia é de dois tipos: a entidade (acima) e a própria operação, que
+-- continua sendo a linha de `operations` — não existe cópia dela aqui. Por isso
+-- a ponta de um vínculo é um par (tipo, id) em vez de chave estrangeira: dá
+-- para ligar entidade a entidade, entidade a operação e operação a operação com
+-- uma tabela só, e o sigilo de cada ponta continua sendo o da tabela de origem.
+--
+-- O nó FUKUROU, o centro da Teia Geral, não está em tabela nenhuma: ele é
+-- montado na tela. Gravá-lo exigiria dar acesso de leitura a ele para todo
+-- mundo, e um nó que todos enxergam é exatamente o que esta feature não quer.
+
+-- Resolve a ponta: cada tipo de nó pergunta ao seu próprio dono de sigilo.
+create or replace function public.can_see_node(k text, i uuid)
+returns boolean language plpgsql stable security definer set search_path = public as $fn$
+begin
+  if i is null then return false; end if;
+  if k = 'ent' then return public.can_see_entity(i); end if;
+  if k = 'op'  then
+    return exists (select 1 from public.operations o
+                    where o.id = i and public.can_read_channel(o.channel));
+  end if;
+  return false;
+end $fn$;
+
+-- ---------- vínculos ----------
+create table if not exists public.links (
+  id         uuid primary key default gen_random_uuid(),
+  a_kind     text not null,
+  a_id       uuid not null,
+  b_kind     text not null,
+  b_id       uuid not null,
+  type       text not null default 'outro',
+  label      text not null default '',
+  confidence text not null default 'provavel',
+  note       text not null default '',
+  created_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.links drop constraint if exists links_kind_check;
+alter table public.links add constraint links_kind_check
+  check (a_kind in ('ent','op') and b_kind in ('ent','op'));
+
+alter table public.links drop constraint if exists links_type_check;
+alter table public.links add constraint links_type_check
+  check (type in ('comando','familia','local','financeiro','social','outro'));
+
+alter table public.links drop constraint if exists links_conf_check;
+alter table public.links add constraint links_conf_check
+  check (confidence in ('confirmado','provavel','suposto'));
+
+-- Um nó não se liga a si mesmo, e o mesmo par não entra duas vezes. O site
+-- grava sempre na mesma ordem (ver `ordena` em teia.js) para esta unicidade
+-- valer de verdade.
+alter table public.links drop constraint if exists links_sem_laco;
+alter table public.links add constraint links_sem_laco
+  check (not (a_kind = b_kind and a_id = b_id));
+
+create unique index if not exists links_par_idx
+  on public.links (a_kind, a_id, b_kind, b_id);
+create index if not exists links_a_idx on public.links (a_kind, a_id);
+create index if not exists links_b_idx on public.links (b_kind, b_id);
+
+drop trigger if exists links_touch on public.links;
+create trigger links_touch before update on public.links
+  for each row execute function public.touch_updated_at();
+
+-- ---------- posição dos nós ----------
+-- A teia é um quadro de investigação: onde cada nó foi parar é informação, e
+-- vale para todo mundo que abre a mesma aba — como a ordem da barra lateral.
+create table if not exists public.node_positions (
+  view_key   text not null,            -- 'geral' ou 'op:<uuid>'
+  node_kind  text not null,
+  node_id    uuid not null,
+  x          double precision not null,
+  y          double precision not null,
+  updated_by uuid references public.profiles(id) on delete set null,
+  updated_at timestamptz not null default now(),
+  primary key (view_key, node_kind, node_id)
+);
+
+-- ---------- quem entra na Teia Geral ----------
+-- A teia individual de uma operação segue o sigilo do canal dela: quem lê o
+-- canal, abre a aba. A Teia Geral é outra coisa — ela mostra de uma vez o
+-- desenho de todas as investigações que o agente alcança, e isso é um poder
+-- à parte. ADMIN e MASTER têm sempre; os demais, só por concessão, feita
+-- dentro da própria página do grafo.
+--
+-- A concessão abre a porta, não derruba a parede: lá dentro o RLS continua
+-- valendo nó por nó, e quem entra vê só o que já alcançava pelos canais.
+create table if not exists public.teia_geral_access (
+  profile_id uuid primary key references public.profiles(id) on delete cascade,
+  granted_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create or replace function public.can_see_teia_geral()
+returns boolean language sql stable security definer set search_path = public as $fn$
+  select public.is_admin()
+      or exists (select 1 from public.teia_geral_access where profile_id = auth.uid())
+$fn$;
+
+-- ---------- faxina ----------
+-- Vínculo não tem chave estrangeira (a ponta é polimórfica), então quem apaga
+-- as sobras é gatilho. Sem isto, apagar uma operação deixaria aresta solta
+-- apontando para um nó que não existe mais.
+create or replace function public.limpa_no()
+returns trigger language plpgsql security definer set search_path = public as $fn$
+declare k text := tg_argv[0];
+begin
+  delete from public.links
+   where (a_kind = k and a_id = old.id) or (b_kind = k and b_id = old.id);
+  delete from public.node_positions where node_kind = k and node_id = old.id;
+  return old;
+end $fn$;
+
+drop trigger if exists entities_limpa_no on public.entities;
+create trigger entities_limpa_no after delete on public.entities
+  for each row execute function public.limpa_no('ent');
+
+drop trigger if exists operations_limpa_no on public.operations;
+create trigger operations_limpa_no after delete on public.operations
+  for each row execute function public.limpa_no('op');
+
+-- Apagada a operação, a aba individual dela some — e com ela as posições que
+-- só faziam sentido naquela aba.
+create or replace function public.limpa_aba_da_operacao()
+returns trigger language plpgsql security definer set search_path = public as $fn$
+begin
+  delete from public.node_positions where view_key = 'op:' || old.id::text;
+  return old;
+end $fn$;
+
+drop trigger if exists operations_limpa_aba on public.operations;
+create trigger operations_limpa_aba after delete on public.operations
+  for each row execute function public.limpa_aba_da_operacao();
+
+-- ---------- RLS do grafo ----------
+alter table public.links             enable row level security;
+alter table public.node_positions    enable row level security;
+alter table public.teia_geral_access enable row level security;
+
+do $do$
+declare t text; p text;
+begin
+  foreach t in array array['links','node_positions','teia_geral_access'] loop
+    for p in select policyname from pg_policies
+              where schemaname = 'public' and tablename = t loop
+      execute format('drop policy %I on public.%I', p, t);
+    end loop;
+  end loop;
+end $do$;
+
+-- As DUAS pontas precisam ser visíveis. É esta linha que impede descobrir uma
+-- operação sigilosa pela aresta que chega nela: sem acesso à outra ponta, o
+-- vínculo simplesmente não existe para quem está olhando.
+create policy link_read on public.links for select to authenticated
+  using (public.can_see_node(a_kind, a_id) and public.can_see_node(b_kind, b_id));
+create policy link_insert on public.links for insert to authenticated
+  with check (created_by = auth.uid()
+              and public.can_see_node(a_kind, a_id) and public.can_see_node(b_kind, b_id));
+create policy link_update on public.links for update to authenticated
+  using (public.can_see_node(a_kind, a_id) and public.can_see_node(b_kind, b_id))
+  with check (public.can_see_node(a_kind, a_id) and public.can_see_node(b_kind, b_id));
+create policy link_delete on public.links for delete to authenticated
+  using (public.can_see_node(a_kind, a_id) and public.can_see_node(b_kind, b_id)
+         and (created_by = auth.uid() or public.is_staff()));
+
+create policy pos_read  on public.node_positions for select to authenticated
+  using (public.can_see_node(node_kind, node_id));
+create policy pos_write on public.node_positions for all to authenticated
+  using (public.can_see_node(node_kind, node_id))
+  with check (public.can_see_node(node_kind, node_id));
+
+-- O agente enxerga a própria linha — é assim que o site sabe se mostra ou não
+-- a entrada da Teia Geral na barra. A lista inteira, só o ADMIN vê.
+create policy teia_acc_read  on public.teia_geral_access for select to authenticated
+  using (public.is_admin() or profile_id = auth.uid());
+create policy teia_acc_write on public.teia_geral_access for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
 -- ============================================================================
 -- 8. REALTIME
 -- ============================================================================
@@ -1612,7 +1797,8 @@ begin
                            'category_members','channel_members',
                            'operations','operation_entries','sidebar_order',
                            'fukurou_chats','fukurou_msgs',
-                           'entities','entity_aliases','entity_operations']
+                           'entities','entity_aliases','entity_operations',
+                           'links','node_positions','teia_geral_access']
   loop
     begin
       execute format('alter publication supabase_realtime add table public.%I', t);
@@ -1633,6 +1819,9 @@ alter table public.sidebar_order     replica identity full;
 alter table public.entities          replica identity full;
 alter table public.entity_aliases    replica identity full;
 alter table public.entity_operations replica identity full;
+alter table public.links             replica identity full;
+alter table public.node_positions    replica identity full;
+alter table public.teia_geral_access replica identity full;
 
 -- ============================================================================
 -- 9. RECARGA DO CACHE
