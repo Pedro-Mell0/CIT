@@ -1589,10 +1589,18 @@ create policy enta_write on public.entity_aliases for all to authenticated
 create policy ento_read on public.entity_operations for select to authenticated
   using (exists (select 1 from public.operations o
                   where o.id = operation_id and public.can_read_channel(o.channel)));
+-- `channel like 'chan:%'` é a regra "agente não cria teia" escrita onde ela
+-- vale de verdade. O outro prefixo, `agent:<id>`, é o espaço privado entre um
+-- agente e o comando — anotação pessoal, não investigação. Se uma entidade
+-- pudesse morar lá, o gatilho de detecção chamaria `leitores_do_canal` nesse
+-- canal, que devolve o agente MAIS todo o comando: um dossiê pessoal avisaria
+-- a chefia inteira de uma conexão. Esconder o botão na tela não resolveria.
 create policy ento_insert on public.entity_operations for insert to authenticated
   with check (created_by = auth.uid()
               and exists (select 1 from public.operations o
-                           where o.id = operation_id and public.can_read_channel(o.channel)));
+                           where o.id = operation_id
+                             and o.channel like 'chan:%'
+                             and public.can_read_channel(o.channel)));
 create policy ento_update on public.entity_operations for update to authenticated
   using (exists (select 1 from public.operations o
                   where o.id = operation_id and public.can_read_channel(o.channel)))

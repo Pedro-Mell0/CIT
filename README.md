@@ -380,9 +380,10 @@ entidade pelo nome ou apelido e escolhe, ou cadastra na hora pelo
 A mesma pessoa pode ser chefe numa operação e testemunha em outra sem virar
 dois cadastros: o tipo é da entidade, o papel é da ligação.
 
-Cada entidade tem tipo, nome, **sigla** (a legenda do nó no grafo), apelidos,
-resumo, tags e imagens. A primeira imagem é a miniatura do nó. Ficam num bucket
-privado próprio (`entidades`), servido por URL assinada de 1 hora.
+Cada entidade tem tipo, nome, **sigla** (a legenda nas fichas e nos chips do
+dossiê), apelidos, resumo, tags e imagens. A primeira imagem é a miniatura do
+nó. Ficam num bucket privado próprio (`entidades`), servido por URL assinada de
+1 hora.
 
 **Possível duplicata**: ao digitar o nome, o site procura cadastro parecido —
 por nome e por apelido — e avisa antes de você criar o segundo. A procura varre
@@ -434,6 +435,11 @@ meio. A aba **aparece sozinha** quando a operação é criada, porque a lista sa
 das operações que você enxerga, não de um cadastro à parte. Dentro dela, um
 botão volta à Teia Geral.
 
+Só dossiê de **canal** vira teia. O dossiê que mora no espaço privado entre um
+agente e o comando é anotação pessoal: não ganha aba, não aparece na Teia
+Geral e não oferece o botão de converter em entidades. A regra vale no
+servidor — a policy `ento_insert` recusa ligar entidade a um dossiê desses.
+
 A Teia Geral é **restrita**: ADMIN e MASTER entram sempre, os demais só por
 concessão, feita no botão **ACESSO** dentro da própria página. A concessão abre
 a porta, não derruba a parede — lá dentro o RLS continua valendo nó por nó, e
@@ -444,8 +450,10 @@ de uma operação segue o sigilo do canal dela: quem lê o canal, abre a aba.
 
 A **forma e a cor** do nó dizem o tipo: pessoa em violeta, local em dourado,
 veículo em azul, organização em ciano, informação em cinza, operação em ciano
-no formato redondo. Sem foto, o nó mostra a sigla; com foto, a miniatura. Nó de
-operação sigilosa vem com borda dupla vermelha.
+no formato redondo. Com foto, o nó mostra a miniatura; sem foto, um ícone do
+tipo — vulto para pessoa, alfinete para local, carro para veículo, prédio para
+organização, dossiê para operação. Nó de operação sigilosa vem com borda dupla
+vermelha.
 
 A **cor da linha** diz o tipo do vínculo — comando, família, local/patrimônio,
 financeiro, social — e o **traço** diz a confiança: cheio é *confirmado*,

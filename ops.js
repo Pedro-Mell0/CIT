@@ -26,6 +26,11 @@
 
   let curChan = null, ops = [], sel = null, entries = [], vincs = [];
 
+  // Entidade existe para cruzar investigações, e quem cruza é canal. O espaço
+  // privado do agente com o comando (`agent:<id>`) guarda anotação pessoal:
+  // não tem teia, logo não tem o que cadastrar nem o que converter ali.
+  const canalDeTeia = () => !!curChan && curChan.startsWith('chan:');
+
   // ---------- dados ----------
   async function load() {
     if (!curChan || curChan === 'manage' || curChan.startsWith('teia:')) {
@@ -102,7 +107,7 @@
     bar.append(edit, add, pdf);
     // Dossiê antigo, ainda com suspeitos e local digitados à mão: o convite
     // para transformá-los em entidades fica aqui, e não some até ser feito.
-    if (!op.entities_at && window.ENT) {
+    if (!op.entities_at && window.ENT && canalDeTeia()) {
       const conv = el('button', 'ghost conv', '⇄ CONVERTER EM ENTIDADES');
       conv.title = 'Transformar o texto livre deste dossiê em entidades com id próprio';
       conv.onclick = () => window.ENT.revisar(op, () => load());
@@ -525,7 +530,7 @@
   async function form(op) {
     // Operação nova já nasce com entidades; a antiga só passa a usá-las
     // depois de convertida, para o texto que está lá não sumir da tela.
-    const comEntidades = !!window.ENT && (!op || !!op.entities_at);
+    const comEntidades = !!window.ENT && canalDeTeia() && (!op || !!op.entities_at);
     const ligacoes = comEntidades && op ? await window.ENT.vinculosDa(op.id) : [];
 
     const m = modal(op ? 'EDITAR OPERAÇÃO' : 'NOVA OPERAÇÃO');

@@ -54,24 +54,66 @@
   }
 
   // ---------------------------------------------------------------- desenho
-  /** Miniatura de quem não tem foto: a sigla dentro do nó, como no quadro. */
   const escapaXml = t => String(t)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-  function svgSigla(texto, cor) {
-    const t = escapaXml((texto || '?').slice(0, 4));
+  const FUNDO = '#0a0622';
+
+  /**
+   * Miniatura de quem não tem foto. Desenho vetorial, e não texto: fonte dentro
+   * de data-URI não carrega, o navegador cai numa qualquer e era isso que
+   * desenquadrava a sigla dentro do nó.
+   *
+   * Todo traço cabe numa caixa central de 44×44, que entra inteira no círculo,
+   * no retângulo, no hexágono e no losango — as formas que a teia usa. Sem isso,
+   * o que serve ao círculo vaza pela ponta do losango.
+   */
+  function svgNo(kind, cor) {
+    const c = escapaXml(cor);
+    const corpo = {
+      operacao:
+        `<path d="M24 20h20l14 13v27H24z" fill="${c}"/>` +
+        `<path d="M44 20l14 13H44z" fill="${FUNDO}" opacity=".5"/>` +
+        `<rect x="31" y="40" width="18" height="3" fill="${FUNDO}"/>` +
+        `<rect x="31" y="47" width="18" height="3" fill="${FUNDO}"/>` +
+        `<rect x="31" y="54" width="11" height="3" fill="${FUNDO}"/>`,
+      pessoa:
+        `<circle cx="40" cy="32" r="11" fill="${c}"/>` +
+        `<path d="M21 62c0-10.5 8.5-19 19-19s19 8.5 19 19z" fill="${c}"/>`,
+      local:
+        `<path d="M40 19c-8.3 0-15 6.7-15 15 0 11.2 15 28 15 28s15-16.8 15-28` +
+        ` c0-8.3-6.7-15-15-15z" fill="${c}"/>` +
+        `<circle cx="40" cy="33.5" r="6" fill="${FUNDO}"/>`,
+      veiculo:
+        `<path d="M21 45l5-13h28l5 13v9H21z" fill="${c}"/>` +
+        `<path d="M29 43l3-8h16l3 8z" fill="${FUNDO}"/>` +
+        `<circle cx="30" cy="55" r="5" fill="${c}"/>` +
+        `<circle cx="50" cy="55" r="5" fill="${c}"/>`,
+      organizacao:
+        `<path d="M23 26h19v36H23z" fill="${c}"/>` +
+        `<path d="M42 38h15v24H42z" fill="${c}"/>` +
+        `<g fill="${FUNDO}">` +
+        `<rect x="28" y="32" width="4" height="5"/><rect x="34" y="32" width="4" height="5"/>` +
+        `<rect x="28" y="42" width="4" height="5"/><rect x="34" y="42" width="4" height="5"/>` +
+        `<rect x="28" y="52" width="4" height="5"/><rect x="34" y="52" width="4" height="5"/>` +
+        `<rect x="46" y="44" width="4" height="5"/><rect x="51" y="44" width="4" height="5"/>` +
+        `<rect x="46" y="53" width="4" height="5"/><rect x="51" y="53" width="4" height="5"/>` +
+        `</g>`,
+      informacao:
+        `<circle cx="40" cy="40" r="19" fill="${c}"/>` +
+        `<circle cx="40" cy="31" r="3.4" fill="${FUNDO}"/>` +
+        `<rect x="37" y="37" width="6" height="15" rx="2.4" fill="${FUNDO}"/>`,
+    }[kind] || `<circle cx="40" cy="40" r="15" fill="${c}"/>`;
+
     const svg =
-      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">` +
-      `<rect width="80" height="80" fill="#0a0622"/>` +
-      `<text x="40" y="40" fill="${cor}" font-family="Chakra Petch,sans-serif" ` +
-      `font-size="${t.length > 3 ? 20 : t.length > 2 ? 24 : 30}" font-weight="700" ` +
-      `letter-spacing="1" text-anchor="middle" dominant-baseline="central">${t}</text></svg>`;
+      `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80">` +
+      `<rect width="80" height="80" fill="${FUNDO}"/>${corpo}</svg>`;
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
   }
 
   function svgCoruja() {
     const svg =
-      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">` +
+      `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">` +
       `<rect width="64" height="64" fill="#0a0622"/>` +
       `<g fill="none" stroke="#9b5cff" stroke-width="2.5" stroke-linejoin="round">` +
       `<path d="M8 6l12 8h24l12-8v26c0 16-10 26-24 26S8 48 8 32z"/>` +
@@ -150,10 +192,17 @@
         // exige enxergar as duas operações.
         sb.from('auto_connections').select('*'),
       ]);
-      // Canal com trava de código ainda não liberada nesta sessão fica de fora,
-      // pela mesma razão da busca: o nó entregaria justamente o que a trava
-      // esconde. A parede continua sendo o RLS; isto é a porta.
-      dados.ops = (o.data || []).filter(x => !window.LOCKS?.travaPendente?.(x.channel));
+      // Só canal de verdade vira teia. `operations.channel` também guarda
+      // `agent:<id>`, que é o espaço privado entre um agente e o comando: o
+      // dossiê que mora lá é anotação pessoal, não investigação, e não tem
+      // teia. Sem este corte a barra lateral enchia de "teia do AKILE".
+      //
+      // Canal com trava de código ainda não liberada nesta sessão também fica
+      // de fora, pela mesma razão da busca: o nó entregaria justamente o que a
+      // trava esconde. A parede continua sendo o RLS; isto é a porta.
+      dados.ops = (o.data || []).filter(x =>
+        String(x.channel || '').startsWith('chan:') &&
+        !window.LOCKS?.travaPendente?.(x.channel));
       // Só as ligações das operações que ficaram de pé: senão uma operação
       // atrás de trava ainda contaria para o "aparece em mais de uma".
       const visiveis = new Set(dados.ops.map(x => x.id));
@@ -224,7 +273,7 @@
         data: {
           id: noOp(o.id), nome: o.title, kind: 'operacao', cor,
           forma: TIPO_NO.operacao.forma, tam: geral ? 34 : 40,
-          img: svgSigla(window.ENT.sigla(o.title), cor), nivel: 1,
+          img: svgNo('operacao', cor), nivel: 1,
           status: o.status, canal: o.channel,
         },
         classes: sigilosa(o) ? 'sigiloso' : '',
@@ -245,7 +294,7 @@
       const capa = e.images?.[0] && dados.fotos[e.images[0]];
       nos.push({ data: {
         id: noEnt(id), nome: e.name, kind: e.kind, cor: t.cor, forma: t.forma,
-        tam: 28, img: capa || svgSigla(e.abbr || window.ENT.sigla(e.name), t.cor), nivel: 2,
+        tam: 28, img: capa || svgNo(e.kind, t.cor), nivel: 2,
       } });
     });
 
