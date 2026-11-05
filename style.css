@@ -1019,3 +1019,27 @@ button.ent-chip-n:hover{color:var(--cyan);text-decoration:underline}
 .tw-conex .obs{font-size:.72rem;color:var(--dim);font-style:italic}
 .tw-conex .acoes{display:flex;gap:.3rem;flex-wrap:wrap}
 .tw-conex .acoes .ghost{padding:.18rem .4rem;font-size:.66rem}
+
+/* ---------- busca e filtros da teia ---------- */
+.tw-caixa{padding:.6rem 1rem;border-bottom:1px solid var(--line);background:#0b072655;
+  display:grid;gap:.6rem;max-height:40vh;overflow:auto;flex:none}
+.tw-filtros.ativo{color:var(--gold);border-color:var(--gold)}
+.tw-filtros.ativo::after{content:" ●";font-size:.5rem;vertical-align:middle}
+
+.tw-q{padding:.45rem .6rem}
+.tw-q-res{display:grid}
+.tw-q-l{display:flex;gap:.6rem;align-items:baseline;background:none;border:0;
+  border-bottom:1px solid #2a217055;color:var(--text);padding:.3rem .2rem;text-align:left;
+  font-size:.78rem;width:100%}
+.tw-q-l:hover{background:var(--panel);color:var(--cyan)}
+.tw-q-l .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tw-q-l .k{margin-left:auto;font-size:.62rem;color:var(--dim);flex:none;letter-spacing:.06em}
+.tw-q-nada{color:var(--dim);font-size:.74rem;padding:.3rem .2rem}
+
+.tw-f-grupo{display:grid;gap:.3rem}
+.tw-f-grupo h5{font-size:.6rem;letter-spacing:.12em;color:var(--dim);font-weight:400}
+.tw-f-itens{display:flex;flex-wrap:wrap;gap:.3rem .9rem}
+.tw-f-i{display:inline-flex;align-items:center;gap:.35rem;font-size:.72rem;cursor:pointer}
+.tw-f-i input{width:auto;padding:0;margin:0}
+.tw-f-i i{width:10px;height:10px;border-radius:2px;display:block;flex:none}
+.tw-caixa>.ghost{justify-self:start}

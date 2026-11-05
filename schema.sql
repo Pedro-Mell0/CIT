@@ -1708,6 +1708,21 @@ returns boolean language sql stable security definer set search_path = public as
       or exists (select 1 from public.teia_geral_access where profile_id = auth.uid())
 $fn$;
 
+-- A aba a que uma posição pertence: 'geral' ou 'op:<uuid>'.
+create or replace function public.can_see_view(v text)
+returns boolean language plpgsql stable security definer set search_path = public as $fn$
+declare alvo uuid;
+begin
+  if v = 'geral' then return public.can_see_teia_geral(); end if;
+  if v like 'op:%' then
+    alvo := public.uuid_ou_nulo(substring(v from 4));
+    if alvo is null then return false; end if;
+    return exists (select 1 from public.operations o
+                    where o.id = alvo and public.can_read_channel(o.channel));
+  end if;
+  return false;
+end $fn$;
+
 -- ---------- faxina ----------
 -- Vínculo não tem chave estrangeira (a ponta é polimórfica), então quem apaga
 -- as sobras é gatilho. Sem isto, apagar uma operação deixaria aresta solta
@@ -1774,11 +1789,14 @@ create policy link_delete on public.links for delete to authenticated
   using (public.can_see_node(a_kind, a_id) and public.can_see_node(b_kind, b_id)
          and (created_by = auth.uid() or public.is_staff()));
 
+-- Ver o nó não basta: a ABA também tem dono. Sem esta segunda metade, uma
+-- linha de posição de um nó que o agente alcança, gravada na aba de uma
+-- operação sigilosa, entregaria o id daquela operação pelo `view_key`.
 create policy pos_read  on public.node_positions for select to authenticated
-  using (public.can_see_node(node_kind, node_id));
+  using (public.can_see_view(view_key) and public.can_see_node(node_kind, node_id));
 create policy pos_write on public.node_positions for all to authenticated
-  using (public.can_see_node(node_kind, node_id))
-  with check (public.can_see_node(node_kind, node_id));
+  using (public.can_see_view(view_key) and public.can_see_node(node_kind, node_id))
+  with check (public.can_see_view(view_key) and public.can_see_node(node_kind, node_id));
 
 -- O agente enxerga a própria linha — é assim que o site sabe se mostra ou não
 -- a entrada da Teia Geral na barra. A lista inteira, só o ADMIN vê.

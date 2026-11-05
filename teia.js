@@ -38,6 +38,10 @@
   let selecionado = null;
   let dados = { ops: [], vincs: [], links: [], pos: {}, fotos: {}, conexoes: [] };
   let carregando = false;
+  // `null` em qualquer um quer dizer "tudo": é o estado de quem nunca mexeu
+  // nos filtros, e evita ter de encher três conjuntos a cada carregamento.
+  let filtros = { tipos: null, vincs: null, ops: null };
+  const filtrando = () => !!(filtros.tipos || filtros.vincs || filtros.ops);
 
   const chaveVista = () => (vista === 'geral' ? 'geral' : 'op:' + vista);
   const noOp  = id => 'op:' + id;
@@ -146,8 +150,14 @@
         // exige enxergar as duas operações.
         sb.from('auto_connections').select('*'),
       ]);
-      dados.ops = o.data || [];
-      dados.vincs = eo.data || [];
+      // Canal com trava de código ainda não liberada nesta sessão fica de fora,
+      // pela mesma razão da busca: o nó entregaria justamente o que a trava
+      // esconde. A parede continua sendo o RLS; isto é a porta.
+      dados.ops = (o.data || []).filter(x => !window.LOCKS?.travaPendente?.(x.channel));
+      // Só as ligações das operações que ficaram de pé: senão uma operação
+      // atrás de trava ainda contaria para o "aparece em mais de uma".
+      const visiveis = new Set(dados.ops.map(x => x.id));
+      dados.vincs = (eo.data || []).filter(v => visiveis.has(v.operation_id));
       dados.links = ln.data || [];
       dados.conexoes = cx.data || [];
       dados.pos = {};
@@ -187,7 +197,8 @@
   function monta() {
     const nos = [], arestas = [];
     const geral = vista === 'geral';
-    const ops = geral ? dados.ops : dados.ops.filter(o => o.id === vista);
+    let ops = geral ? dados.ops : dados.ops.filter(o => o.id === vista);
+    if (geral && filtros.ops) ops = ops.filter(o => filtros.ops.has(o.id));
     if (!ops.length) return { nos, arestas };
 
     const idsOps = new Set(ops.map(o => o.id));
@@ -229,6 +240,7 @@
     idsEnts.forEach(id => {
       const e = window.ENT.cache[id];
       if (!e) return;
+      if (filtros.tipos && !filtros.tipos.has(e.kind)) { idsEnts.delete(id); return; }
       const t = TIPO_NO[e.kind] || TIPO_NO.pessoa;
       const capa = e.images?.[0] && dados.fotos[e.images[0]];
       nos.push({ data: {
@@ -238,7 +250,7 @@
     });
 
     vincs.forEach(v => {
-      if (!window.ENT.cache[v.entity_id]) return;
+      if (!window.ENT.cache[v.entity_id] || !idsEnts.has(v.entity_id)) return;
       const compartilhada = (porEntidade[v.entity_id]?.size || 0) > 1;
       arestas.push({
         data: {
@@ -257,6 +269,7 @@
       const a = l.a_kind === 'op' ? noOp(l.a_id) : noEnt(l.a_id);
       const b = l.b_kind === 'op' ? noOp(l.b_id) : noEnt(l.b_id);
       if (!existe.has(a) || !existe.has(b)) return;
+      if (filtros.vincs && !filtros.vincs.has(l.type)) return;
       const t = TIPO_VINC[l.type] || TIPO_VINC.outro;
       arestas.push({ data: {
         id: 'ln:' + l.id, source: a, target: b, cor: t.cor,
@@ -278,6 +291,8 @@
         <span class="tw-sub"></span>
         <div class="tw-tools">
           <button class="ghost tw-volta hide">← VOLTAR À TEIA GERAL</button>
+          <button class="ghost tw-buscar">BUSCAR NÓ</button>
+          <button class="ghost tw-filtros">FILTROS</button>
           <button class="ghost tw-acesso hide" title="Quem pode abrir a Teia Geral">ACESSO</button>
           <button class="primary sm tw-novo">⬢ CRIAR NÓ</button>
         </div>
@@ -286,6 +301,7 @@
         <span class="tw-cont"></span>
         <span class="tw-dica"></span>
       </div>
+      <div class="tw-caixa hide"></div>
       <div class="tw-palco">
         <div class="tw-grafo"></div>
         <aside class="tw-painel hide" aria-label="Dossiê do nó"></aside>
@@ -297,6 +313,8 @@
     root.querySelector('.tw-volta').onclick = () => openChannel('teia:geral');
     root.querySelector('.tw-acesso').onclick = painelAcesso;
     root.querySelector('.tw-novo').onclick = criaNo;
+    root.querySelector('.tw-buscar').onclick = () => alterna('busca');
+    root.querySelector('.tw-filtros').onclick = () => alterna('filtros');
   }
 
   function legenda() {
@@ -321,7 +339,7 @@
     const vazio = root.querySelector('.tw-vazio');
 
     root.querySelector('.tw-cont').textContent =
-      `NÓS ${nos.length} · VÍNCULOS ${arestas.length}`;
+      `NÓS ${nos.length} · VÍNCULOS ${arestas.length}` + (filtrando() ? ' · FILTRADO' : '');
     root.querySelector('.tw-dica').textContent = selecionado
       ? ''
       : 'clique no nó → abre a ficha e destaca os vínculos · duplo clique na operação → abre a aba dela';
@@ -371,7 +389,10 @@
     if (!todasSalvas) {
       cy.nodes().forEach(n => { const p = salvas[n.id()]; if (p) n.position(p); });
       cy.fit(undefined, 60);
-      gravaPosicoes(cy.nodes());        // o layout recém-calculado vira o lugar
+      // O layout recém-calculado vira o lugar de todo mundo — mas só quando
+      // está tudo à vista. Com filtro ligado o desenho é de um recorte, e
+      // gravá-lo embaralharia o lugar dos nós no quadro inteiro.
+      if (!filtrando()) gravaPosicoes(cy.nodes());
     }
 
     cy.on('tap', 'node', e => seleciona(e.target.id()));
@@ -671,6 +692,127 @@
       box.append(linha);
     });
     corpo.append(box);
+  }
+
+  // --------------------------------------------------- busca e filtros
+  let caixaAberta = null;
+
+  function alterna(qual) {
+    const caixa = root.querySelector('.tw-caixa');
+    if (caixaAberta === qual) {
+      caixaAberta = null;
+      caixa.classList.add('hide');
+      caixa.innerHTML = '';
+      return;
+    }
+    caixaAberta = qual;
+    caixa.classList.remove('hide');
+    caixa.innerHTML = '';
+    (qual === 'busca' ? montaBusca : montaFiltros)(caixa);
+  }
+
+  /** Procura entre os nós desenhados — que são, por definição, os que este
+      agente alcança. Nome e apelido, como no cadastro. */
+  function montaBusca(caixa) {
+    const inp = el('input', 'tw-q');
+    inp.placeholder = 'nome ou apelido do nó...';
+    inp.spellcheck = false;
+    const res = el('div', 'tw-q-res');
+    caixa.append(inp, res);
+    inp.focus();
+
+    let t;
+    const procura = async () => {
+      const q = inp.value.trim().toLowerCase();
+      res.innerHTML = '';
+      if (!cy || q.length < 2) return;
+
+      let achados = cy.nodes().filter(n => n.data('nome').toLowerCase().includes(q));
+      const vistos = new Set(achados.map(n => n.id()));
+
+      // Apelido não está no grafo: ele vive no banco, e é lá que se procura.
+      const { data } = await sb.from('entity_aliases')
+        .select('entity_id').ilike('alias', `%${q.replace(/[,()"\\%]/g, ' ')}%`).limit(20);
+      (data || []).forEach(r => {
+        const no = cy.getElementById(noEnt(r.entity_id));
+        if (no.length && !vistos.has(no.id())) { vistos.add(no.id()); achados = achados.merge(no); }
+      });
+
+      if (!vistos.size) {
+        res.append(el('p', 'tw-q-nada', '> nenhum nó com esse nome nesta vista.'));
+        return;
+      }
+      achados.sort((a, b) => a.data('nome').localeCompare(b.data('nome'))).forEach(n => {
+        const b = el('button', 'tw-q-l');
+        b.append(el('span', 'n', n.data('nome')));
+        b.append(el('span', 'k', n.data('kind') === 'operacao'
+          ? 'OPERAÇÃO' : window.ENT.rotuloTipo(n.data('kind'))));
+        b.onclick = () => {
+          seleciona(n.id());
+          cy.animate({ center: { eles: n }, zoom: 1.1 }, { duration: 260 });
+        };
+        res.append(b);
+      });
+    };
+    inp.addEventListener('input', () => { clearTimeout(t); t = setTimeout(procura, 200); });
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { e.stopPropagation(); alterna('busca'); }
+      if (e.key === 'Enter') { e.preventDefault(); res.querySelector('.tw-q-l')?.click(); }
+    });
+  }
+
+  /** Grupo de caixas de seleção. `null` no filtro quer dizer tudo ligado. */
+  function grupo(caixa, titulo, itens, chave) {
+    const bloco = el('div', 'tw-f-grupo');
+    bloco.append(el('h5', null, titulo));
+    const linha = el('div', 'tw-f-itens');
+    itens.forEach(([v, rotulo, cor]) => {
+      const lb = el('label', 'tw-f-i');
+      const cx = el('input');
+      cx.type = 'checkbox';
+      cx.checked = !filtros[chave] || filtros[chave].has(v);
+      cx.onchange = () => {
+        const todos = itens.map(i => i[0]);
+        const atual = filtros[chave] ? new Set(filtros[chave]) : new Set(todos);
+        cx.checked ? atual.add(v) : atual.delete(v);
+        // Tudo marcado volta a ser `null`: o filtro deixa de existir em vez de
+        // virar um conjunto com todos os valores dentro.
+        filtros[chave] = atual.size === todos.length ? null : atual;
+        marcaFiltro();
+        desenha();
+      };
+      const pt = el('i');
+      if (cor) pt.style.background = cor;
+      lb.append(cx, pt, el('span', null, rotulo));
+      linha.append(lb);
+    });
+    bloco.append(linha);
+    caixa.append(bloco);
+  }
+
+  function montaFiltros(caixa) {
+    grupo(caixa, 'TIPO DE NÓ',
+      window.ENT.TIPOS.map(([v, r]) => [v, r, TIPO_NO[v]?.cor]), 'tipos');
+    grupo(caixa, 'TIPO DE VÍNCULO',
+      Object.entries(TIPO_VINC).map(([v, t]) => [v, t.nome.toUpperCase(), t.cor]), 'vincs');
+    if (vista === 'geral' && dados.ops.length > 1) {
+      grupo(caixa, 'OPERAÇÃO',
+        dados.ops.slice().sort((a, b) => a.title.localeCompare(b.title))
+          .map(o => [o.id, o.title, TIPO_NO.operacao.cor]), 'ops');
+    }
+    const limpar = el('button', 'ghost sm', 'limpar filtros');
+    limpar.onclick = () => {
+      filtros = { tipos: null, vincs: null, ops: null };
+      marcaFiltro();
+      desenha();
+      caixa.innerHTML = '';
+      montaFiltros(caixa);
+    };
+    caixa.append(limpar);
+  }
+
+  function marcaFiltro() {
+    root.querySelector('.tw-filtros').classList.toggle('ativo', filtrando());
   }
 
   // --------------------------------------------------- criar e editar
@@ -989,6 +1131,13 @@
 
     root.classList.remove('hide');
     selecionado = null;
+    // Filtro por operação não sobrevive à troca de aba: na teia individual ele
+    // não quer dizer nada, e voltando para a geral seria um filtro invisível.
+    filtros.ops = null;
+    caixaAberta = null;
+    root.querySelector('.tw-caixa').classList.add('hide');
+    root.querySelector('.tw-caixa').innerHTML = '';
+    marcaFiltro();
     await carrega();
 
     const op = vista === 'geral' ? null : dados.ops.find(o => o.id === vista);

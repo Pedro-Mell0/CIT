@@ -531,6 +531,34 @@ Regras:
 A caixa de avisos é de quem recebeu e de mais ninguém — nem o ADMIN lê a caixa
 alheia.
 
+
+### Busca, filtros e sigilo na teia
+
+**BUSCAR NÓ** procura por nome e por apelido **entre os nós desta vista** — o
+que está na tela é, por definição, o que você alcança. Clicar no resultado
+seleciona e centraliza o nó.
+
+**FILTROS** liga e desliga por **tipo de nó**, por **tipo de vínculo** e, na
+Teia Geral, por **operação**. O botão acende em dourado enquanto houver filtro,
+e a contagem no topo avisa *FILTRADO*. Filtro ligado não grava posição: o
+desenho ali é de um recorte, e gravá-lo embaralharia o lugar dos nós no quadro
+inteiro. O filtro por operação não sobrevive à troca de aba.
+
+**Sigilo.** A teia usa o sistema que o CIT já tem, e não filtra nada à mão:
+as consultas saem cruas e o RLS corta o que o agente não alcança. O que não
+vem do banco, não vira nó. Na prática:
+
+- **Entidade** aparece para quem alcança alguma operação dela.
+- **Ligação entidade×operação** só aparece para quem lê o canal daquela
+  operação — é o que esconde o "aparece também em TROIA".
+- **Vínculo** só existe para quem enxerga as **duas** pontas: não há como
+  descobrir uma operação sigilosa pela linha que chega nela.
+- **Posição de nó** exige enxergar o nó *e* a aba: senão o `view_key` de uma
+  aba sigilosa entregaria o id daquela operação.
+- **Canal com trava de código** não liberada nesta sessão fica fora da teia,
+  pela mesma razão da busca com Ctrl+F.
+- **Conexão automática** só se resolve com acesso aos dois lados.
+
 ## Busca
 
 **Ctrl+F** (ou o botão ⌕) varre mensagens, dossiês e relatos de **todos os canais que
