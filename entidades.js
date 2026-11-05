@@ -610,6 +610,7 @@
     TIPOS, SLOTS, campoDoSlot, cache,
     rotuloTipo, sigla, miniatura, pintaFotos,
     buscar, parecidas, carregar, apelidos, vinculosDa,
+    urlsAssinadas,
     form, picker, revisar, fragmentos,
   };
 })();

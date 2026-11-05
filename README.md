@@ -15,7 +15,9 @@ format.js    formatação de texto (negrito, tópicos, etc.)
 fx.js        ambientação: som, decodificação, relógio, chuva de caracteres
 app.js       acesso, barra de canais, mensagens e edição
 ops.js       dossiês de operação (painel lateral direito)
+entidades.js cadastro de entidades, seletor do dossiê e conversão do texto livre
 manage.js    gerenciar usuários (ADMIN) e criar canais/categorias (COMANDO)
+teia.js      Teia de Vínculos: o grafo geral e o de cada operação
 search.js    varredura global (Ctrl+F)
 fukurou.js   página do bot (Fukurou), só para MASTER
 schema.sql   banco de dados completo
@@ -360,6 +362,112 @@ pesquisável, não é print de tela.
 O fundo preto depende de `print-color-adjust: exact`, respeitado por Chrome,
 Edge e Firefox. Se algum navegador ainda imprimir em branco, ligue
 *Mais definições → Gráficos de plano de fundo* na caixa de impressão.
+
+### Entidades
+
+Suspeito, local, veículo, organização e qualquer informação identificável
+deixaram de ser texto digitado dentro do dossiê. Cada um é uma **entidade** com
+id próprio, cadastrada uma vez e reaproveitada: o mesmo homem citado em três
+operações é uma linha só, com os três vínculos. É isso que deixa cruzar
+operações com segurança — e é daí que a Teia de Vínculos é desenhada.
+
+No formulário da operação, os campos **Local**, **Suspeitos**, **Agentes**,
+**Testemunhas** e **Vítimas** não são mais caixas de texto: você busca a
+entidade pelo nome ou apelido e escolhe, ou cadastra na hora pelo
+*+ cadastrar “…” como entidade nova*. Ao lado de cada uma cabe um **papel**
+("chefe", "capanga", "ponto de encontro"), que é o rótulo do vínculo na teia.
+A mesma pessoa pode ser chefe numa operação e testemunha em outra sem virar
+dois cadastros: o tipo é da entidade, o papel é da ligação.
+
+Cada entidade tem tipo, nome, **sigla** (a legenda do nó no grafo), apelidos,
+resumo, tags e imagens. A primeira imagem é a miniatura do nó. Ficam num bucket
+privado próprio (`entidades`), servido por URL assinada de 1 hora.
+
+**Possível duplicata**: ao digitar o nome, o site procura cadastro parecido —
+por nome e por apelido — e avisa antes de você criar o segundo. A procura varre
+o registro inteiro de propósito, inclusive entidades de operações que você não
+alcança: duas fichas para a mesma pessoa quebrariam justamente o cruzamento que
+a teia existe para fazer. O que o aviso mostra é só tipo, nome e apelido —
+**nunca em que operação a entidade aparece**, nunca a foto, nunca o resumo.
+
+**Sigilo**: a entidade herda o sigilo das operações em que aparece. Quem alcança
+qualquer uma delas, a enxerga. A *ligação* entre entidade e operação é mais
+fechada que a entidade: só aparece para quem lê o canal daquela operação. Na
+prática, dois agentes podem ver a mesma ficha sem que nenhum descubra as
+operações do outro. Quem decide é o RLS, no banco.
+
+### Converter os dossiês antigos
+
+Nada do que já estava escrito é apagado. Dossiê feito antes das entidades
+continua mostrando o texto como sempre mostrou, com um botão dourado
+**⇄ CONVERTER EM ENTIDADES** na barra do dossiê.
+
+A conversão abre uma tela de revisão: o site lê o texto do dossiê **e dos
+relatos dele**, quebra em trechos (vírgula, ponto-e-vírgula, linha, " e ") e
+propõe uma entidade por trecho, já consultando o registro. Para cada um você
+escolhe *usar o cadastro que existe*, *criar entidade nova* ou *ignorar — não é
+entidade*; trecho repetido no dossiê e em vários relatos vira uma linha só. Nada
+é convertido sem você confirmar.
+
+Convertido o dossiê, os campos de texto antigos passam a ser **espelho** das
+entidades: o banco os reescreve sozinho a cada vínculo criado, removido ou
+renomeado. É por isso que o **Ctrl+F** e o **⎙ PDF** continuam funcionando sem
+saber que o modelo mudou, e por isso um banco convertido pela metade nunca
+mostra dossiê em branco. Quem manda passa a ser o vínculo; a coluna de texto é
+só o reflexo dele.
+
+Operação **nova já nasce com entidades** — ali o texto livre não existe mais.
+
+## Teia de Vínculos
+
+O quadro de investigação: cada coisa apurada é um **nó**, cada relação entre
+duas é um **vínculo**, e a seção **Teia de Vínculos**, no topo da barra lateral,
+dá duas visões dos mesmos dados — sem duplicar nada.
+
+**◉ GERAL · FUKUROU** — tudo que você alcança, girando em torno do nó central
+FUKUROU. Cada operação é um nó pendurado nele; as pessoas, locais, veículos e
+demais entidades se ramificam a partir da operação em que foram apuradas.
+
+**⬡ uma aba por operação** — só os nós daquela investigação, com a operação no
+meio. A aba **aparece sozinha** quando a operação é criada, porque a lista sai
+das operações que você enxerga, não de um cadastro à parte. Dentro dela, um
+botão volta à Teia Geral.
+
+A Teia Geral é **restrita**: ADMIN e MASTER entram sempre, os demais só por
+concessão, feita no botão **ACESSO** dentro da própria página. A concessão abre
+a porta, não derruba a parede — lá dentro o RLS continua valendo nó por nó, e
+quem entra vê só as operações que já alcançava pelos canais. A aba individual
+de uma operação segue o sigilo do canal dela: quem lê o canal, abre a aba.
+
+### Lendo o quadro
+
+A **forma e a cor** do nó dizem o tipo: pessoa em violeta, local em dourado,
+veículo em azul, organização em ciano, informação em cinza, operação em ciano
+no formato redondo. Sem foto, o nó mostra a sigla; com foto, a miniatura. Nó de
+operação sigilosa vem com borda dupla vermelha.
+
+A **cor da linha** diz o tipo do vínculo — comando, família, local/patrimônio,
+financeiro, social — e o **traço** diz a confiança: cheio é *confirmado*,
+pontilhado é *provável*, tracejado é *suposto*. Linha tracejada dourada é a
+**conexão detectada automaticamente**: aquela entidade aparece em mais de uma
+operação que você alcança.
+
+- **Arrastar o nó** muda o lugar dele, e o lugar fica gravado para todo mundo
+  que abre a mesma aba — é quadro de investigação, não arrumação pessoal.
+- **Rolar** dá zoom; **arrastar o fundo** move a tela.
+- **Clicar no nó** abre a ficha dele à direita (foto, galeria, resumo,
+  apelidos, operações em que aparece e a lista de relacionamentos) e destaca
+  todos os vínculos daquele nó, esmaecendo o resto do grafo. Clicar em um nome
+  da lista de relacionamentos salta para aquele nó.
+- **Duplo clique num nó de operação**, na Teia Geral, abre a aba dela.
+- **Clicar no fundo** desfaz a seleção.
+
+Na ficha de uma entidade que aparece em mais de uma operação sai o aviso
+*conexão detectada automaticamente*, com as operações listadas — só as que você
+alcança. As demais não entram na consulta, então não há o que esconder ali.
+
+No dossiê, cada entidade vira uma ficha clicável nos campos de envolvidos:
+clicar nela leva direto ao nó dela na teia.
 
 ## Busca
 

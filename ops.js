@@ -28,7 +28,9 @@
 
   // ---------- dados ----------
   async function load() {
-    if (!curChan || curChan === 'manage') { ops = []; sel = null; entries = []; marcaDossies(false); return draw(); }
+    if (!curChan || curChan === 'manage' || curChan.startsWith('teia:')) {
+      ops = []; sel = null; entries = []; vincs = []; marcaDossies(false); return draw();
+    }
     const { data } = await sb.from('operations').select('*').eq('channel', curChan).order('created_at', { ascending: false });
     ops = data || [];
     marcaDossies(ops.length > 0);

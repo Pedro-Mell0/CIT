@@ -888,3 +888,100 @@ button.ent-chip-n:hover{color:var(--cyan);text-decoration:underline}
 /* o convite para converter o dossiê antigo não passa despercebido */
 .op-bar .ghost.conv{color:var(--gold);border-color:var(--gold);border-style:dashed}
 .op-bar .ghost.conv:hover{background:#ffc74d14;color:var(--gold);border-color:var(--gold)}
+
+/* ---------- Teia de Vínculos ---------- */
+/* Toma a sala inteira, como a gestão de usuários: as três colunas e o
+   cabeçalho do canal saem de cena, mas a barra lateral fica — é por ela que
+   se troca de aba. */
+:root.view-teia #room-body>.col,
+:root.view-teia #room-body>.grip,
+:root.view-teia #room-head{display:none!important}
+
+#teia{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--ink);
+  border:1px solid var(--line)}
+.tw-head{display:flex;align-items:center;gap:.7rem;padding:.7rem 1rem;flex:none}
+.tw-title{font-family:'Chakra Petch',sans-serif;font-size:1.1rem;letter-spacing:.14em;
+  color:var(--cyan);white-space:nowrap}
+.tw-sub{color:var(--dim);font-size:.7rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tw-tools{margin-left:auto;display:flex;gap:.4rem;flex:none}
+.tw-tools .ghost{padding:.35rem .6rem;font-size:.7rem;letter-spacing:.06em}
+
+.tw-stat{display:flex;gap:.9rem;padding:0 1rem .55rem;flex-wrap:wrap;flex:none;
+  border-bottom:1px solid var(--line)}
+.tw-cont{font-size:.66rem;letter-spacing:.1em;color:var(--cyan)}
+.tw-dica{font-size:.66rem;color:var(--dim)}
+
+.tw-palco{flex:1;position:relative;min-height:0;overflow:hidden;
+  background:radial-gradient(620px 420px at 50% 45%,#2a1a6e22,transparent)}
+.tw-grafo{position:absolute;inset:0}
+/* a grade por baixo do grafo é a mesma linguagem do fundo do chat */
+.tw-palco::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.25;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),
+    linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:46px 46px}
+
+.tw-vazio{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;
+  gap:.9rem;color:var(--dim);text-align:center;padding:2rem;pointer-events:none}
+.tw-vazio button{pointer-events:auto}
+
+.tw-legenda{position:absolute;left:1rem;bottom:.8rem;display:flex;gap:.9rem;flex-wrap:wrap;
+  pointer-events:none}
+.tw-leg{display:inline-flex;align-items:center;gap:.35rem;font-size:.62rem;color:var(--dim)}
+.tw-leg i{width:14px;height:2px;display:block;border-radius:2px}
+
+/* ---------- ficha do nó ---------- */
+.tw-painel{position:absolute;top:.8rem;right:.8rem;width:min(21rem,calc(100% - 1.6rem));
+  max-height:calc(100% - 1.6rem);display:flex;flex-direction:column;
+  background:#0a0620f2;border:1px solid var(--cyan);box-shadow:0 0 40px #45e3ff22;z-index:3}
+.tw-p-head{display:flex;align-items:center;gap:.5rem;padding:.45rem .6rem;flex:none;
+  border-bottom:1px solid var(--line)}
+.tw-p-head b{font-size:.64rem;letter-spacing:.14em;color:var(--dim)}
+.tw-p-head .ghost{margin-left:auto;border:0;padding:.1rem .35rem}
+.tw-p-corpo{padding:.7rem .8rem;overflow:auto;display:grid;gap:.55rem;align-content:start}
+
+.tw-p-topo{display:flex;gap:.7rem;align-items:flex-start}
+.tw-p-topo .ent-foto{width:3.4rem;height:3.4rem}
+.tw-p-nome{font-family:'Chakra Petch',sans-serif;font-size:1.05rem;letter-spacing:.05em;
+  color:var(--text);word-break:break-word}
+.tw-p-sub{font-size:.66rem;color:var(--dim);letter-spacing:.04em;text-transform:uppercase}
+.tw-p-sig{font-size:.66rem;color:var(--dead)}
+.tw-p-ape{font-size:.72rem;color:var(--dim);font-style:italic}
+.tw-p-res{font-size:.78rem;color:var(--text)}
+
+.tw-p-gal{display:flex;gap:.3rem;align-items:center;flex-wrap:wrap}
+.tw-p-gal .ent-foto{width:3.1rem;height:3.1rem;cursor:zoom-in;padding:0}
+.tw-p-mais{font-size:.68rem;color:var(--dim)}
+
+.tw-p-h{font-size:.62rem;letter-spacing:.12em;color:var(--dim);font-weight:400;
+  border-bottom:1px solid var(--line);padding-bottom:.2rem;margin-top:.2rem}
+
+.tw-p-rel{display:grid}
+.tw-p-rel-l{display:flex;gap:.6rem;align-items:baseline;background:none;border:0;
+  border-bottom:1px solid #2a217055;color:var(--text);padding:.28rem .1rem;text-align:left;
+  font-size:.74rem;width:100%}
+.tw-p-rel-l:hover{background:var(--panel);color:var(--cyan)}
+.tw-p-rel-l .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tw-p-rel-l .k{margin-left:auto;font-size:.64rem;flex:none;letter-spacing:.04em}
+
+.tw-p-ops{display:flex;flex-wrap:wrap;gap:.3rem}
+.tw-p-op{background:var(--panel);border:1px solid var(--line);border-left:2px solid var(--cyan);
+  color:var(--text);font-size:.7rem;padding:.2rem .45rem}
+.tw-p-op:hover{border-color:var(--cyan)}
+.tw-p-op.sig{border-left-color:var(--dead)}
+.tw-p-alerta{font-size:.68rem;color:var(--gold)}
+
+.tw-p-pe{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.3rem}
+.tw-p-pe .primary.sm{flex:1;text-align:center}
+
+/* ---------- a seção na barra lateral ---------- */
+#chans .teia-sec button.teia-geral{color:var(--violet)}
+#chans .teia-sec button.teia-geral .ic{color:var(--violet);opacity:1;
+  filter:drop-shadow(0 0 6px var(--violet))}
+#chans .teia-sec button.teia-geral.on{color:var(--cyan)}
+#chans .teia-sec button .sig{margin-left:auto}
+
+@media(max-width:900px){
+  .tw-painel{position:static;width:auto;max-height:42vh;margin:.5rem}
+  .tw-palco{display:flex;flex-direction:column}
+  .tw-grafo{position:relative;flex:1;min-height:14rem}
+  .tw-legenda{position:static;padding:.4rem 1rem}
+}

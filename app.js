@@ -54,7 +54,7 @@ function carregaLido() {
  */
 function marcaLido(key, quando) {
   unread.delete(key);
-  if (!key || key === 'manage') return;
+  if (!key || key === 'manage' || key.startsWith('teia:')) return;
   const novo = quando || new Date().toISOString();
   if (lido[key] && Date.parse(lido[key]) >= Date.parse(novo)) return;
   lido[key] = novo;
@@ -232,6 +232,9 @@ async function start() {
   drawChannels();
   openChannel('geral');
   listen();
+  // Depois de abrir a sala: a barra lateral ganha a seção da teia assim que
+  // a lista de operações visíveis chega, sem segurar a entrada do agente.
+  window.TEIA?.prepara?.();
 
   if (!isMaster()) await garanteNomeReal();
 }
@@ -332,6 +335,8 @@ function listen() {
       window.OPS?.entidadeMudou?.();
       window.TEIA?.recarrega?.();
     })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'links' }, () => window.TEIA?.recarrega?.())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'teia_geral_access' }, () => window.TEIA?.prepara?.())
     .subscribe();
 }
 
@@ -342,6 +347,11 @@ const saveCollapsed = () => localStorage.setItem('cit.collapsed', JSON.stringify
 function chanInfo(key) {
   if (key === 'geral') return { label: 'geral', icon: '#', hint: 'todos os agentes · anônimo' };
   if (key === 'manage') return { label: 'Gerenciar usuários', icon: '⚙', hint: 'administração' };
+  if (key === 'teia:geral') return { label: 'Teia Geral', icon: '◉', hint: 'todas as operações que você alcança' };
+  if (key.startsWith('teia:')) {
+    const o = window.TEIA?.abas?.().find(x => x.id === key.slice(5));
+    return { label: o ? 'Teia · ' + o.title : 'Teia', icon: '⬡', hint: 'somente nós desta operação' };
+  }
   if (key.startsWith('agent:')) {
     const p = people[key.slice(6)];
     if (!p) return { label: '[removido]', icon: '🔒', hint: 'privado' };
@@ -511,6 +521,22 @@ function drawChannels() {
 
     armaTopo(box);
   });
+
+  // ---------- Teia de Vínculos ----------
+  // A Teia Geral só aparece para quem pode abri-la; as abas por operação são
+  // derivadas da lista de operações visíveis, então a aba de uma operação nova
+  // surge sozinha assim que ela é criada.
+  const teiaOps = window.TEIA?.abas?.() || [];
+  if (window.TEIA && (window.TEIA.podeGeral() || teiaOps.length)) {
+    const box = el('div', 'nav-item teia-sec');
+    box.append(el('h3', null, 'Teia de Vínculos'));
+    if (window.TEIA.podeGeral()) navBtn(box, 'teia:geral', 'GERAL · FUKUROU', '◉', 'teia-geral');
+    teiaOps.forEach(o => {
+      const b = navBtn(box, 'teia:' + o.id, o.title, '⬡', 'sub');
+      if (chanInfo(o.channel).sigiloso) b.append(el('span', 'sig', '{sigiloso}'));
+    });
+    nav.prepend(box);
+  }
 
   if (isAdmin()) {
     const box = el('div', 'nav-item');
@@ -1253,20 +1279,25 @@ async function openChannel(key, jumpTo) {
   drawChannels();
 
   const manageView = key === 'manage';
+  const teiaView = key.startsWith('teia:');
   const apenasChat = key === 'geral';
   document.documentElement.classList.toggle('view-manage', manageView);
+  document.documentElement.classList.toggle('view-teia', teiaView);
   document.documentElement.classList.toggle('view-chat-only', apenasChat);
   layout();
   $('#manage').classList.toggle('hide', !manageView);
+  if (!teiaView) window.TEIA?.close?.();
   const alvoKick = key.startsWith('agent:') ? people[key.slice(6)] : null;
-  $('#kick').classList.toggle('hide', manageView || !alvoKick || alvoKick.id === me.id
+  const fora = manageView || teiaView;
+  $('#kick').classList.toggle('hide', fora || !alvoKick || alvoKick.id === me.id
     || !(isAdmin() || (isStaff() && alvoKick.role === 'agent')));
-  $('#ch-edit').classList.toggle('hide', manageView || !(isStaff() && key.startsWith('chan:')));
-  $('#op-new').classList.toggle('hide', manageView || apenasChat);
-  document.querySelector('.col-tgs').classList.toggle('hide', manageView);
-  $('#members').classList.toggle('hide', manageView);
+  $('#ch-edit').classList.toggle('hide', fora || !(isStaff() && key.startsWith('chan:')));
+  $('#op-new').classList.toggle('hide', fora || apenasChat);
+  document.querySelector('.col-tgs').classList.toggle('hide', fora);
+  $('#members').classList.toggle('hide', fora);
   window.OPS?.setChannel?.(key);
   if (manageView) return window.MANAGE?.open?.();
+  if (teiaView) return window.TEIA?.open?.(key.slice(5));
 
   // só apaga a bolinha; quem carimba a data é o carregamento, com hora do
   // servidor. Carimbar aqui, com o relógio local adiantado, faria o carimbo
