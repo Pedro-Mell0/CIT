@@ -515,8 +515,11 @@ cem palavrinhas cruzando o quadro é o que mais o suja. Ele aparece na linha sob
 o ponteiro e em todo o ramo do nó selecionado.
 
 - **Segurar ESPAÇO e arrastar** gira o plano à mão, nos dois eixos.
-- **Arrastar um nó** o move no espaço, e o lugar fica gravado para todo mundo
-  que abre a mesma aba — é quadro de investigação, não arrumação pessoal. A
+- **SHIFT + arrastar** move o nó no espaço, e o lugar fica gravado para todo
+  mundo que abre a mesma aba — é quadro de investigação, não arrumação pessoal.
+  O gesto pede tecla de propósito: sem ela, errar o nó por dois pixels
+  arrastava o quadro inteiro. Com a tecla na mão, a folga para pegar é
+  generosa — ninguém segura SHIFT sem querer pegar alguma coisa. A
   **operação** leva junto as entidades que só ela tem; a que aparece em duas
   fica onde está, porque pertence às duas e arrastá-la atrás de uma seria
   mentir sobre a outra. A **entidade** anda sozinha.
@@ -607,6 +610,13 @@ alheia.
 **BUSCAR NÓ** procura por nome e por apelido **entre os nós desta vista** — o
 que está na tela é, por definição, o que você alcança. Clicar no resultado
 seleciona e centraliza o nó.
+
+**↻ REORGANIZAR** joga fora o que foi arrumado à mão nesta aba e deixa o
+cálculo refazer o quadro. Serve para desfazer uma arrumação que não deu certo —
+e para as abas que herdaram posição sem ninguém ter pedido: a teia plana
+gravava sozinha o resultado do primeiro desenho, e por isso uma operação podia
+aparecer com um arranjo diferente de todas as outras. Apaga para todo mundo,
+então pede confirmação.
 
 **FILTROS** liga e desliga por **tipo de nó**, por **tipo de vínculo** e, na
 Teia Geral, por **operação**. O botão acende em dourado enquanto houver filtro,

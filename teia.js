@@ -157,8 +157,8 @@
   const FOCAL = 900;        // distância focal da projeção
   const GIRO = 0.055;       // rad/s — uma volta a cada ~114 segundos
   const OCIO = 5000;        // ms de quadro parado antes de o giro voltar
-  const DICA = 'clique no nó → ficha e vínculos · duplo clique na operação → abre a aba ' +
-               'dela · segure ESPAÇO e arraste para girar o plano';
+  const DICA = 'clique no nó → ficha e vínculos · SHIFT + arrastar move o nó · ' +
+               'ESPAÇO + arrastar gira o plano · duplo clique na operação → abre a aba dela';
 
   // `giro` é o do relógio, que anda sozinho; `yaw` e `pitch` são do agente.
   // Separados, porque soltar o arrasto não pode desfazer o que já girou.
@@ -720,6 +720,24 @@
     if (error) console.error('posições:', error);
   }
 
+  /**
+   * Joga fora o que foi arrumado à mão nesta aba e deixa o cálculo refazer o
+   * quadro. Serve para desfazer uma arrumação que não deu certo — e para as
+   * abas que herdaram posição da teia plana sem ninguém ter pedido: a versão
+   * antiga gravava sozinha o resultado do primeiro desenho, e por isso uma
+   * operação aparecia com um arranjo diferente de todas as outras.
+   */
+  async function reorganiza() {
+    if (!confirm('Recalcular o lugar de todos os nós desta aba?\n\n' +
+                 'O que foi arrumado à mão aqui se perde — para todo mundo.')) return;
+    const chave = chaveVista();
+    const { error } = await sb.from('node_positions').delete().eq('view_key', chave);
+    if (error) return toast('Não foi possível reorganizar: ' + error.message, true);
+    delete dados.pos[chave];
+    desenha();
+    toast('Teia reorganizada.');
+  }
+
   /** Traz o nó para a frente da câmera e aproxima. O plano segue girando. */
   function centraliza(n) {
     if (!n?.p || !cena) return;
@@ -746,11 +764,14 @@
       if (e.button !== 0) return;
       cv.setPointerCapture(e.pointerId);
       const p = ponto(e);
-      // Com ESPAÇO, gira a câmera. Em cima de um nó, arrasta o nó. No vazio,
-      // desloca a vista.
-      // Folga maior para pegar do que para apontar: com o quadro afastado o nó
-      // tem oito pixels de raio, e errar por dois vira "arrastar não funciona".
-      const alvo = espaco ? null : noEm(p.x, p.y, 12);
+      // ESPAÇO gira a câmera, SHIFT move o nó, e sem nenhum dos dois o arrasto
+      // desloca a vista. O gesto do nó pede tecla de propósito: sem ela, errar
+      // o nó por dois pixels arrastava o quadro inteiro, e o que chegava de
+      // volta era "não consigo arrastar os nós".
+      //
+      // Com a tecla na mão a folga para pegar pode ser generosa — ninguém
+      // segura SHIFT sem querer pegar alguma coisa.
+      const alvo = e.shiftKey && !espaco ? noEm(p.x, p.y, 22) : null;
       const pega = !!alvo && !alvo.centro;
       arrasto = {
         x: p.x, y: p.y, andou: 0,
@@ -771,8 +792,9 @@
         // vínculo aparece, um de cada vez, em vez de todos ao mesmo tempo.
         const a = n ? null : arestaEm(p.x, p.y);
         cena.sobreAresta = a ? a.id : null;
-        // Mão aberta em cima do nó: é o que diz que ele sai do lugar.
-        cv.style.cursor = n ? 'grab' : a ? 'pointer' : espaco ? 'grab' : 'default';
+        // Mão aberta só com o SHIFT na mão: é aí que o nó sai do lugar.
+        cv.style.cursor = n ? (e.shiftKey ? 'grab' : 'pointer')
+          : a ? 'pointer' : espaco ? 'grab' : 'default';
         return;
       }
       const dx = p.x - arrasto.x, dy = p.y - arrasto.y;
@@ -1041,6 +1063,7 @@
           <button class="ghost tw-volta hide">← VOLTAR À TEIA GERAL</button>
           <button class="ghost tw-buscar">BUSCAR NÓ</button>
           <button class="ghost tw-filtros">FILTROS</button>
+          <button class="ghost tw-arrumar" title="Recalcula o lugar de todos os nós desta aba">↻ REORGANIZAR</button>
           <button class="ghost tw-acesso hide" title="Quem pode abrir a Teia Geral">ACESSO</button>
           <button class="primary sm tw-novo">⬢ CRIAR NÓ</button>
         </div>
@@ -1063,6 +1086,7 @@
     root.querySelector('.tw-novo').onclick = criaNo;
     root.querySelector('.tw-buscar').onclick = () => alterna('busca');
     root.querySelector('.tw-filtros').onclick = () => alterna('filtros');
+    root.querySelector('.tw-arrumar').onclick = reorganiza;
   }
 
   function legenda() {
