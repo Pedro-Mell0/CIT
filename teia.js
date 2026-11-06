@@ -201,6 +201,55 @@
     return { x: Math.cos(th) * r, y, z: Math.sin(th) * r };
   }
 
+  // Abas já consertadas nesta sessão. `layout3d` roda a cada desenho, e sem
+  // isto o mesmo DELETE sairia várias vezes antes de o primeiro voltar.
+  const jaLimpas = new Set();
+
+  /**
+   * A nuvem gravada veio da teia plana, de antes de o quadro ter profundidade?
+   *
+   * A assinatura é um eixo achatado: todos os nós no mesmo plano. Mão humana
+   * não produz isso. Arrastar um nó passa por `moveNos`, que desfaz o pitch e
+   * o giro — e o giro anda sozinho —, então cada arrasto mexe nos três eixos
+   * ao mesmo tempo. Dezesseis nós parando no mesmo plano, no mesmo milímetro,
+   * é coordenada herdada, não arrumação de ninguém.
+   *
+   * De onde vem: uma versão antiga gravava sozinha o resultado do primeiro
+   * desenho, quando o desenho ainda era chapado. A aba ficava com um disco de
+   * raio pequeno no lugar da esfera — os nós de trás caindo em cima do nó
+   * central, os nomes empilhados — enquanto todas as outras operações, sem
+   * nada gravado, nasciam certas. Era exatamente a queixa: "o grafo desta
+   * operação é diferente do das outras".
+   *
+   * Quatro nós é o mínimo para a conta significar alguma coisa: com três,
+   * qualquer trio é coplanar por definição.
+   */
+  function herdadaDaTeiaPlana(pts) {
+    if (pts.length < 4) return false;
+    const faixa = c => {
+      let lo = Infinity, hi = -Infinity;
+      pts.forEach(p => { const v = p[c] || 0; if (v < lo) lo = v; if (v > hi) hi = v; });
+      return hi - lo;
+    };
+    const f = [faixa('x'), faixa('y'), faixa('z')];
+    const maior = Math.max(...f);
+    return maior > 0 && Math.min(...f) < maior * .02;
+  }
+
+  /**
+   * Apaga as posições herdadas e deixa a aba voltar ao cálculo — que é como
+   * todas as outras operações já são desenhadas. É o mesmo DELETE do botão
+   * ↻ REORGANIZAR, sem a pergunta: ali ele joga fora arrumação de gente, e
+   * por isso pergunta; aqui joga fora rascunho que o próprio site gravou.
+   */
+  async function esqueceHeranca(chave) {
+    if (jaLimpas.has(chave)) return;
+    jaLimpas.add(chave);
+    delete dados.pos[chave];
+    const { error } = await sb.from('node_positions').delete().eq('view_key', chave);
+    if (error) console.error('herança plana:', error);
+  }
+
   /**
    * O lugar de cada nó no espaço.
    *
@@ -341,9 +390,25 @@
     // Se ele pudesse ser gravado, bastaria uma posição vinda de outro ponto
     // zero — as da teia plana, por exemplo — para o quadro inteiro nascer num
     // canto, com o centro de fora. Arrastá-lo desloca a vista, não o mundo.
-    const salvas = dados.pos[chaveVista()] || {};
-    const gravadas = [];
+    const chave = chaveVista();
+    const salvas = dados.pos[chave] || {};
+
+    // Antes de obedecer ao que está gravado, uma pergunta: isto foi mão
+    // humana? Ver `heradaDaTeiaPlana`. Se não foi, o cálculo manda, e as
+    // linhas velhas são apagadas — senão o primeiro nó arrastado ali as
+    // ressuscitaria todas de uma vez.
+    const pontos = [];
     G.nos.forEach(n => {
+      if (n === centro || n.id === 'fukurou') return;
+      const { kind, id } = parte(n.id);
+      const q = salvas[kind + ':' + id];
+      if (q) pontos.push(q);
+    });
+    const herdadas = herdadaDaTeiaPlana(pontos);
+    if (herdadas) esqueceHeranca(chave);
+
+    const gravadas = [];
+    if (!herdadas) G.nos.forEach(n => {
       if (n === centro || n.id === 'fukurou') return;
       const { kind, id } = parte(n.id);
       const q = salvas[kind + ':' + id];

@@ -710,6 +710,31 @@ centro mora. A própria teia conserta e grava o conserto ao abrir, mas dá para
 fazer na mão: subtraia de `x`, `y` e `z` o meio da caixa que os nós ocupam
 naquela `view_key`.
 
+**Uma operação com um grafo diferente do das outras** — os nós amontoados num
+disco pequeno, alguns caindo em cima do nó central e os nomes empilhados — é
+herança da teia plana, de antes de o quadro ter profundidade. Uma versão
+antiga gravava sozinha o resultado do primeiro desenho, e aquelas coordenadas
+chapadas ficaram no banco: a aba que as tem obedece a elas, e todas as outras,
+sem nada gravado, nascem do cálculo e saem certas.
+
+A teia reconhece e apaga sozinha ao abrir. A assinatura é um eixo achatado —
+todos os nós no mesmo plano, no mesmo milímetro —, que mão humana não produz:
+arrastar um nó mexe nos três eixos ao mesmo tempo, porque a conta desfaz o
+pitch e o giro, e o giro anda sozinho. Para conferir quais abas ainda têm
+coordenadas assim:
+
+```sql
+select view_key, count(*),
+       max(x) - min(x) as faixa_x,
+       max(y) - min(y) as faixa_y,
+       max(z) - min(z) as faixa_z
+from node_positions where node_kind = 'ent'
+group by view_key;
+```
+
+Faixa zero em um dos eixos, com quatro nós ou mais, é herança. O botão
+**↻ REORGANIZAR** faz a mesma limpeza à mão, em qualquer aba.
+
 **Trocar o codinome de um agente** é do ADMIN, pelo ✎ nome no painel ⚙. Como o
 login é derivado do codinome, o e-mail interno muda junto: o agente passa a
 entrar com o nome novo e a mesma senha.
