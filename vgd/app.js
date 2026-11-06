@@ -17,6 +17,18 @@ const authStore = (() => {
 
 const $ = s => document.querySelector(s);
 
+// Duas perguntas diferentes, e misturá-las é o que costuma quebrar site em
+// celular: "a tela é estreita?" não é a mesma coisa que "isto é um dedo?".
+// A primeira manda no layout (a barra de canais vira gaveta); a segunda manda
+// nos gestos (arrastar para reordenar deixa de existir).
+// A condição é a mesma do bloco "celular e toque" no style.css — mexer aqui
+// sem mexer lá faz o CSS e o JS discordarem sobre em que modo a sala está.
+// A altura entra na conta porque celular deitado tem 844px de largura: passa
+// por qualquer teste de largura e ainda assim é um celular.
+const TELA_CEL = window.matchMedia?.(
+  '(max-width:760px),(max-height:500px) and (orientation:landscape)') || null;
+const DEDO = !!window.matchMedia?.('(hover:none)')?.matches;
+
 // Enquanto o config.js estiver com os valores de exemplo, `createClient` morre
 // com "Invalid URL" e a página fica preta, sem uma linha que explique por quê.
 // O aviso na tela custa cinco linhas e economiza meia hora de console.
@@ -453,7 +465,7 @@ function navBtn(parent, key, label, icon, cls) {
   b.append(el('span', 'ic', icon), el('span', 'nm', label));
   b.classList.toggle('on', key === chan);
   b.classList.toggle('new', unread.has(key));
-  b.onclick = () => { openChannel(key); if (innerWidth <= 760) $('#side').classList.remove('open'); };
+  b.onclick = () => { openChannel(key); gaveta(false); };
   parent.append(b);
   return b;
 }
@@ -720,7 +732,7 @@ const limpaMarcas = () => document.querySelectorAll('#chans .drop-before,#chans 
 
 function armaTopo(box) {
   if (!isStaff()) return;
-  box.draggable = true;
+  box.draggable = !DEDO;
 
   box.addEventListener('dragstart', e => {
     if (arrasto) return;                      // o canal já tomou conta do arrasto
@@ -767,7 +779,7 @@ function armaTopo(box) {
 
 function armaCanal(btn, ch) {
   if (!isStaff()) return btn;
-  btn.draggable = true;
+  btn.draggable = !DEDO;
 
   btn.addEventListener('dragstart', e => {
     arrasto = { tipo: 'canal', key: 'chan:' + ch.id, id: ch.id };
@@ -834,7 +846,11 @@ async function moveCanal(chanId, catId) {
   const RAIZ = document.documentElement;
   const MIN = 170, MAX = 430;
   const largura = px => {
-    const w = Math.round(Math.min(Math.max(px, MIN), Math.min(MAX, innerWidth - 420)));
+    // No celular a gaveta flutua por cima da sala e não disputa largura com
+    // ninguém. A conta de PC (reservar 420px para a sala) dava negativo numa
+    // tela de 390px e devolvia o mínimo: a gaveta abria espremida.
+    const teto = TELA_CEL?.matches ? MAX : Math.min(MAX, innerWidth - 420);
+    const w = Math.round(Math.min(Math.max(px, MIN), Math.max(MIN, teto)));
     RAIZ.style.setProperty('--side-w', w + 'px');
     try { localStorage.setItem('vgd.sidew', String(w)); } catch {}
   };
@@ -1242,7 +1258,26 @@ $('#msg').addEventListener('input', grow);
 $('#msg').addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
 });
-$('#menu').onclick = () => $('#side').classList.toggle('open');
+// ---------- a gaveta de canais no celular ----------
+// A classe fica em dois lugares de propósito: `.open` move a gaveta, e
+// `.side-aberta` na raiz acende o véu que escurece a sala atrás. O véu é um
+// elemento de verdade, não mais um `box-shadow` gigante — sombra não recebe
+// toque, e por isso tocar fora da gaveta não fechava nada.
+function gaveta(abrir) {
+  const s = $('#side');
+  const v = abrir === undefined ? !s.classList.contains('open') : !!abrir;
+  s.classList.toggle('open', v);
+  document.documentElement.classList.toggle('side-aberta', v);
+}
+
+$('#menu').onclick = () => gaveta();
+$('#side-veu').onclick = () => gaveta(false);
+addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.documentElement.classList.contains('side-aberta')) gaveta(false);
+});
+// Sair do modo celular (girar o aparelho, alargar a janela) precisa fechar a
+// gaveta junto: no PC ela é parte da sala, e o véu ficaria sem quem o tirasse.
+TELA_CEL?.addEventListener?.('change', () => { if (!TELA_CEL.matches) gaveta(false); });
 $('#ch-edit').onclick = () => window.MANAGE?.channelForm?.(chans[chan.slice(5)]);
 $('#new-ch').onclick = () => window.MANAGE?.newMenu?.();
 

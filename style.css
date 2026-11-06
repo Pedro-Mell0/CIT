@@ -367,13 +367,18 @@ mark{background:#45e3ff33;color:var(--cyan);padding:0 .1rem}
 .toast.bad{border-color:var(--danger);box-shadow:0 0 30px #ff5c8a33}
 
 /* ---------- telas pequenas ---------- */
+/* "Celular" aqui não é só largura. Um celular deitado tem 844px de largura e
+   390 de altura: passa folgado por `max-width:760px` e cairia no layout de
+   PC, com a barra de canais fixa comendo um terço da tela e três colunas
+   empilhadas numa faixa de 300px de altura. A condição é a mesma em todos os
+   blocos daqui para baixo — e no `app.js`, em `TELA_CEL`. Se mudar, muda
+   nos dois, senão o CSS e o JS discordam sobre em que modo a sala está. */
 @media(max-width:900px){
   #room-body{flex-direction:column;overflow:auto;gap:.4rem}
   #room-body>.grip{display:none!important}
   #room-body>.col{width:auto!important;flex:none!important;min-height:62vh}
 }
-@media(max-width:760px){
-  #app{grid-template-columns:1fr}
+@media (max-width:760px),(max-height:500px) and (orientation:landscape){
   #side{position:fixed;inset:0 25% 0 0;z-index:25;transform:translateX(-100%);transition:transform .2s}
   #side.open{transform:none;box-shadow:0 0 0 100vmax #000a}
   #menu{display:block}
@@ -1066,3 +1071,251 @@ button.ent-chip-n:hover{color:var(--cyan);text-decoration:underline}
 .tw-f-i input{width:auto;padding:0;margin:0}
 .tw-f-i i{width:10px;height:10px;border-radius:2px;display:block;flex:none}
 .tw-caixa>.ghost{justify-self:start}
+
+/* ==================== celular e toque ====================================
+   Tudo o que o site precisa para ser usável com o dedo mora aqui, no fim do
+   arquivo. O lugar é de propósito: em CSS, com a mesma especificidade, o que
+   vem depois vence — então nada acima precisou ser caçado e reescrito, e dá
+   para ler a adaptação inteira de uma vez em vez de garimpá-la em vinte
+   lugares.
+
+   Três perguntas diferentes, três consultas diferentes:
+   - `hover:none`   → é um dedo. Vale no celular deitado e no tablet.
+   - `max-width`    → a tela é estreita. Vale também na janela apertada do PC.
+   - `@supports`    → a unidade existe neste navegador (os embutidos, como o
+                      do FiveM, costumam ser versões antigas do Chromium).
+   ========================================================================= */
+
+/* ---------- a altura de verdade ---------- */
+/* No celular `100%` é medido pela janela MAIOR — a de antes de a barra de
+   endereço aparecer. Com ela na tela, o fim da página fica escondido atrás:
+   era por isso que a caixa de mensagem sumia embaixo. `dvh` acompanha a
+   altura real, encolhendo e crescendo junto com a barra. */
+@supports (height:100dvh){
+  html,body{height:100dvh}
+}
+/* O site é uma casca: quem rola é cada coluna, nunca a página inteira. Sem
+   isto o dedo arrasta o documento junto, a barra do navegador fica entrando e
+   saindo por cima do conteúdo e o layout pula a cada gesto. */
+body{overflow:hidden;overscroll-behavior:none}
+/* A exceção é a tela de acesso, que precisa rolar em tela baixa (teclado
+   aberto, celular deitado) — senão o botão de entrar fica inalcançável. */
+#auth{height:100%;overflow:auto;
+  padding:calc(1rem + env(safe-area-inset-top)) calc(1rem + env(safe-area-inset-right))
+          calc(1rem + env(safe-area-inset-bottom)) calc(1rem + env(safe-area-inset-left))}
+
+/* ---------- o que só existia ao passar o mouse ---------- */
+@media (hover:none){
+  /* Botão que só aparece no hover não existe para quem usa o dedo. Editar e
+     apagar mensagem, a engrenagem do canal e o lápis da categoria eram
+     invisíveis E inalcançáveis no celular: o toque não tem "antes". */
+  .m .act{opacity:.72}
+  #chans button.ch-ed{opacity:.75}
+  .cat-ed{opacity:.8}
+  .anexo-x,.anexo-capa{opacity:1}
+
+  /* Área de toque: o dedo não acerta um alvo de doze pixels. O mínimo aqui é
+     generoso de propósito — errar o 🗑 de uma mensagem alheia é caro. */
+  .ghost,.primary,.chip,.col-tg,.op-tab,.tw-p-op,.tabs button{min-height:38px}
+  .ghost.sm,.primary.sm,.op-bar .ghost,.tw-tools .ghost,
+  .tw-conex .acoes .ghost,.mg-acts .ghost{min-height:34px}
+  .m .act,.op-entry .act,.col-x,.cat-ed,.anexo-x,.anexo-capa,
+  .ent-chip-x,.tw-p-head .ghost,#find-x{min-width:36px;min-height:32px}
+  .m .head{gap:.45rem}
+  #chans button{padding-top:.62rem;padding-bottom:.62rem}
+  .access-item,.membro,.tw-p-rel-l,.tw-q-l,.ent-res-l,.r-card,.tw-f-i{min-height:40px}
+  .swatch{height:2.4rem}
+  /* A alça de redimensionar tem 8px: no dedo é mais fácil pegá-la sem querer
+     do que de propósito. Vale a pena engordar as duas. */
+  .grip{width:14px}
+  #msg-grip{height:14px}
+
+  /* Arrastar para reordenar é gesto de mouse: no toque o mesmo movimento é
+     rolagem, e `draggable` ligado só fazia a lista grudar no dedo. Quem
+     desliga o atributo é o app.js; aqui só cai a aparência de alça — o punho
+     ∷ fica transparente, mas no lugar, porque é o mesmo elemento que carrega
+     o nome da coluna. Escondê-lo deixava o cabeçalho em branco. */
+  .col-drag{cursor:default}
+  .col-drag::first-letter{opacity:.25}
+
+  /* Nada de rolagem presa dentro da lista de mensagens: chegando na ponta, o
+     gesto para ali em vez de empurrar a página atrás. */
+  #msgs,.col-body,#chans,.modal-body,#find-res,.tw-p-corpo{overscroll-behavior:contain}
+}
+
+/* ---------- tela estreita ---------- */
+@media (max-width:760px),(max-height:500px) and (orientation:landscape){
+  /* O iPhone dá zoom sozinho quando o campo em foco tem letra menor que 16px,
+     e a página fica torta até o recarregamento — é o "bug" mais citado de
+     formulário em celular. 16px é o preço de não dar. Caixa de marcar fica
+     de fora: ali a medida é do desenho, não da letra. */
+  input:not([type=checkbox]):not([type=radio]),textarea,select{font-size:16px}
+  /* os dois campos estreitos que a letra maior apertaria */
+  .ent-chip-p,.ent-rev-p{width:100%}
+  .ent-rev-o select{min-width:0}
+
+  /* ---- a sala vira uma aba por vez ---- */
+  /* Empilhar relatos, dossiê e transmissão numa tela de seis polegadas dava
+     três caixas de 62vh, cada uma com rolagem própria, dentro de uma página
+     que também rolava: três barras disputando o mesmo dedo e nada no lugar
+     onde se espera. No celular só uma coluna fica em cena, e os botões
+     ▤ ▦ ▣ do cabeçalho viram as abas que trocam entre elas (quem decide
+     qual está aberta é o `app.js`). */
+  #room-body{flex-direction:column;overflow:hidden;gap:0;padding:.35rem}
+  #room-body>.grip{display:none!important}
+  #room-body>.col{width:auto!important;flex:1 1 auto!important;min-height:0}
+  /* o ✕ de recolher não cabe no modelo de abas: recolher a única coluna
+     visível deixaria a sala vazia, sem nada para tocar de volta */
+  #room-body>.col .col-x{display:none}
+
+  /* cabeçalho em duas linhas: canal em cima, ferramentas e abas embaixo */
+  #room-head{flex-wrap:wrap;gap:.4rem .5rem;padding:.5rem .6rem}
+  #room-head h2{font-size:1rem;flex:1 1 auto;min-width:0}
+  /* `1 1 auto` e não `1 1 100%`: no celular em pé as ferramentas não cabem ao
+     lado do nome e descem sozinhas para a segunda linha; deitado, cabem, e
+     aí não faz sentido gastar uma linha inteira com elas. */
+  #room-head .tools{margin-left:0;flex:1 1 auto;flex-wrap:wrap;gap:.35rem;
+    justify-content:flex-start}
+  #room-head .col-tgs{flex:1 1 100%;margin-left:0;gap:.3rem}
+  #room-head .col-tg{flex:1}
+  #kick{font-size:.7rem}
+  #menu{flex:none}
+
+  /* ---- a gaveta de canais ---- */
+  /* Largura em `min()`: a fixa de 270px engolia uma tela de 320. E o teto da
+     largura some no celular — ver `maxCol` no app.js: a conta de desktop
+     devolvia o mínimo de 150px aqui, e a gaveta abria espremida. */
+  #side{width:min(var(--side-w),84vw);inset:0 auto 0 0;
+    padding:calc(1rem + env(safe-area-inset-top)) 1rem calc(1rem + env(safe-area-inset-bottom));
+    box-shadow:none}
+  #side.open{box-shadow:0 10px 40px #000c}
+  [data-grip="side"]{display:none!important}
+
+  /* ---- a caixa de mensagem ---- */
+  /* O respiro de baixo evita que o botão de enviar termine debaixo da barra
+     de gestos do sistema. */
+  .composer{padding:.6rem .8rem calc(.7rem + env(safe-area-inset-bottom))}
+  #msg-grip{margin:-.6rem -.8rem -.1rem}
+  #caret-hint{left:.7rem}
+
+  .m{max-width:100%}
+  #msgs{padding:.7rem}
+  .col-body{padding:.65rem}
+  #ops-tabs{padding:.5rem .65rem 0}
+  #manage{padding:.8rem}
+  /* A tabela do MASTER tem uma coluna a mais e vencia o empilhamento das
+     outras por especificidade: ficava com cinco colunas num celular. */
+  .mg-table-master .mg-row{grid-template-columns:1fr 1fr}
+
+  /* ---- janelas ---- */
+  #modal{padding:.5rem}
+  .modal-box{width:100%;max-height:94vh}
+  .modal-body{padding:.8rem}
+  .modal-foot{padding:.7rem .8rem calc(.7rem + env(safe-area-inset-bottom));
+    justify-content:stretch}
+  .modal-foot>button{flex:1 1 auto}
+  .modal-foot .form-note{flex:1 1 100%;margin-right:0}
+  .pick-row .primary{flex:1 1 100%}
+  .access-list,.membros{max-height:40vh}
+
+  /* ---- busca ---- */
+  /* Colada no topo: numa tela baixa, 6vh de respiro é uma linha de resultado
+     a menos. */
+  #find{padding:.5rem .5rem calc(.5rem + env(safe-area-inset-bottom))}
+  .find-box{max-height:100%}
+  #find-res{padding:.5rem .6rem .8rem}
+
+  /* ---- teia ---- */
+  .tw-head{flex-wrap:wrap;padding:.5rem .6rem;gap:.35rem .5rem}
+  .tw-title{font-size:.95rem}
+  .tw-sub{flex:1 1 100%;order:5}
+  .tw-tools{margin-left:0;flex:1 1 100%;order:6;flex-wrap:wrap;gap:.3rem}
+  .tw-tools .ghost,.tw-tools .primary.sm{flex:1 1 auto;text-align:center}
+  .tw-stat{padding:0 .6rem .5rem;gap:.5rem}
+  .tw-grafo{min-height:46vh}
+  .tw-legenda{padding:.4rem .6rem;gap:.5rem}
+  .tw-caixa{padding:.5rem .6rem;max-height:52vh}
+  .tw-p-corpo{padding:.8rem}
+}
+
+/* O ☰ da teia: a Teia de Vínculos esconde o cabeçalho do canal inteiro, e com
+   ele ia embora o único botão que abre a gaveta de canais. No PC não faz
+   falta — a gaveta está sempre lá. No celular, era um beco sem saída: entrou
+   na teia, só saía recarregando a página. */
+.tw-menu{display:none}
+@media (max-width:760px),(max-height:500px) and (orientation:landscape){
+  /* `order:-1` para ele ficar na ponta esquerda, onde o ☰ sempre fica — no
+     HTML ele vem depois do título, que é onde não atrapalha o PC. */
+  .tw-menu{display:block;flex:none;order:-1;padding:.4rem .6rem}
+}
+
+/* O botão que troca o gesto de um dedo entre "deslocar a vista" e "girar o
+   plano" — é o equivalente de toque à barra de espaço. Só aparece no dedo. */
+.tw-girar{display:none}
+@media (hover:none){
+  .tw-girar{display:block}
+  .tw-girar.on{color:var(--cyan);border-color:var(--cyan);background:var(--panel)}
+}
+
+/* `dvh` também nas janelas, pelo mesmo motivo da página: com o teclado aberto
+   `vh` continua contando a tela inteira e o rodapé da janela some. */
+@supports (height:100dvh){
+  .modal-box{max-height:88dvh}
+  .find-box{max-height:86dvh}
+  @media (max-width:760px),(max-height:500px) and (orientation:landscape){
+    .modal-box{max-height:94dvh}
+    .find-box{max-height:100%}
+  }
+}
+
+/* ---------- o véu da gaveta ---------- */
+/* Escurece a sala e, principalmente, recebe o toque que fecha a gaveta. */
+#side-veu{position:fixed;inset:0;z-index:24;background:#000a;
+  animation:in .18s ease-out}
+:root:not(.side-aberta) #side-veu{display:none}
+
+/* ---------- tela muito estreita ---------- */
+@media (max-width:420px){
+  /* Com menos de 420px o rótulo escrito do "Remover agente" não cabe ao lado
+     das abas. Vira ícone — o `title` continua dizendo o que ele é. O MEMBROS
+     já tinha virado ícone mais acima, na faixa dos 760px. */
+  #kick{font-size:0;padding:.4rem .55rem}
+  #kick::before{content:"\2716";font-size:.9rem}
+  .card{padding:1.5rem 1.1rem}
+  h1{font-size:2.1rem}
+  .op-title{font-size:1.15rem}
+  #hud-clock{font-size:1.15rem}
+}
+
+/* ---------- celular deitado ---------- */
+/* Tela baixa e larga: o que ocupa altura fixa precisa encolher, senão sobra
+   cabeçalho e não sobra conteúdo. */
+@media (max-height:460px) and (orientation:landscape){
+  /* O cabeçalho da sala tem três faixas: nome, ferramentas e abas. Em pé elas
+     custam 17% da tela; deitado custariam 26%, e o que sobra para ler é
+     pouco. Os alvos de toque encolhem de 38 para 32px — ainda acima do que
+     o dedo erra, e devolvem uma linha e meia de mensagem. */
+  #room-head{padding:.35rem .5rem;gap:.3rem}
+  #room-head .col-tg,#room-head .tools .ghost,#room-head .tools .primary{min-height:32px}
+  .col-head{padding:.3rem .6rem}
+  .tw-head{padding:.35rem .6rem}
+  .tw-stat{padding:0 .6rem .35rem}
+
+  #boot{display:none}
+  .card{padding:1.1rem 1.2rem;gap:.55rem}
+  .logo{width:48px;height:48px}
+  h1{font-size:1.8rem}
+  #hud{display:none}
+  .fmt-hint{display:none}
+}
+
+/* ---------- o papel vem por último ---------- */
+/* O bloco `@media print` que monta o PDF do dossiê está lá em cima, e em CSS
+   o que vem depois vence quando a especificidade empata — consulta de mídia
+   não conta pontos. Sem repetir aqui, o `overflow:hidden` e o `100dvh` desta
+   seção valeriam também no papel, e o dossiê sairia cortado na altura da
+   primeira tela, com todo o resto perdido. Daqui para baixo, nada. */
+@media print{
+  html,body{height:auto!important;overflow:visible!important}
+  #auth{height:auto;overflow:visible;padding:0}
+}

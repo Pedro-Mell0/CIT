@@ -2,7 +2,12 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- `viewport-fit=cover` deixa a página ir até a borda em celular com
+     entalhe; o respiro volta pelos `env(safe-area-inset-*)` no CSS.
+     `maximum-scale` fica de fora de propósito: tirar o zoom do agente para
+     evitar o zoom automático do iPhone é trocar um incômodo por uma
+     barreira. O que evita aquele zoom é a letra de 16px nos campos. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!-- O site já é escuro. Sem este aviso, navegador embutido com tema escuro
      forçado (FiveM e afins) reescreve as cores por conta própria e escurece
      justamente o texto, deixando preto no preto. -->
@@ -14,7 +19,7 @@
 <!-- O `?v=` é o que faz o navegador buscar de novo depois de uma mudança.
      Sem ele o arquivo fica em cache e a correção simplesmente não chega:
      suba o número a cada publicação. -->
-<link rel="stylesheet" href="style.css?v=2026-11-06a">
+<link rel="stylesheet" href="style.css?v=2026-11-06b">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute"><symbol id="owl" viewBox="0 0 64 64">
@@ -44,6 +49,11 @@
 </main>
 
 <div id="app" class="hide">
+  <!-- Véu do celular: escurece a sala com a gaveta de canais aberta e,
+       principalmente, fecha a gaveta quando se toca fora dela. Antes o
+       escuro era um `box-shadow` gigante — parecia um véu, mas não recebia
+       toque, e a única saída era acertar o ☰ de novo. -->
+  <div id="side-veu" aria-hidden="true"></div>
   <aside id="side">
     <div class="me"><svg class="logo sm"><use href="#owl"/></svg>
       <div><b id="me-name"></b><span id="me-role"></span></div>
@@ -157,16 +167,16 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <!-- Cytoscape desenha a Teia de Vínculos. Só é usado lá; o resto do site
      não depende dele. -->
-<script src="config.js?v=2026-11-06a"></script>
-<script src="format.js?v=2026-11-06a"></script>
-<script src="fx.js?v=2026-11-06a"></script>
-<script src="app.js?v=2026-11-06a"></script>
-<script src="entidades.js?v=2026-11-06a"></script>
-<script src="ops.js?v=2026-11-06a"></script>
-<script src="manage.js?v=2026-11-06a"></script>
-<script src="teia.js?v=2026-11-06a"></script>
-<script src="avisos.js?v=2026-11-06a"></script>
-<script src="search.js?v=2026-11-06a"></script>
-<script src="fukurou.js?v=2026-11-06a"></script>
+<script src="config.js?v=2026-11-06b"></script>
+<script src="format.js?v=2026-11-06b"></script>
+<script src="fx.js?v=2026-11-06b"></script>
+<script src="app.js?v=2026-11-06b"></script>
+<script src="entidades.js?v=2026-11-06b"></script>
+<script src="ops.js?v=2026-11-06b"></script>
+<script src="manage.js?v=2026-11-06b"></script>
+<script src="teia.js?v=2026-11-06b"></script>
+<script src="avisos.js?v=2026-11-06b"></script>
+<script src="search.js?v=2026-11-06b"></script>
+<script src="fukurou.js?v=2026-11-06b"></script>
 </body>
 </html>

@@ -157,8 +157,22 @@
   const FOCAL = 900;        // distância focal da projeção
   const GIRO = 0.055;       // rad/s — uma volta a cada ~114 segundos
   const OCIO = 5000;        // ms de quadro parado antes de o giro voltar
-  const DICA = 'clique no nó → ficha e vínculos · SHIFT + arrastar move o nó · ' +
-               'ESPAÇO + arrastar gira o plano · duplo clique na operação → abre a aba dela';
+  // Teclado e dedo não têm os mesmos gestos, então não podem ler a mesma
+  // dica: no celular a linha falava de SHIFT e de barra de espaço, teclas que
+  // não existem ali, e o agente concluía que a teia simplesmente não funciona.
+  const DEDO = !!window.matchMedia?.('(hover:none)')?.matches;
+  const DICA = DEDO
+    ? 'toque no nó → ficha e vínculos · segure e arraste move o nó · ' +
+      'dois dedos aproximam e giram · toque duplo na operação → abre a aba dela'
+    : 'clique no nó → ficha e vínculos · SHIFT + arrastar move o nó · ' +
+      'ESPAÇO + arrastar gira o plano · duplo clique na operação → abre a aba dela';
+
+  // Gestos de toque, em números. O tempo é o do toque longo; a folga é quanto
+  // o dedo pode escorregar antes de o toque virar arrasto — dedo não fica
+  // parado como um cursor, e exigir imobilidade nunca pegaria o nó.
+  const SEGURA = 380;     // ms até o toque longo pegar o nó
+  const FOLGA = 14;       // px de escorregão ainda considerados "parado"
+  const DUPLO = 320;      // ms entre dois toques para contarem como duplo
 
   // `giro` é o do relógio, que anda sozinho; `yaw` e `pitch` são do agente.
   // Separados, porque soltar o arrasto não pode desfazer o que já girou.
@@ -717,8 +731,10 @@
     return Math.hypot(px - (ax + t * vx), py - (ay + t * vy));
   }
 
-  function arestaEm(x, y) {
-    let achada = null, melhor = 7;
+  // A folga é parâmetro porque o dedo não aponta como o cursor: sete pixels
+  // bastam para o mouse e não acertam uma linha nunca no celular.
+  function arestaEm(x, y, folga = 7) {
+    let achada = null, melhor = folga;
     G.arestas.forEach(a => {
       const A = noDe(a.de)?.s, B = noDe(a.para)?.s;
       if (!A || !B) return;
@@ -821,9 +837,169 @@
       return { x: e.clientX - r.left, y: e.clientY - r.top };
     };
 
+    // ---------------------------------------------------------------- toque
+    // Sem teclado não há SHIFT nem barra de espaço, e sem roda não há zoom.
+    // A tradução dos gestos:
+    //   um dedo arrastando ....... desloca a vista (ou gira, com o botão ⟳)
+    //   um dedo parado sobre o nó  pega o nó e passa a arrastá-lo
+    //   dois dedos ............... aproximam, giram e deslocam ao mesmo tempo
+    //   toque simples ............ seleciona nó ou vínculo
+    //   toque duplo na operação .. abre a aba dela
+    //
+    // O toque longo é o que substitui o SHIFT, e pelo mesmo motivo: sem um
+    // gesto deliberado, errar o nó por dois pixels arrastaria o quadro
+    // inteiro — e no dedo "dois pixels" é otimismo.
+    const dedos = new Map();     // pointerId → último ponto, no canvas
+    let pinca = null;            // { x, y, d, a } da dupla de dedos
+    let espera = 0;              // temporizador do toque longo
+    let ultimo = 0;              // instante do último toque, para o duplo
+    let fimToque = 0;            // quando o último dedo saiu, para calar o dblclick
+
+    const paraEspera = () => { clearTimeout(espera); espera = 0; };
+    /** Centro, distância e ângulo entre os dois dedos. */
+    const dupla = () => {
+      const [a, b] = [...dedos.values()];
+      return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2,
+               d: Math.hypot(b.x - a.x, b.y - a.y),
+               a: Math.atan2(b.y - a.y, b.x - a.x) };
+    };
+
+    function toqueDesce(e) {
+      cv.setPointerCapture(e.pointerId);
+      const p = ponto(e);
+      dedos.set(e.pointerId, p);
+      cena.parado = true;
+      agiu();
+
+      if (dedos.size === 2) {
+        // O segundo dedo cancela o que o primeiro ia fazer: ninguém pousa
+        // dois dedos querendo arrastar um nó.
+        paraEspera();
+        if (arrasto?.modo === 'no' && arrasto.junto) gravaPosicoes(arrasto.junto);
+        arrasto = null;
+        cena.sobre = null;
+        pinca = dupla();
+        return;
+      }
+      if (dedos.size > 2) return;
+
+      pinca = null;
+      arrasto = { x: p.x, y: p.y, andou: 0, modo: espaco ? 'gira' : 'vista',
+                  no: null, junto: null, toque: true };
+      espera = setTimeout(() => {
+        espera = 0;
+        if (!arrasto || arrasto.andou > FOLGA || dedos.size !== 1) return;
+        const alvo = noEm(arrasto.x, arrasto.y, 26);
+        if (!alvo || alvo.centro) return;
+        arrasto.modo = 'no';
+        arrasto.no = alvo;
+        arrasto.junto = arrastaJunto(alvo);
+        arrasto.pegou = true;
+        cena.sobre = alvo.id;          // o nó acende: pegou
+        navigator.vibrate?.(18);
+      }, SEGURA);
+      cv.classList.add('girando');
+    }
+
+    function toqueAnda(e) {
+      const ant = dedos.get(e.pointerId);
+      if (!ant) return;
+      const p = ponto(e);
+      dedos.set(e.pointerId, p);
+
+      if (dedos.size >= 2 && pinca) {
+        const c = dupla();
+        cam.zoom = Math.max(.2, Math.min(6, cam.zoom * (c.d / (pinca.d || c.d || 1))));
+        // Torcer os dedos gira o plano. A diferença de ângulo precisa ser
+        // normalizada: passando por ±π ela daria um salto de uma volta
+        // inteira e o quadro giraria de uma vez.
+        let da = c.a - pinca.a;
+        while (da > Math.PI) da -= TAU;
+        while (da < -Math.PI) da += TAU;
+        cam.yaw += da;
+        cam.px += c.x - pinca.x;
+        cam.py += c.y - pinca.y;
+        pinca = c;
+        agiu();
+        return;
+      }
+      if (!arrasto) return;
+
+      const dx = p.x - ant.x, dy = p.y - ant.y;
+      arrasto.andou += Math.abs(dx) + Math.abs(dy);
+      arrasto.x = p.x; arrasto.y = p.y;
+      if (espera && arrasto.andou > FOLGA) paraEspera();   // escorregou: é arrasto
+      if (arrasto.modo === 'gira') {
+        cam.yaw -= dx * .006;
+        cam.pitch = Math.max(-1.35, Math.min(1.35, cam.pitch + dy * .005));
+      } else if (arrasto.modo === 'no') {
+        moveNos(arrasto.junto, dx, dy, arrasto.no);
+      } else {
+        cam.px += dx; cam.py += dy;
+      }
+    }
+
+    function toqueSobe(e) {
+      if (!dedos.has(e.pointerId)) return;
+      dedos.delete(e.pointerId);
+      paraEspera();
+
+      if (dedos.size >= 2) { pinca = dupla(); return; }
+      if (dedos.size === 1) {
+        // Saiu um dedo da pinça. O que sobrou continua na tela, e tratá-lo
+        // como um toque novo faria o quadro pular para onde ele está.
+        // `andou` já nasce alto: o que vier dele é arrasto, nunca toque.
+        pinca = null;
+        const [v] = [...dedos.values()];
+        arrasto = { x: v.x, y: v.y, andou: 99, modo: espaco ? 'gira' : 'vista',
+                    no: null, junto: null, toque: true };
+        return;
+      }
+
+      pinca = null;
+      fimToque = performance.now();
+      cena.parado = false;
+      cena.sobre = null;
+      cv.classList.remove('girando');
+      agiu();
+      const a = arrasto;
+      arrasto = null;
+      if (!a) return;
+      // Pegou o nó e o moveu, por pouco que seja: grava. O limite aqui é
+      // baixo de propósito — com `FOLGA` o nó saía do lugar na tela e não era
+      // gravado, e voltava sozinho para o lugar antigo no próximo
+      // carregamento, sem nada explicando por quê.
+      if (a.modo === 'no' && a.junto && a.andou >= 3) return gravaPosicoes(a.junto);
+      if (a.andou >= FOLGA) return;              // foi arrasto, não toque
+
+      const p = ponto(e);
+      const n = noEm(p.x, p.y, 20);
+      const agora = performance.now();
+      if (agora - ultimo < DUPLO) {
+        ultimo = 0;
+        if (n && n.kind === 'operacao' && vista === 'geral') return openChannel('teia:' + n.id.slice(3));
+      }
+      ultimo = agora;
+      if (n) return seleciona(n.id);
+      const ar = arestaEm(p.x, p.y, 16);
+      if (ar) return selecionaVinculo(ar);
+      limpaSelecao();
+    }
+
+    function toqueCancela(e) {
+      dedos.delete(e.pointerId);
+      paraEspera();
+      if (dedos.size) return;
+      pinca = null; arrasto = null;
+      cena.parado = false; cena.sobre = null;
+      cv.classList.remove('girando');
+    }
+
+    // ---------------------------------------------------------------- mouse
     cv.addEventListener('pointerleave', () => { cena.sobre = cena.sobreAresta = null; });
 
     cv.addEventListener('pointerdown', e => {
+      if (e.pointerType === 'touch') return toqueDesce(e);
       if (e.button !== 0) return;
       cv.setPointerCapture(e.pointerId);
       const p = ponto(e);
@@ -847,6 +1023,7 @@
     });
 
     cv.addEventListener('pointermove', e => {
+      if (e.pointerType === 'touch') return toqueAnda(e);
       const p = ponto(e);
       if (!arrasto) {
         const n = noEm(p.x, p.y);
@@ -874,6 +1051,7 @@
     });
 
     const solta = e => {
+      if (e.pointerType === 'touch') return toqueSobe(e);
       if (!arrasto) return;
       const clique = arrasto.andou < 5;
       const movido = !clique && arrasto.modo === 'no' ? arrasto.junto : null;
@@ -891,11 +1069,17 @@
       limpaSelecao();
     };
     cv.addEventListener('pointerup', solta);
-    cv.addEventListener('pointercancel', () => {
+    cv.addEventListener('pointercancel', e => {
+      if (e.pointerType === 'touch') return toqueCancela(e);
       arrasto = null; cena.parado = false; cv.classList.remove('girando');
     });
 
     cv.addEventListener('dblclick', e => {
+      // O navegador ainda manda `dblclick` depois de um toque duplo, e
+      // `dblclick` é MouseEvent — não tem `pointerType` para distinguir. Quem
+      // distingue é o relógio: se um dedo saiu agora, aquilo já foi tratado
+      // como toque duplo, e abrir a aba de novo é abrir duas vezes.
+      if (performance.now() - fimToque < 700) return;
       agiu();
       const p = ponto(e);
       const n = noEm(p.x, p.y);
@@ -1122,7 +1306,10 @@
       <header class="tw-head">
         <h2 class="tw-title">TEIA</h2>
         <span class="tw-sub"></span>
+        <button class="ghost tw-menu" aria-label="Canais" title="Canais">☰</button>
         <div class="tw-tools">
+          <button class="ghost tw-girar" aria-pressed="false"
+                  title="Com ⟳ ligado, arrastar um dedo gira o plano em vez de deslocar a vista">⟳ GIRAR</button>
           <button class="ghost tw-volta hide">← VOLTAR À TEIA GERAL</button>
           <button class="ghost tw-buscar">BUSCAR NÓ</button>
           <button class="ghost tw-filtros">FILTROS</button>
@@ -1144,6 +1331,17 @@
       </div>`;
     $('#room-body').append(root);
 
+    // A teia esconde o cabeçalho do canal, e com ele o ☰ que abre a gaveta:
+    // no celular isso trancava o agente aqui dentro.
+    root.querySelector('.tw-menu').onclick = () => window.GAVETA?.();
+    // O equivalente de toque à barra de espaço. Trava ligado em vez de pedir
+    // que se segure algo: no dedo não há "segurar uma tecla e arrastar".
+    const gir = root.querySelector('.tw-girar');
+    gir.onclick = () => {
+      espaco = !espaco;
+      gir.classList.toggle('on', espaco);
+      gir.setAttribute('aria-pressed', String(espaco));
+    };
     root.querySelector('.tw-volta').onclick = () => openChannel('teia:geral');
     root.querySelector('.tw-acesso').onclick = painelAcesso;
     root.querySelector('.tw-novo').onclick = criaNo;

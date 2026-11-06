@@ -39,6 +39,33 @@ schema.sql   banco de dados completo
 > A chave `anon` pode ficar no código: a segurança vem das regras de RLS do
 > `schema.sql`.
 
+### Publicar uma mudança
+
+Os arquivos locais são carregados com `?v=<data>` no `index.html`. **Suba esse
+número a cada publicação** — é o que faz o navegador buscar o arquivo de novo.
+Sem isso ele serve o que tem em cache e a correção simplesmente não chega: a
+pessoa continua vendo a versão antiga e jurando que nada mudou.
+
+## No celular
+
+Abaixo de 760px de largura — e também no celular **deitado**, que é largo mas
+baixo:
+
+- **A barra de canais vira gaveta**, aberta pelo ☰ e fechada tocando fora
+  dela, no canal escolhido ou no ESC.
+- **Os botões que só apareciam com o mouse em cima** — o ✎ e o 🗑 do informe,
+  a ⚙ do canal, o ✎ da categoria — ficam sempre à mostra: no toque não existe
+  "passar por cima antes".
+- **As tabelas** de contas, cores e questões empilham em duas colunas, com as
+  ações numa linha só delas.
+- **Arrastar para reordenar** canais não existe no toque; o mesmo movimento
+  ali é rolagem. Pelo computador continua igual.
+
+As janelas, a busca e a caixa de informe respeitam a barra do sistema e a
+altura real da tela — a que encolhe quando a barra de endereço aparece. Os
+campos de formulário usam letra de 16px no celular: abaixo disso o iPhone dá
+zoom sozinho ao focar e a página fica torta até recarregar.
+
 ## Cargos
 
 | Cargo     | Pode                                                                 |

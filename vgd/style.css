@@ -604,19 +604,160 @@ mark{background:#ff9d2e33;color:var(--amber);padding:0 .1rem}
 @media(prefers-reduced-motion:reduce){#aranha{display:none!important}}
 
 /* ---------- telas pequenas ---------- */
-@media(max-width:760px){
-  #side{position:fixed;inset:0 25% 0 0;z-index:25;transform:translateX(-100%);transition:transform .2s}
-  #side.open{transform:none;box-shadow:0 0 0 100vmax #000a}
-  #app>.grip{display:none}
-  #menu{display:block}
+/* O que era este bloco virou a seção "celular e toque", no fim do arquivo:
+   a gaveta, as tabelas empilhadas e o resto moraram aqui até ganharem a
+   companhia dos alvos de toque, da altura real da tela e do véu — e manter
+   as duas metades separadas por mil linhas era pedir que uma envelhecesse
+   sem a outra. */
+@media(max-width:520px){.paleta{grid-template-columns:repeat(4,1fr)}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ==================== celular e toque ====================================
+   Irmão do bloco de mesmo nome no CIT, e pelas mesmas razões — o que muda é
+   só o que existe aqui: a prova, o banco de questões e os resultados.
+
+   - `hover:none`   → é um dedo. Vale no celular deitado e no tablet.
+   - `max-width`    → a tela é estreita. Vale na janela apertada do PC também.
+   - `@supports`    → a unidade existe neste navegador (o embutido do FiveM
+                      costuma ser uma versão antiga do Chromium).
+
+   "Celular" não é só largura: deitado ele tem 844px de largura e 390 de
+   altura, e passaria folgado por qualquer teste de largura. A condição é a
+   mesma em todos os blocos daqui para baixo e no `app.js`, em `TELA_CEL`.
+   ========================================================================= */
+
+/* ---------- a altura de verdade ---------- */
+/* No celular `100%` é medido pela janela MAIOR — a de antes de a barra de
+   endereço aparecer. Com ela na tela, o fim da página fica escondido atrás:
+   era por isso que a caixa de informe sumia embaixo. */
+@supports (height:100dvh){
+  html,body{height:100dvh}
+}
+/* O site é uma casca: quem rola é cada painel, nunca a página inteira. */
+body{overflow:hidden;overscroll-behavior:none}
+/* A exceção é a tela de acesso, que precisa rolar em tela baixa. */
+#auth{height:100%;overflow:auto;
+  padding:calc(1rem + env(safe-area-inset-top)) calc(1rem + env(safe-area-inset-right))
+          calc(1rem + env(safe-area-inset-bottom)) calc(1rem + env(safe-area-inset-left))}
+
+/* ---------- o que só existia ao passar o mouse ---------- */
+@media (hover:none){
+  /* Botão que só aparece no hover não existe para quem usa o dedo: editar e
+     apagar informe, a engrenagem do canal e o lápis da categoria eram
+     invisíveis E inalcançáveis no celular. */
+  .m .act{opacity:.72}
+  #chans button.ch-ed{opacity:.75}
+  .cat-ed{opacity:.8}
+
+  /* Área de toque: o dedo não acerta um alvo de doze pixels. */
+  .ghost,.primary,.chip,.tabs button,.q-opt{min-height:38px}
+  .ghost.sm,.primary.sm,.mg-acts .ghost,.q-acts .ghost{min-height:34px}
+  .m .act,.cat-ed,#find-x{min-width:36px;min-height:32px}
+  .m .head{gap:.45rem}
+  #chans button{padding-top:.62rem;padding-bottom:.62rem}
+  .access-item,.membro,.r-card{min-height:40px}
+  .swatch{height:2.4rem}
+  .grip{width:14px}
+  #msg-grip{height:14px}
+
+  /* Chegando na ponta, o gesto para ali em vez de empurrar a página atrás. */
+  #msgs,#chans,.modal-body,#find-res,.pane-scroll{overscroll-behavior:contain}
+}
+
+/* ---------- tela estreita ---------- */
+@media (max-width:760px),(max-height:500px) and (orientation:landscape){
+  /* O iPhone dá zoom sozinho quando o campo em foco tem letra menor que 16px,
+     e a página fica torta até o recarregamento. 16px é o preço de não dar. */
+  input:not([type=checkbox]):not([type=radio]),textarea,select{font-size:16px}
+
+  /* a barra de canais é uma gaveta: 270px fixos engoliam uma tela de 320 */
+  #side{position:fixed;inset:0 auto 0 0;z-index:25;transform:translateX(-100%);
+    transition:transform .2s;width:min(var(--side-w),84vw);box-shadow:none;
+    padding:calc(1rem + env(safe-area-inset-top)) 1rem calc(1rem + env(safe-area-inset-bottom))}
+  #side.open{transform:none;box-shadow:0 10px 40px #000c}
+  #app>.grip,[data-grip="side"]{display:none!important}
+  #menu{display:block;flex:none}
   #ch-hint{display:none}
-  .fmt-hint{display:none}
   #hud{display:none}
+  .fmt-hint{display:none}
+
+  /* cabeçalho em duas linhas quando as ferramentas não couberem ao lado */
+  #room-head{flex-wrap:wrap;gap:.4rem .5rem;padding:.5rem .6rem}
+  #room-head h2{font-size:1rem;flex:1 1 auto;min-width:0}
+  #room-head .tools{margin-left:0;flex:1 1 auto;flex-wrap:wrap;gap:.35rem}
+
+  /* a caixa de informe não pode terminar debaixo da barra do sistema */
+  .composer{padding:.6rem .8rem calc(.7rem + env(safe-area-inset-bottom))}
+  #msg-grip{margin:-.6rem -.8rem -.1rem}
+  #caret-hint{left:.7rem}
+  .m{max-width:100%}
+  #msgs{padding:.7rem}
+  .pane-scroll{padding:.8rem}
+
+  /* tabelas: empilham em duas colunas, com as ações numa linha só delas */
   .mg-row,.cor-row,.q-row{grid-template-columns:1fr 1fr;gap:.4rem}
   .mg-hr{display:none}
   .mg-acts,.q-acts{grid-column:1/-1;justify-content:flex-start}
   #members{font-size:0;padding:.4rem .55rem}
   #members::before{content:"\2687";font-size:.9rem}
+
+  /* janelas quase na tela inteira, com os botões do rodapé em linha cheia */
+  #modal{padding:.5rem}
+  .modal-box{width:100%;max-height:94vh}
+  .modal-body{padding:.8rem}
+  .modal-foot{padding:.7rem .8rem calc(.7rem + env(safe-area-inset-bottom));
+    justify-content:stretch}
+  .modal-foot>button{flex:1 1 auto}
+  .modal-foot .form-note{flex:1 1 100%;margin-right:0}
+  .access-list,.membros{max-height:40vh}
+
+  /* a busca colada no topo: 6vh de respiro é uma linha de resultado a menos */
+  #find{padding:.5rem .5rem calc(.5rem + env(safe-area-inset-bottom))}
+  .find-box{max-height:100%}
+  #find-res{padding:.5rem .6rem .8rem}
 }
-@media(max-width:520px){.paleta{grid-template-columns:repeat(4,1fr)}}
-@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* `dvh` também nas janelas: com o teclado aberto, `vh` continua contando a
+   tela inteira e o rodapé da janela some. */
+@supports (height:100dvh){
+  .modal-box{max-height:88dvh}
+  .find-box{max-height:86dvh}
+  @media (max-width:760px),(max-height:500px) and (orientation:landscape){
+    .modal-box{max-height:94dvh}
+    .find-box{max-height:100%}
+  }
+}
+
+/* ---------- o véu da gaveta ---------- */
+/* Escurece a sala e, principalmente, recebe o toque que fecha a gaveta. Antes
+   o escuro era um `box-shadow` gigante: parecia um véu, mas não recebia
+   toque, e a única saída era acertar o ☰ de novo. */
+#side-veu{position:fixed;inset:0;z-index:24;background:#000a}
+:root:not(.side-aberta) #side-veu{display:none}
+
+/* ---------- tela muito estreita ---------- */
+@media (max-width:420px){
+  .card{padding:1.5rem 1.1rem}
+  h1{font-size:2.1rem}
+  #hud-clock{font-size:1.15rem}
+  .res-nota{font-size:2rem}
+}
+
+/* ---------- celular deitado ---------- */
+@media (max-height:460px) and (orientation:landscape){
+  #boot{display:none}
+  .card{padding:1.1rem 1.2rem;gap:.55rem}
+  .logo{width:48px;height:48px}
+  h1{font-size:1.8rem}
+  #room-head{padding:.35rem .5rem;gap:.3rem}
+  #room-head .tools .ghost{min-height:32px}
+}
+
+/* ---------- o papel vem por último ---------- */
+/* Mesma razão do CIT: consulta de mídia não conta pontos de especificidade,
+   então o `overflow:hidden` e o `100dvh` da seção acima valeriam também na
+   impressão, cortando a página na altura da primeira tela. */
+@media print{
+  html,body{height:auto!important;overflow:visible!important}
+  #auth{height:auto;overflow:visible;padding:0}
+}

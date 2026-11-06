@@ -2,7 +2,12 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- `viewport-fit=cover` deixa a página ir até a borda em celular com
+     entalhe; o respiro volta pelos `env(safe-area-inset-*)` no CSS.
+     `maximum-scale` fica de fora de propósito: tirar o zoom do usuário
+     para evitar o zoom automático do iPhone é trocar um incômodo por uma
+     barreira. O que evita aquele zoom é a letra de 16px nos campos. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!-- O site já é escuro. Sem este aviso, navegador embutido com tema escuro
      forçado (FiveM e afins) reescreve as cores por conta própria e escurece
      justamente o texto, deixando preto no preto. -->
@@ -25,7 +30,10 @@
 </script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐯</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=JetBrains+Mono:wght@400;600&family=Orbitron:wght@600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<!-- O `?v=` é o que faz o navegador buscar de novo depois de uma mudança.
+     Sem ele o arquivo fica em cache e a correção simplesmente não chega:
+     suba o número a cada publicação. -->
+<link rel="stylesheet" href="style.css?v=2026-11-06b">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute"><symbol id="tigre" viewBox="0 0 64 64">
@@ -69,6 +77,9 @@
 </main>
 
 <div id="app" class="hide">
+  <!-- Véu do celular: escurece a sala com a gaveta de canais aberta e,
+       principalmente, fecha a gaveta quando se toca fora dela. -->
+  <div id="side-veu" aria-hidden="true"></div>
   <aside id="side">
     <div class="me"><svg class="logo sm"><use href="#tigre"/></svg>
       <div><b id="me-name"></b><span id="me-role"></span></div>
@@ -153,12 +164,12 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js"></script>
-<script src="format.js"></script>
-<script src="fx.js"></script>
-<script src="app.js"></script>
-<script src="prova.js"></script>
-<script src="manage.js"></script>
-<script src="search.js"></script>
+<script src="config.js?v=2026-11-06b"></script>
+<script src="format.js?v=2026-11-06b"></script>
+<script src="fx.js?v=2026-11-06b"></script>
+<script src="app.js?v=2026-11-06b"></script>
+<script src="prova.js?v=2026-11-06b"></script>
+<script src="manage.js?v=2026-11-06b"></script>
+<script src="search.js?v=2026-11-06b"></script>
 </body>
 </html>

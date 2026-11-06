@@ -114,6 +114,29 @@ largura ajustável. Se ela for recolhida, a primeira coluna visível assume esse
 papel. Ordem, larguras e colapsos ficam guardados naquele navegador. Abaixo de
 900px de largura as colunas empilham na vertical.
 
+### No celular
+
+Abaixo de 760px de largura — e também no celular **deitado**, que é largo mas
+baixo — a sala muda de modelo em vez de só apertar:
+
+- **Uma coluna por vez.** Os botões ▤ ▦ ▣ do cabeçalho deixam de abrir e
+  recolher e passam a ser **abas**: toca-se numa e ela ocupa a sala inteira. A
+  aba escolhida fica guardada naquele navegador. Empilhar as três numa tela de
+  seis polegadas dava três caixas com rolagem própria dentro de uma página que
+  também rolava, e nada ficava onde se espera.
+- **A barra de canais vira gaveta**, aberta pelo ☰ e fechada tocando fora
+  dela, no canal escolhido ou no ESC.
+- **Os botões que só apareciam com o mouse em cima** — o ✎ e o 🗑 da mensagem,
+  a ⚙ do canal, o ✎ da categoria — ficam sempre à mostra: no toque não existe
+  "passar por cima antes".
+- **Arrastar para reordenar** canais e colunas não existe no toque; o mesmo
+  movimento ali é rolagem. Pelo computador continua igual.
+- A largura das colunas do computador **não é mexida** pelo que se faz no
+  celular: elas voltam como estavam.
+
+As janelas, a busca e a caixa de mensagem respeitam a barra do sistema e a
+altura real da tela — a que encolhe quando a barra de endereço aparece.
+
 ## Canais
 
 - `# geral` — todos os agentes.
@@ -549,6 +572,26 @@ o ponteiro e em todo o ramo do nó selecionado.
   aquele nó.
 - **Duplo clique num nó de operação**, na Teia Geral, abre a aba dela.
 - **Clicar no fundo** desfaz a seleção.
+
+**No celular** não há SHIFT, não há barra de espaço e não há roda. Os mesmos
+gestos, traduzidos para o dedo:
+
+| no computador | no celular |
+|---------------|------------|
+| arrastar o fundo | **um dedo** arrastando |
+| rolar a roda | **dois dedos** aproximando e afastando |
+| ESPAÇO + arrastar | **torcer** os dois dedos — ou ligar o botão **⟳ GIRAR** e arrastar com um dedo, que aí também inclina |
+| SHIFT + arrastar o nó | **segurar** o dedo no nó até ele acender, e arrastar |
+| clicar no nó | **tocar** no nó |
+| duplo clique na operação | **toque duplo** na operação |
+
+O toque longo é o que substitui o SHIFT, e pelo mesmo motivo: sem um gesto
+deliberado, errar o nó por dois pixels arrastaria o quadro inteiro — e no dedo
+"dois pixels" é otimismo. O botão **⟳ GIRAR** trava ligado em vez de pedir que
+se segure alguma coisa, porque no toque não existe "segurar uma tecla e
+arrastar ao mesmo tempo"; ele só aparece onde não há mouse. O **☰** no
+cabeçalho da teia também só aparece no celular: a teia esconde o cabeçalho do
+canal, e com ele iria embora o único botão que abre a gaveta de canais.
 
 Na ficha de uma entidade que aparece em mais de uma operação sai o aviso
 *conexão detectada automaticamente*, com as operações listadas — só as que você

@@ -444,7 +444,7 @@ function navBtn(parent, key, label, icon, cls) {
   b.append(el('span', 'ic', icon), el('span', 'nm', label));
   b.classList.toggle('on', key === chan);
   b.classList.toggle('new', unread.has(key));
-  b.onclick = () => { openChannel(key); if (innerWidth <= 760) $('#side').classList.remove('open'); };
+  b.onclick = () => { openChannel(key); gaveta(false); };
   parent.append(b);
   return b;
 }
@@ -557,7 +557,7 @@ function drawChannels() {
     if (isMaster()) {
       const b = el('button', 'fukurou-nav');
       b.append(el('span', 'ic', '🦉'), el('span', 'nm', 'Fukurou'));
-      b.onclick = () => { window.FUKUROU?.open(); if (innerWidth <= 760) $('#side').classList.remove('open'); };
+      b.onclick = () => { window.FUKUROU?.open(); gaveta(false); };
       box.append(b);
     }
     nav.append(box);
@@ -758,7 +758,7 @@ const limpaMarcas = () => document.querySelectorAll('#chans .drop-before,#chans 
 
 function armaTopo(box) {
   if (!isStaff()) return;
-  box.draggable = true;
+  box.draggable = !DEDO;
 
   box.addEventListener('dragstart', e => {
     if (arrasto) return;                      // o canal já tomou conta do arrasto
@@ -805,7 +805,7 @@ function armaTopo(box) {
 
 function armaCanal(btn, ch) {
   if (!isStaff()) return btn;
-  btn.draggable = true;
+  btn.draggable = !DEDO;
 
   btn.addEventListener('dragstart', e => {
     arrasto = { tipo: 'canal', key: 'chan:' + ch.id, id: ch.id };
@@ -868,6 +868,20 @@ async function moveCanal(chanId, catId) {
 }
 
 // ---------- colunas: ordem, largura e colapso ----------
+// Duas perguntas diferentes, e misturá-las é o que costuma quebrar site em
+// celular: "a tela é estreita?" não é a mesma coisa que "isto é um dedo?".
+// A primeira manda no layout (a sala vira uma aba por vez); a segunda manda
+// nos gestos (arrastar para reordenar deixa de existir).
+// A mesma condição está no style.css, no bloco "telas pequenas" — mexer
+// aqui sem mexer lá faz o CSS e o JS discordarem sobre em que modo a sala
+// está, e o resultado é coluna escondida sem aba que a traga de volta.
+// A altura entra na conta porque celular deitado tem 844px de largura: passa
+// por qualquer teste de largura e ainda assim é um celular.
+const TELA_CEL = window.matchMedia?.(
+  '(max-width:760px),(max-height:500px) and (orientation:landscape)') || null;
+const DEDO = !!window.matchMedia?.('(hover:none)')?.matches;
+const noCelular = () => !!TELA_CEL?.matches;
+
 // A barra de canais fica sempre à esquerda e fora dessa dança; as três de
 // dentro da sala trocam de lugar arrastando o cabeçalho.
 const COLS = {
@@ -890,6 +904,28 @@ let colOrder = (() => {
 const colPref = k => { try { return localStorage.getItem('cit.col2.' + k); } catch { return null; } };
 const soChat = () => document.documentElement.classList.contains('view-chat-only');
 
+// Qual das três colunas está em cena no celular. Fica guardada no navegador
+// para o agente voltar na aba em que estava, e não no padrão de sempre.
+let colCel = (() => { try { return localStorage.getItem('cit.colcel'); } catch { return null; } })();
+if (!INNER.includes(colCel)) colCel = null;
+
+/**
+ * A aba aberta agora. Sem escolha explícita o padrão segue o canal: onde há
+ * operação a conversa não é o principal, e abrir no chat esconderia justamente
+ * o que o agente veio ler.
+ */
+function abaCel() {
+  if (soChat()) return 'chat';
+  return colCel || (temDossie ? 'entries' : 'chat');
+}
+
+function trocaAba(k) {
+  if (!INNER.includes(k)) return;
+  colCel = k;
+  try { localStorage.setItem('cit.colcel', k); } catch {}
+  layout();
+}
+
 let temDossie = false;   // o canal atual tem alguma operação?
 function marcaDossies(v) {
   const antes = temDossie;
@@ -903,6 +939,11 @@ function marcaDossies(v) {
  * no botão da coluna para a escolha dele passar a mandar.
  */
 function colVisivel(k) {
+  // No celular não há três colunas: há três abas e uma delas em cena. A barra
+  // de canais fica sempre "visível" porque ali ela é gaveta — quem a esconde
+  // e mostra é a classe `.open`, não o colapso de coluna. Deixá-la colapsada
+  // no celular trancava o agente na sala, sem nada que abrisse a lista.
+  if (noCelular()) return k === 'side' ? true : k === abaCel();
   if (soChat()) {
     if (k === 'entries' || k === 'dossier') return false;
     // no geral o chat é a sala inteira: recolhido em outro canal, ele não pode
@@ -970,7 +1011,10 @@ function salaMedida() {
 function maxCol(k) {
   const c = COLS[k];
   if (!c?.css) return 0;
-  if (k === 'side') return Math.max(c.min, Math.min(c.max, innerWidth - 480));
+  // No celular a gaveta flutua por cima da sala, então não disputa largura
+  // com ninguém. A conta de desktop (reservar 480px para a sala) dava negativo
+  // numa tela de 390px e devolvia o mínimo: a gaveta abria com 150px.
+  if (k === 'side') return noCelular() ? c.max : Math.max(c.min, Math.min(c.max, innerWidth - 480));
   // Sem medida ainda (app escondido, primeira pintura): nenhum teto. Apertar
   // com base em zero devolveria o mínimo e apagaria a largura escolhida.
   if (!salaMedida()) return c.max;
@@ -1061,6 +1105,12 @@ function larguraCol(k, px) {
 
 /** Reaplica as larguras dentro do teto atual (janela menor, coluna recolhida). */
 function reajustaLarguras() {
+  // No celular só há uma coluna em cena e ela ocupa a sala inteira: não há
+  // largura a repartir. Deixar a conta rodar aqui seria pior do que inútil —
+  // o teto de uma tela de 390px é menor que qualquer largura escolhida no PC,
+  // e o ajuste GRAVA o resultado. Abrir o site no celular uma vez bastava
+  // para o agente voltar ao computador com as colunas espremidas.
+  if (noCelular()) return;
   if (!salaMedida()) return;          // nada a reajustar antes de existir sala
   Object.keys(COLS).forEach(k => {
     if (!COLS[k].css) return;
@@ -1099,7 +1149,12 @@ function ordenaCols(mover, alvo, antes) {
   layout();
 
   document.querySelectorAll('.col-tg').forEach(b => {
-    b.onclick = () => abreCol(b.dataset.col, document.documentElement.classList.contains('no-' + b.dataset.col));
+    b.onclick = () => {
+      // Mesmo botão, dois papéis: no PC ele abre e recolhe a coluna; no
+      // celular ele é a aba, e aba não "fecha" — ela troca.
+      if (noCelular()) return trocaAba(b.dataset.col);
+      abreCol(b.dataset.col, document.documentElement.classList.contains('no-' + b.dataset.col));
+    };
   });
   document.querySelectorAll('.col-x').forEach(b => {
     b.onclick = () => abreCol(b.dataset.col, false);
@@ -1115,7 +1170,7 @@ function ordenaCols(mover, alvo, antes) {
     const alca = head?.querySelector('.col-drag');
     if (!head || !alca) return;
     const key = sec.dataset.col;
-    alca.draggable = true;
+    alca.draggable = !DEDO;
 
     alca.addEventListener('dragstart', e => {
       puxada = key;
@@ -1173,6 +1228,15 @@ function ordenaCols(mover, alvo, antes) {
   addEventListener('mouseup', up);
   addEventListener('touchend', up);
   addEventListener('resize', reajustaLarguras);
+  // Girar o celular, ou arrastar a janela do PC por cima dos 760px, troca o
+  // modelo de layout inteiro. Sem este aviso a sala ficava no modelo errado
+  // até a próxima troca de canal.
+  TELA_CEL?.addEventListener?.('change', () => {
+    // Saindo do modo celular a gaveta precisa fechar junto: no PC ela é parte
+    // da sala, e o véu por cima de tudo ficaria sem quem o tirasse.
+    if (!noCelular()) window.GAVETA?.(false);
+    layout();
+  });
 })();
 
 // ---------- trava de acesso por código ----------
@@ -1562,7 +1626,26 @@ $('#msg').addEventListener('input', grow);
 $('#msg').addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
 });
-$('#menu').onclick = () => $('#side').classList.toggle('open');
+// ---------- a gaveta de canais no celular ----------
+// A classe fica em dois lugares de propósito: `.open` move a gaveta, e
+// `.side-aberta` na raiz acende o véu que escurece a sala atrás. O véu é um
+// elemento de verdade, não mais um `box-shadow` gigante — sombra não recebe
+// toque, e por isso tocar fora da gaveta não fechava nada.
+function gaveta(abrir) {
+  const s = $('#side');
+  const v = abrir === undefined ? !s.classList.contains('open') : !!abrir;
+  s.classList.toggle('open', v);
+  document.documentElement.classList.toggle('side-aberta', v);
+}
+window.GAVETA = gaveta;
+
+$('#menu').onclick = () => gaveta();
+$('#side-veu').onclick = () => gaveta(false);
+// ESC fecha a gaveta antes de qualquer outra coisa — com teclado acoplado ao
+// celular, ou na janela estreita do PC, é o atalho que se tenta primeiro.
+addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.documentElement.classList.contains('side-aberta')) gaveta(false);
+});
 
 $('#kick').onclick = async () => {
   const id = chan.replace('agent:', ''), p = people[id];
