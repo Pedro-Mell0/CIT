@@ -1682,8 +1682,10 @@ create trigger links_touch before update on public.links
   for each row execute function public.touch_updated_at();
 
 -- ---------- posição dos nós ----------
--- A teia é um quadro de investigação: onde cada nó foi parar é informação, e
--- vale para todo mundo que abre a mesma aba — como a ordem da barra lateral.
+-- Esta tabela está PARADA desde que a teia virou 3D: o lugar de cada nó passou
+-- a ser calculado, e num plano que gira não existe "arrastar o nó para cá".
+-- Fica de pé porque é barata e porque guarda o que já foi arrumado à mão — se
+-- um dia voltar a arrumação, volta daqui, e não do zero.
 create table if not exists public.node_positions (
   view_key   text not null,            -- 'geral' ou 'op:<uuid>'
   node_kind  text not null,

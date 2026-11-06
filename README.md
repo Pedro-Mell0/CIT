@@ -453,6 +453,23 @@ de uma operação segue o sigilo do canal dela: quem lê o canal, abre a aba.
 
 ### Lendo o quadro
 
+A teia é **tridimensional**. O centro — FUKUROU na Teia Geral, a própria
+operação na aba de um canal — fica no meio; as operações se abrem num anel em
+volta; e cada entidade orbita a operação em que foi apurada. A que aparece em
+mais de uma flutua entre elas, acima do plano: é ali que ela de fato está.
+
+O plano **gira sozinho**, devagar e no sentido horário — uma volta a cada dois
+minutos. O lugar de cada nó é calculado, não sorteado: o quadro gira, mas não
+embaralha, e quem fechou a teia com uma pessoa à direita da operação a
+reencontra ali.
+
+Não entra biblioteca 3D. O desenho é feito à mão num canvas, com a projeção em
+perspectiva calculada na página: são dezenas de nós e algumas centenas de
+linhas, e isso custa menos do que carregar um motor inteiro — de quebra, o
+quadro sai com a fonte e as cores do site. Enquanto a teia está aberta o ruído
+de CRT se cala, porque ali cada quadro já tem dono. O botão ⏹ não é mexido: ao
+sair da página o tubo volta como estava.
+
 Todo nó é redondo, e quem diz o tipo é a **cor**: pessoa em violeta, local em
 dourado, veículo em azul, organização em ciano, informação em cinza, operação
 em ciano. Com foto, o nó mostra a miniatura; sem foto, a coruja do CIT pintada
@@ -466,9 +483,10 @@ pontilhado é *provável*, tracejado é *suposto*. Linha tracejada dourada é a
 **conexão detectada automaticamente**: aquela entidade aparece em mais de uma
 operação que você alcança.
 
-- **Arrastar o nó** muda o lugar dele, e o lugar fica gravado para todo mundo
-  que abre a mesma aba — é quadro de investigação, não arrumação pessoal.
-- **Rolar** dá zoom; **arrastar o fundo** move a tela.
+- **Segurar ESPAÇO e arrastar** gira o plano à mão, nos dois eixos. Enquanto a
+  mão está no arrasto o giro automático espera; soltando, ele continua de onde
+  o agente deixou.
+- **Rolar** dá zoom; **arrastar** sem o ESPAÇO move a tela.
 - **Clicar no nó** faz a ficha dele entrar pela direita, de cima a baixo do
   palco (foto, galeria, resumo, apelidos, operações em que aparece e a lista
   de relacionamentos), e destaca todos os vínculos daquele nó, esmaecendo o
@@ -554,9 +572,9 @@ seleciona e centraliza o nó.
 
 **FILTROS** liga e desliga por **tipo de nó**, por **tipo de vínculo** e, na
 Teia Geral, por **operação**. O botão acende em dourado enquanto houver filtro,
-e a contagem no topo avisa *FILTRADO*. Filtro ligado não grava posição: o
-desenho ali é de um recorte, e gravá-lo embaralharia o lugar dos nós no quadro
-inteiro. O filtro por operação não sobrevive à troca de aba.
+e a contagem no topo avisa *FILTRADO*. O filtro por operação não sobrevive à
+troca de aba: na teia individual ele não quer dizer nada, e voltando para a
+geral seria um filtro invisível.
 
 **Sigilo.** A teia usa o sistema que o CIT já tem, e não filtra nada à mão:
 as consultas saem cruas e o RLS corta o que o agente não alcança. O que não

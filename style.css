@@ -472,6 +472,13 @@ mark{background:#45e3ff33;color:var(--cyan);padding:0 .1rem}
   72%{opacity:1}
 }
 
+/* A teia já desenha o próprio quadro sessenta vezes por segundo. Enquanto ela
+   está aberta o tubo se cala: a varredura e as listras disputariam a mesma GPU
+   para enfeitar uma tela que o agente está usando para trabalhar. Isto não
+   mexe na preferência do botão ⏹ — é só por esta página, e volta ao sair dela. */
+:root.teia-aberta #crt{display:none}
+:root.teia-aberta body::after{content:none}
+
 @media print{#crt{display:none!important}}
 @media(prefers-reduced-motion:reduce){#crt{display:none!important}}
 
@@ -914,6 +921,10 @@ button.ent-chip-n:hover{color:var(--cyan);text-decoration:underline}
 .tw-palco{flex:1;position:relative;min-height:0;overflow:hidden;
   background:radial-gradient(620px 420px at 50% 45%,#2a1a6e22,transparent)}
 .tw-grafo{position:absolute;inset:0}
+/* O palco 3D. `touch-action:none` entrega o gesto inteiro ao canvas: sem isso
+   o navegador rola a página no meio do arrasto. */
+.tw-cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.tw-cv.girando{cursor:grabbing}
 /* a grade por baixo do grafo é a mesma linguagem do fundo do chat */
 .tw-palco::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.25;
   background-image:linear-gradient(var(--line) 1px,transparent 1px),

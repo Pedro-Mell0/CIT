@@ -1587,7 +1587,9 @@ $('#new-ch').onclick = () => window.MANAGE?.newMenu?.();
 
   const pulso = () => {
     setTimeout(() => {
-      if (ligado() && !document.hidden) {
+      // Com a teia aberta a vacilada fica de fora: ela anima a opacidade do
+      // #app inteiro, e ali cada quadro já tem dono.
+      if (ligado() && !document.hidden && !html.classList.contains('teia-aberta')) {
         html.classList.add('flick');
         setTimeout(() => html.classList.remove('flick'), 280);
       }

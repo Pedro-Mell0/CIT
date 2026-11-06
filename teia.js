@@ -44,17 +44,20 @@
     witnesses: 'Testemunha', victims: 'Vítima',
   };
 
-  let root = null, cy = null;
+  let root = null;
+  // O grafo da vista atual: a lista de nós, a de arestas, o índice por id e
+  // quem toca quem. Era isto que o Cytoscape guardava; agora que o desenho é
+  // nosso, o modelo também é — e cabe em quatro campos.
+  let G = { nos: [], arestas: [], porId: {}, toca: {} };
   let vista = 'geral';          // 'geral' ou o id da operação
   let selecionado = null;
-  let dados = { ops: [], vincs: [], links: [], pos: {}, fotos: {}, conexoes: [] };
+  let dados = { ops: [], vincs: [], links: [], fotos: {}, conexoes: [] };
   let carregando = false;
   // `null` em qualquer um quer dizer "tudo": é o estado de quem nunca mexeu
   // nos filtros, e evita ter de encher três conjuntos a cada carregamento.
   let filtros = { tipos: null, vincs: null, ops: null };
   const filtrando = () => !!(filtros.tipos || filtros.vincs || filtros.ops);
 
-  const chaveVista = () => (vista === 'geral' ? 'geral' : 'op:' + vista);
   const noOp  = id => 'op:' + id;
   const noEnt = id => 'ent:' + id;
   const parte = id => ({ kind: id.slice(0, 3) === 'op:' ? 'op' : 'ent', id: id.slice(id.indexOf(':') + 1) });
@@ -98,85 +101,524 @@
     return (cacheSvg[cor] = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg));
   }
 
-  const estilo = () => [
-    { selector: 'node', style: {
-      'label': 'data(nome)',
-      'color': '#d8d5ff',
-      'font-family': 'JetBrains Mono, monospace',
-      'font-size': 9,
-      'text-valign': 'bottom',
-      'text-margin-y': 6,
-      'text-wrap': 'ellipsis',
-      'text-max-width': 110,
-      'background-color': '#0a0622',
-      'background-image': 'data(img)',
-      'background-fit': 'cover',
-      'border-width': 2,
-      'border-color': 'data(cor)',
-      'shape': 'ellipse',
-      'width': 'data(tam)',
-      'height': 'data(tam)',
-      'transition-property': 'opacity',
-      'transition-duration': '120ms',
-    } },
-    { selector: 'node.fukurou', style: {
-      'border-width': 3, 'font-size': 12, 'color': '#45e3ff',
-      'text-margin-y': 9, 'font-family': 'Chakra Petch, sans-serif',
-    } },
-    // A operação não tem retrato: o nome dela É o desenho do nó. Rótulo no
-    // centro, quebrando em linhas dentro do círculo, e nada embaixo.
-    { selector: 'node.operacao', style: {
-      'background-image': 'none',
-      'background-color': '#071a38',
-      'text-valign': 'center',
-      'text-halign': 'center',
-      'text-margin-y': 0,
-      'text-wrap': 'wrap',
-      'text-max-width': 'data(larg)',
-      'font-family': 'Chakra Petch, sans-serif',
-      'font-size': 11,
-      'color': '#bff3ff',
-    } },
-    { selector: 'node.sigiloso', style: { 'border-style': 'double', 'border-color': '#ff2e5f' } },
-    { selector: 'node:selected', style: { 'border-width': 4, 'border-color': '#fff' } },
-    { selector: 'node.foco', style: { 'border-width': 4 } },
+  // ============================================================== o palco 3D
+  /**
+   * A teia é desenhada à mão, num canvas 2D, com a projeção em perspectiva
+   * feita aqui mesmo. Não entra biblioteca 3D de propósito: são dezenas de nós
+   * e algumas centenas de linhas, e girar e projetar isso custa menos do que
+   * carregar um motor inteiro. De quebra o desenho sai com a fonte e as cores
+   * do site — que é justamente o que uma textura de WebGL não dá de graça.
+   *
+   * O mundo gira sozinho em torno do eixo vertical, devagar, no sentido
+   * horário. A câmera só muda de ângulo quando o agente segura ESPAÇO e
+   * arrasta; arrastar sem o ESPAÇO desloca a vista, e a roda aproxima.
+   */
+  const TAU = Math.PI * 2;
+  const FOCAL = 900;        // distância focal da projeção
+  const GIRO = 0.055;       // rad/s — uma volta a cada ~114 segundos
+  const DICA = 'clique no nó → ficha e vínculos · duplo clique na operação → abre a aba ' +
+               'dela · segure ESPAÇO e arraste para girar o plano';
 
-    { selector: 'edge', style: {
-      'width': 1.4,
-      'line-color': 'data(cor)',
-      'opacity': .55,
-      'curve-style': 'straight',
-      'label': 'data(rotulo)',
-      'font-size': 7,
-      'color': '#7d76b9',
-      'text-background-color': '#04020c',
-      'text-background-opacity': .8,
-      'text-background-padding': 2,
-      'transition-property': 'opacity',
-      'transition-duration': '120ms',
-    } },
-    // Suposto é tracejado, provável é pontilhado curto, confirmado é cheio:
-    // o nível de confiança tem que se ler sem clicar em nada.
-    { selector: 'edge[conf = "suposto"]',  style: { 'line-style': 'dashed', 'opacity': .32 } },
-    { selector: 'edge[conf = "provavel"]', style: { 'line-style': 'dotted' } },
-    // A conexão que o sistema achou sozinha: a entidade está em mais de uma
-    // operação. Fica tracejada e mais viva, para destoar do vínculo digitado.
-    { selector: 'edge.compartilhado', style: { 'line-style': 'dashed', 'width': 2, 'opacity': .85 } },
-    { selector: 'edge.foco', style: { 'width': 2.6, 'opacity': 1 } },
+  // `giro` é o do relógio, que anda sozinho; `yaw` e `pitch` são do agente.
+  // Separados, porque soltar o arrasto não pode desfazer o que já girou.
+  // `dist` é só a força da perspectiva — quanto o que está na frente cresce em
+  // relação ao que está atrás. O tamanho na tela é `zoom`, à parte: misturar os
+  // dois faria o enquadramento achatar ou esticar a profundidade junto.
+  const cam = { giro: 0, yaw: 0, pitch: .42, dist: 2400, zoom: 1, px: 0, py: 0 };
 
-    { selector: '.apagado', style: { 'opacity': .12, 'text-opacity': .12 } },
-  ];
+  let cena = null;          // o canvas e o laço, enquanto a teia está aberta
+  let foco = null;          // { nos:Set, arestas:Set } enquanto há seleção
+  let espaco = false;       // a barra está pressionada?
+
+  const noDe = id => G.porId[id] || null;
+  const ligacoesDe = id => G.toca[id] || [];
+  const emFoco = id => !foco || foco.nos.has(id);
+  const corta = (t, n) => (String(t).length > n ? String(t).slice(0, n - 1) + '…' : String(t));
+
+  // ---------------------------------------------------------------- lugares
+  /** Ponto i de n espalhados por igual numa esfera (espiral de Fibonacci). */
+  function naEsfera(i, n) {
+    const y = n < 2 ? 0 : 1 - (i / (n - 1)) * 2;
+    const r = Math.sqrt(Math.max(0, 1 - y * y));
+    const th = i * 2.39996322972865332;        // o ângulo de ouro
+    return { x: Math.cos(th) * r, y, z: Math.sin(th) * r };
+  }
+
+  /**
+   * O lugar de cada nó no espaço. O centro — FUKUROU na teia geral, a própria
+   * operação na teia de um canal — fica na origem; as operações se abrem num
+   * anel em volta; e cada entidade orbita a operação em que foi apurada. A que
+   * aparece em mais de uma fica no meio do caminho entre elas, um pouco acima:
+   * é ali que ela de fato está, e é isso que o quadro tem de mostrar.
+   *
+   * A conta é determinística de propósito. O plano gira, mas não embaralha:
+   * quem fechou a teia com uma pessoa à direita da operação a reencontra ali.
+   */
+  function layout3d() {
+    const nivel = n => G.nos.filter(x => x.nivel === n);
+    const centro = nivel(0)[0] || nivel(1)[0] || null;
+    const ops = nivel(1).filter(o => o !== centro);
+    if (centro) centro.p = { x: 0, y: 0, z: 0 };
+
+    const R1 = 320 + ops.length * 42;
+    ops.forEach((o, i) => {
+      const a = (i / ops.length) * TAU;
+      o.p = { x: Math.cos(a) * R1, y: (i % 2 ? 1 : -1) * R1 * .12, z: Math.sin(a) * R1 };
+    });
+
+    // De que operação é cada entidade, nesta vista.
+    const donos = {};
+    G.arestas.forEach(a => {
+      if (a.tipo !== 'operacao') return;
+      (donos[a.para] = donos[a.para] || []).push(a.de);
+    });
+
+    // Entidades do mesmo conjunto de operações viram um grupo, e o grupo
+    // inteiro se distribui numa esfera em volta do ponto médio dos donos.
+    const grupos = new Map();
+    nivel(2).forEach(e => {
+      const meus = [...new Set(donos[e.id] || [])].sort();
+      const chave = meus.join('|') || 'solto';
+      let g = grupos.get(chave);
+      if (!g) {
+        const ps = meus.map(id => noDe(id)?.p).filter(Boolean);
+        const m = (c) => ps.reduce((s, p) => s + p[c], 0) / ps.length;
+        const base = ps.length
+          ? { x: m('x'), y: m('y') + (ps.length > 1 ? 170 : 0), z: m('z') }
+          : { x: 0, y: 0, z: 0 };
+        // Duas operações em lados opostos do anel dão ponto médio bem em cima
+        // do centro — e aí a entidade compartilhada cobre o FUKUROU. Empurra
+        // para fora, mantendo a direção: ela continua entre as duas.
+        if (ps.length > 1) {
+          const minimo = Math.max(220, R1 * .55);
+          const raio = Math.hypot(base.x, base.z);
+          if (raio < minimo) {
+            const ang = raio > 1 ? Math.atan2(base.z, base.x)
+                                 : Math.atan2(ps[0].z, ps[0].x);
+            base.x = Math.cos(ang) * minimo;
+            base.z = Math.sin(ang) * minimo;
+          }
+        }
+        grupos.set(chave, (g = { base, itens: [] }));
+      }
+      g.itens.push(e);
+    });
+
+    grupos.forEach(g => {
+      const n = g.itens.length;
+      const raio = (ops.length ? 145 : 290) * (.6 + Math.min(1, n / 16) * .9);
+      g.itens.forEach((e, i) => {
+        const d = naEsfera(i, n);
+        e.p = { x: g.base.x + d.x * raio, y: g.base.y + d.y * raio * .7, z: g.base.z + d.z * raio };
+      });
+    });
+
+    // A câmera fica longe o bastante para a perspectiva ser suave: de perto, o
+    // nó da frente ficaria três vezes maior que o de trás e o quadro inteiro
+    // teria de recuar para caber o pior ângulo do giro.
+    let longe = 1;
+    G.nos.forEach(n => { longe = Math.max(longe, Math.hypot(n.p.x, n.p.y, n.p.z)); });
+    cam.dist = Math.max(900, longe * 4.2);
+  }
+
+  /**
+   * Recua a câmera até o quadro inteiro caber — e não só no ângulo de agora.
+   * O plano gira, então a conta é feita em oito ângulos e vale a pior sobra:
+   * enquadrar só o que está à vista faria o grafo transbordar meio minuto
+   * depois, sozinho, sem ninguém ter encostado em nada.
+   */
+  function enquadra() {
+    if (!cena || !G.nos.length) return;
+    const yaw0 = cam.yaw;
+    const caixa = () => {
+      let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+      for (let g = 0; g < 8; g++) {
+        cam.yaw = yaw0 + (g / 8) * TAU;
+        for (const n of G.nos) {
+          const s = projeta(n.p);
+          if (!s) return null;                 // alguém atrás da câmera: recua
+          const r = (n.tam / 2) * s.k + 16;
+          x0 = Math.min(x0, s.x - r); x1 = Math.max(x1, s.x + r);
+          y0 = Math.min(y0, s.y - r); y1 = Math.max(y1, s.y + r);
+        }
+      }
+      return { x0, x1, y0, y1 };
+    };
+
+    for (let i = 0; i < 24; i++) {
+      const c = caixa();
+      if (!c) { cam.dist *= 1.25; continue; }
+      const f = Math.max((c.x1 - c.x0) / cena.w, (c.y1 - c.y0) / cena.h);
+      if (f <= 1.0 && f >= .88) break;
+      cam.zoom = Math.max(.15, Math.min(6, cam.zoom / Math.min(1.6, Math.max(.62, f))));
+    }
+
+    // A perspectiva joga o lado de perto para baixo: o meio do desenho não é o
+    // meio da tela, e sem este acerto o quadro nasce encostado no rodapé.
+    const c = caixa();
+    cam.yaw = yaw0;
+    if (c) cam.py += cena.cy - (c.y0 + c.y1) / 2;
+  }
+
+  // -------------------------------------------------------------- projeção
+  function projeta(p) {
+    const a = cam.giro + cam.yaw;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    const x1 = p.x * ca + p.z * sa;
+    const z1 = p.z * ca - p.x * sa;
+    const cb = Math.cos(cam.pitch), sb = Math.sin(cam.pitch);
+    const y2 = p.y * cb - z1 * sb;
+    const z2 = p.y * sb + z1 * cb;
+    const prof = cam.dist - z2;                // o que está mais perto é maior
+    if (prof < 90) return null;
+    const k = FOCAL * cam.zoom / prof;
+    return { x: cena.cx + cam.px + x1 * k, y: cena.cy + cam.py - y2 * k, k, prof };
+  }
+
+  // --------------------------------------------------------------- figuras
+  // Cada nó é desenhado UMA vez num canvas de 128 e reaproveitado em todo
+  // quadro. Sem isto seriam cem recortes circulares por quadro, sessenta vezes
+  // por segundo, para desenhar sempre a mesma coisa.
+  const figuras = {};
+  const retratos = {};
+
+  function retrato(src) {
+    let im = retratos[src];
+    if (!im) { im = retratos[src] = new Image(); im.src = src; }
+    return im.complete && im.naturalWidth ? im : null;
+  }
+
+  /** O nome da operação, quebrado em linhas que cabem dentro do círculo. */
+  function escreveDentro(x, texto, c, r) {
+    const larg = r * 1.5;
+    for (const corpo of [16, 14, 12, 10, 9]) {
+      x.font = '600 ' + corpo + 'px "Chakra Petch", sans-serif';
+      const linhas = [];
+      let atual = '';
+      String(texto).split(/\s+/).forEach(p => {
+        const tenta = atual ? atual + ' ' + p : p;
+        if (x.measureText(tenta).width > larg && atual) { linhas.push(atual); atual = p; }
+        else atual = tenta;
+      });
+      if (atual) linhas.push(atual);
+      const cabe = linhas.every(l => x.measureText(l).width <= larg) &&
+                   linhas.length * (corpo + 2) <= r * 1.7;
+      if (!cabe && corpo > 9) continue;
+      const alt = corpo + 2;
+      const y0 = c - ((linhas.length - 1) * alt) / 2;
+      x.textAlign = 'center';
+      x.textBaseline = 'middle';
+      x.fillStyle = '#bff3ff';
+      linhas.forEach((l, i) => x.fillText(l, c, y0 + i * alt));
+      return;
+    }
+  }
+
+  function figura(n) {
+    const chave = n.kind === 'operacao'
+      ? 'op|' + n.nome + '|' + (n.sigiloso ? 's' : '')
+      : n.kind + '|' + n.cor + '|' + n.img;
+    if (figuras[chave]) return figuras[chave];
+
+    let im = null;
+    if (n.kind !== 'operacao') {
+      im = retrato(n.img);
+      if (!im) return null;              // volta no próximo quadro, já carregada
+    }
+
+    const L = 128, c = L / 2, r = c - 4;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = L;
+    const x = cv.getContext('2d');
+
+    x.save();
+    x.beginPath(); x.arc(c, c, r, 0, TAU); x.clip();
+    if (n.kind === 'operacao') {
+      x.fillStyle = '#071a38'; x.fillRect(0, 0, L, L);
+      escreveDentro(x, n.nome, c, r);
+    } else {
+      x.fillStyle = FUNDO; x.fillRect(0, 0, L, L);
+      const esc = L / Math.max(im.naturalWidth, im.naturalHeight);
+      const w = im.naturalWidth * esc, h = im.naturalHeight * esc;
+      x.drawImage(im, c - w / 2, c - h / 2, w, h);
+    }
+    x.restore();
+
+    x.lineWidth = 5;
+    x.strokeStyle = n.cor;
+    x.beginPath(); x.arc(c, c, r - 2, 0, TAU); x.stroke();
+    if (n.sigiloso) {
+      x.lineWidth = 3; x.strokeStyle = '#ff2e5f';
+      x.beginPath(); x.arc(c, c, r - 9, 0, TAU); x.stroke();
+    }
+    return (figuras[chave] = cv);
+  }
+
+  // A fonte da casa pode não ter chegado quando a primeira figura foi feita, e
+  // aí o nome da operação ficaria gravado numa fonte qualquer para sempre.
+  document.fonts?.ready?.then(() => { Object.keys(figuras).forEach(k => delete figuras[k]); });
+
+  // --------------------------------------------------------------- o quadro
+  function pinta() {
+    const ctx = cena.ctx;
+    ctx.setTransform(cena.dpr, 0, 0, cena.dpr, 0, 0);
+    ctx.clearRect(0, 0, cena.w, cena.h);
+    ctx.lineCap = 'round';
+
+    G.nos.forEach(n => { n.s = projeta(n.p); });
+
+    // Rótulo em toda linha só faz sentido quando há poucas: na teia geral eles
+    // viram um borrão. Com seleção aberta, o do ramo escolhido aparece sempre.
+    const rotulos = G.arestas.length <= 40;
+    G.arestas.forEach(a => {
+      const A = noDe(a.de)?.s, B = noDe(a.para)?.s;
+      if (A && B) pintaAresta(a, A, B, rotulos);
+    });
+
+    G.nos.filter(n => n.s).sort((x, y) => y.s.prof - x.s.prof).forEach(pintaNo);
+  }
+
+  function pintaAresta(a, A, B, rotulos) {
+    const ctx = cena.ctx;
+    const dentro = !foco || foco.arestas.has(a.id);
+    const k = Math.min(1.5, (A.k + B.k) / 2);
+    ctx.globalAlpha = foco ? (dentro ? .95 : .05)
+      : a.conf === 'suposto' ? .28 : a.compartilhado ? .7 : .42;
+    ctx.strokeStyle = a.cor;
+    ctx.lineWidth = Math.max(.7, (foco && dentro ? 2.2 : a.compartilhado ? 1.5 : 1) * k);
+    // Suposto é tracejado, provável é pontilhado curto, confirmado é cheio — e
+    // a conexão que o sistema achou sozinha tem tracejado largo, para destoar.
+    ctx.setLineDash(a.conf === 'suposto' ? [7, 6]
+      : a.conf === 'provavel' ? [2, 5]
+      : a.compartilhado ? [9, 7] : []);
+    ctx.beginPath();
+    ctx.moveTo(A.x, A.y);
+    ctx.lineTo(B.x, B.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    if (!a.rotulo || ctx.globalAlpha < .3) return;
+    if (!rotulos && !(foco && dentro)) return;
+    const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2;
+    const corpo = Math.max(7, Math.min(10, 8 * k));
+    ctx.font = corpo + 'px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const w = ctx.measureText(a.rotulo).width;
+    ctx.fillStyle = '#04020c';
+    ctx.globalAlpha *= .85;
+    ctx.fillRect(mx - w / 2 - 3, my - corpo / 2 - 2, w + 6, corpo + 4);
+    ctx.fillStyle = '#9d95dd';
+    ctx.fillText(a.rotulo, mx, my);
+  }
+
+  function pintaNo(n) {
+    const ctx = cena.ctx, s = n.s;
+    const r = Math.max(6, (n.tam / 2) * s.k);
+    // O que está longe esmaece um pouco: é o que dá profundidade ao quadro.
+    ctx.globalAlpha = foco && !emFoco(n.id) ? .1 : Math.max(.5, Math.min(1, s.k * 1.15));
+
+    const fig = figura(n);
+    if (fig) {
+      ctx.drawImage(fig, s.x - r, s.y - r, r * 2, r * 2);
+    } else {
+      ctx.fillStyle = FUNDO; ctx.strokeStyle = n.cor; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, TAU); ctx.fill(); ctx.stroke();
+    }
+
+    if (n.id === selecionado || n.id === cena.sobre) {
+      ctx.globalAlpha = Math.min(1, ctx.globalAlpha + .3);
+      ctx.strokeStyle = n.id === selecionado ? '#fff' : n.cor;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(s.x, s.y, r + 5, 0, TAU); ctx.stroke();
+    }
+
+    if (n.kind === 'operacao') return;        // o nome dela já está dentro do nó
+    if (ctx.globalAlpha < .18) return;
+    const eCentro = n.kind === 'fukurou';
+    const corpo = Math.max(7.5, Math.min(13, 9.5 * s.k));
+    ctx.font = (eCentro ? '600 ' : '') + corpo + 'px ' +
+      (eCentro ? '"Chakra Petch", sans-serif' : '"JetBrains Mono", monospace');
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = eCentro ? '#45e3ff' : '#cfc9ff';
+    ctx.fillText(corta(n.nome, 24), s.x, s.y + r + 4);
+  }
+
+  // ------------------------------------------------------------- apontar
+  function noEm(x, y) {
+    let achado = null;
+    G.nos.forEach(n => {
+      if (!n.s) return;
+      const r = Math.max(8, (n.tam / 2) * n.s.k) + 3;
+      if (Math.hypot(n.s.x - x, n.s.y - y) <= r &&
+          (!achado || n.s.prof < achado.s.prof)) achado = n;
+    });
+    return achado;
+  }
+
+  function distSeg(px, py, ax, ay, bx, by) {
+    const vx = bx - ax, vy = by - ay;
+    const l2 = vx * vx + vy * vy;
+    const t = l2 ? Math.max(0, Math.min(1, ((px - ax) * vx + (py - ay) * vy) / l2)) : 0;
+    return Math.hypot(px - (ax + t * vx), py - (ay + t * vy));
+  }
+
+  function arestaEm(x, y) {
+    let achada = null, melhor = 7;
+    G.arestas.forEach(a => {
+      const A = noDe(a.de)?.s, B = noDe(a.para)?.s;
+      if (!A || !B) return;
+      const d = distSeg(x, y, A.x, A.y, B.x, B.y);
+      if (d < melhor) { melhor = d; achada = a; }
+    });
+    return achada;
+  }
+
+  /** Traz o nó para a frente da câmera e aproxima. O plano segue girando. */
+  function centraliza(n) {
+    if (!n?.p || !cena) return;
+    cam.yaw = Math.atan2(-n.p.x, n.p.z) - cam.giro;
+    cam.zoom = Math.max(cam.zoom, 1.5);
+    cam.px = cam.py = 0;
+    const s = projeta(n.p);
+    if (s) { cam.px += cena.cx - s.x; cam.py += cena.cy - s.y; }
+  }
+
+  // ---------------------------------------------------------------- a cena
+  function liga(cv) {
+    let arrasto = null;
+    const ponto = e => {
+      const r = cv.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    };
+
+    cv.addEventListener('pointerdown', e => {
+      if (e.button !== 0) return;
+      cv.setPointerCapture(e.pointerId);
+      const p = ponto(e);
+      arrasto = { x: p.x, y: p.y, gira: espaco, andou: 0 };
+      cena.parado = espaco;                   // girando à mão, o relógio espera
+      cv.classList.toggle('girando', espaco);
+    });
+
+    cv.addEventListener('pointermove', e => {
+      const p = ponto(e);
+      if (!arrasto) {
+        const n = noEm(p.x, p.y);
+        cena.sobre = n ? n.id : null;
+        cv.style.cursor = n ? 'pointer' : espaco ? 'grab' : 'default';
+        return;
+      }
+      const dx = p.x - arrasto.x, dy = p.y - arrasto.y;
+      arrasto.andou += Math.abs(dx) + Math.abs(dy);
+      arrasto.x = p.x; arrasto.y = p.y;
+      if (arrasto.gira) {
+        cam.yaw -= dx * .006;
+        cam.pitch = Math.max(-1.35, Math.min(1.35, cam.pitch + dy * .005));
+      } else {
+        cam.px += dx; cam.py += dy;
+      }
+    });
+
+    const solta = e => {
+      if (!arrasto) return;
+      const clique = arrasto.andou < 5;
+      arrasto = null;
+      cena.parado = false;
+      cv.classList.remove('girando');
+      if (!clique) return;
+      const p = ponto(e);
+      const n = noEm(p.x, p.y);
+      if (n) return seleciona(n.id);
+      const a = arestaEm(p.x, p.y);
+      if (a) return selecionaVinculo(a);
+      limpaSelecao();
+    };
+    cv.addEventListener('pointerup', solta);
+    cv.addEventListener('pointercancel', () => {
+      arrasto = null; cena.parado = false; cv.classList.remove('girando');
+    });
+
+    cv.addEventListener('dblclick', e => {
+      const p = ponto(e);
+      const n = noEm(p.x, p.y);
+      if (n && n.kind === 'operacao' && vista === 'geral') openChannel('teia:' + n.id.slice(3));
+    });
+
+    cv.addEventListener('wheel', e => {
+      e.preventDefault();
+      cam.zoom = Math.max(.2, Math.min(6, cam.zoom * (e.deltaY > 0 ? 1 / 1.12 : 1.12)));
+    }, { passive: false });
+  }
+
+  function quadro(t) {
+    if (!cena) return;
+    cena.raf = requestAnimationFrame(quadro);
+    const dt = Math.min(.05, (t - cena.t) / 1000);
+    cena.t = t;
+    if (document.hidden) return;              // aba escondida não gasta quadro
+    if (!cena.parado) cam.giro -= GIRO * dt;  // negativo = horário na tela
+    pinta();
+  }
+
+  function criaCena(palco) {
+    const cv = el('canvas', 'tw-cv');
+    palco.innerHTML = '';
+    palco.append(cv);
+    cena = { cv, ctx: cv.getContext('2d'), w: 1, h: 1, cx: 0, cy: 0,
+             dpr: 1, raf: 0, t: performance.now(), parado: false, sobre: null, obs: null };
+
+    const mede = () => {
+      const w = palco.clientWidth || 1, h = palco.clientHeight || 1;
+      // Em tela retina o canvas sairia no dobro e cada quadro custaria quatro
+      // vezes mais pixels. Preso em 1,5 o traço continua limpo.
+      const dpr = Math.min(1.5, devicePixelRatio || 1);
+      cena.w = w; cena.h = h; cena.cx = w / 2; cena.cy = h / 2; cena.dpr = dpr;
+      cv.width = Math.round(w * dpr);
+      cv.height = Math.round(h * dpr);
+    };
+    mede();
+    cena.obs = new ResizeObserver(mede);
+    cena.obs.observe(palco);
+
+    liga(cv);
+    cena.raf = requestAnimationFrame(quadro);
+  }
+
+  function paraCena() {
+    if (!cena) return;
+    cancelAnimationFrame(cena.raf);
+    cena.obs?.disconnect();
+    cena.cv.remove();
+    cena = null;
+  }
+
+  // A barra de espaço arma o giro à mão. Sem o `preventDefault` a página rola
+  // e, pior, o botão que estiver em foco dispara — espaço é "clicar" nele.
+  addEventListener('keydown', e => {
+    if (e.code !== 'Space' || !cena) return;
+    const t = e.target;
+    if (t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(t.tagName))) return;
+    e.preventDefault();
+    espaco = true;
+    if (cena.cv.style.cursor !== 'pointer') cena.cv.style.cursor = 'grab';
+  });
+  addEventListener('keyup', e => {
+    if (e.code !== 'Space') return;
+    espaco = false;
+    if (cena && cena.cv.style.cursor === 'grab') cena.cv.style.cursor = 'default';
+  });
 
   // ----------------------------------------------------------------- dados
   async function carrega() {
     if (carregando) return;
     carregando = true;
     try {
-      const [o, eo, ln, ps, cx] = await Promise.all([
+      const [o, eo, ln, cx] = await Promise.all([
         sb.from('operations').select('id,title,channel,status,images,entities_at'),
         sb.from('entity_operations').select('*'),
         sb.from('links').select('*'),
-        sb.from('node_positions').select('*'),
         // Só vem o que o agente alcança dos DOIS lados: resolver uma conexão
         // exige enxergar as duas operações.
         sb.from('auto_connections').select('*'),
@@ -198,11 +640,6 @@
       dados.vincs = (eo.data || []).filter(v => visiveis.has(v.operation_id));
       dados.links = ln.data || [];
       dados.conexoes = cx.data || [];
-      dados.pos = {};
-      (ps.data || []).forEach(p => {
-        (dados.pos[p.view_key] = dados.pos[p.view_key] || {})[p.node_kind + ':' + p.node_id] =
-          { x: p.x, y: p.y };
-      });
 
       // As entidades: as que estão em alguma operação e as que algum vínculo
       // manual alcança.
@@ -250,27 +687,20 @@
       .add(v.operation_id));
 
     if (geral) {
-      nos.push({ data: {
-        id: 'fukurou', nome: 'FUKUROU', kind: 'fukurou', cor: '#9b5cff',
-        tam: 74, img: svgCoruja('#9b5cff'), nivel: 0,
-      }, classes: 'fukurou' });
+      nos.push({ id: 'fukurou', nome: 'FUKUROU', kind: 'fukurou', cor: '#9b5cff',
+                 tam: 86, img: svgCoruja('#9b5cff'), nivel: 0 });
     }
 
     ops.forEach(o => {
-      const cor = TIPO_NO.operacao.cor;
       nos.push({
-        data: {
-          id: noOp(o.id), nome: o.title, kind: 'operacao', cor,
-          tam: geral ? 84 : 96, larg: geral ? 60 : 70, nivel: 1,
-          status: o.status, canal: o.channel,
-        },
-        classes: 'operacao' + (sigilosa(o) ? ' sigiloso' : ''),
+        id: noOp(o.id), nome: o.title, kind: 'operacao', cor: TIPO_NO.operacao.cor,
+        tam: geral ? 96 : 130, nivel: 1, sigiloso: sigilosa(o),
+        status: o.status, canal: o.channel,
       });
       if (geral) {
-        arestas.push({ data: {
-          id: 'fk:' + o.id, source: 'fukurou', target: noOp(o.id),
-          cor: TIPO_VINC.comando.cor, rotulo: '', tipo: 'comando', conf: 'confirmado',
-        } });
+        arestas.push({ id: 'fk:' + o.id, de: 'fukurou', para: noOp(o.id),
+                       cor: TIPO_VINC.comando.cor, rotulo: '',
+                       tipo: 'comando', conf: 'confirmado' });
       }
     });
 
@@ -280,39 +710,34 @@
       if (filtros.tipos && !filtros.tipos.has(e.kind)) { idsEnts.delete(id); return; }
       const t = TIPO_NO[e.kind] || TIPO_NO.pessoa;
       const capa = e.images?.[0] && dados.fotos[e.images[0]];
-      nos.push({ data: {
-        id: noEnt(id), nome: e.name, kind: e.kind, cor: t.cor,
-        tam: 36, img: capa || svgCoruja(t.cor), nivel: 2,
-      } });
+      nos.push({ id: noEnt(id), nome: e.name, kind: e.kind, cor: t.cor,
+                 tam: 46, img: capa || svgCoruja(t.cor), nivel: 2 });
     });
 
     vincs.forEach(v => {
       if (!window.ENT.cache[v.entity_id] || !idsEnts.has(v.entity_id)) return;
       const compartilhada = (porEntidade[v.entity_id]?.size || 0) > 1;
       arestas.push({
-        data: {
-          id: 'eo:' + v.entity_id + ':' + v.operation_id,
-          source: noOp(v.operation_id), target: noEnt(v.entity_id),
-          cor: compartilhada ? '#ffc74d' : TIPO_VINC.outro.cor,
-          rotulo: v.role || ROTULO_SLOT[v.slot] || '',
-          tipo: 'operacao', conf: 'confirmado', auto: true,
-        },
-        classes: compartilhada ? 'compartilhado' : '',
+        id: 'eo:' + v.entity_id + ':' + v.operation_id,
+        de: noOp(v.operation_id), para: noEnt(v.entity_id),
+        cor: compartilhada ? '#ffc74d' : TIPO_VINC.outro.cor,
+        rotulo: v.role || ROTULO_SLOT[v.slot] || '',
+        tipo: 'operacao', conf: 'confirmado', auto: true,
+        compartilhado: compartilhada,
       });
     });
 
     // Vínculo manual só entra quando as duas pontas estão desenhadas aqui.
-    const existe = new Set(nos.map(n => n.data.id));
+    const existe = new Set(nos.map(n => n.id));
     dados.links.forEach(l => {
       const a = l.a_kind === 'op' ? noOp(l.a_id) : noEnt(l.a_id);
       const b = l.b_kind === 'op' ? noOp(l.b_id) : noEnt(l.b_id);
       if (!existe.has(a) || !existe.has(b)) return;
       if (filtros.vincs && !filtros.vincs.has(l.type)) return;
       const t = TIPO_VINC[l.type] || TIPO_VINC.outro;
-      arestas.push({ data: {
-        id: 'ln:' + l.id, source: a, target: b, cor: t.cor,
-        rotulo: l.label || '', tipo: l.type, conf: l.confidence, linkId: l.id,
-      } });
+      arestas.push({ id: 'ln:' + l.id, de: a, para: b, cor: t.cor,
+                     rotulo: l.label || '', tipo: l.type,
+                     conf: l.confidence, linkId: l.id });
     });
 
     return { nos, arestas };
@@ -378,14 +803,13 @@
 
     root.querySelector('.tw-cont').textContent =
       `NÓS ${nos.length} · VÍNCULOS ${arestas.length}` + (filtrando() ? ' · FILTRADO' : '');
-    root.querySelector('.tw-dica').textContent = selecionado
-      ? ''
-      : 'clique no nó → abre a ficha e destaca os vínculos · duplo clique na operação → abre a aba dela';
+    root.querySelector('.tw-dica').textContent = selecionado ? '' : DICA;
 
-    cy?.destroy();
-    cy = null;
+    paraCena();
+    G = { nos, arestas, porId: {}, toca: {} };
 
     if (!nos.length) {
+      palco.innerHTML = '';
       vazio.classList.remove('hide');
       vazio.innerHTML = '';
       vazio.append(el('p', null, vista === 'geral'
@@ -404,102 +828,51 @@
     }
     vazio.classList.add('hide');
 
-    const salvas = dados.pos[chaveVista()] || {};
-    const todasSalvas = nos.every(n => n.data.id === 'fukurou' || salvas[n.data.id]);
-
-    cy = cytoscape({
-      container: palco,
-      elements: { nodes: nos, edges: arestas },
-      style: estilo(),
-      minZoom: .2,
-      maxZoom: 3,
-      wheelSensitivity: .22,
-      // Em tela retina o canvas sai no dobro da resolução e cada quadro custa
-      // quatro vezes mais. Preso em 1, o arrasto fica fluido e a diferença no
-      // desenho não aparece neste tamanho de nó.
-      pixelRatio: 1,
-      // Durante o pan e o zoom o grafo vira uma textura única e volta a ser
-      // desenhado quando a mão para: é o que tira o arrastão do movimento.
-      textureOnViewport: true,
-      motionBlur: false,
-      layout: todasSalvas
-        ? { name: 'preset', positions: n => salvas[n.id()] || { x: 0, y: 0 }, fit: true, padding: 60 }
-        : vista === 'geral'
-          ? { name: 'concentric', concentric: n => 3 - (n.data('nivel') ?? 2),
-              levelWidth: () => 1, minNodeSpacing: 64, padding: 60, animate: false }
-          : { name: 'cose', idealEdgeLength: 150, nodeRepulsion: 14000, padding: 60,
-              animate: false, randomize: true },
+    nos.forEach(n => { G.porId[n.id] = n; });
+    arestas.forEach(a => {
+      (G.toca[a.de] = G.toca[a.de] || []).push(a);
+      (G.toca[a.para] = G.toca[a.para] || []).push(a);
     });
 
-    // Posição dos que já tinham lugar marcado, mesmo quando outros não têm.
-    if (!todasSalvas) {
-      cy.nodes().forEach(n => { const p = salvas[n.id()]; if (p) n.position(p); });
-      cy.fit(undefined, 60);
-      // O layout recém-calculado vira o lugar de todo mundo — mas só quando
-      // está tudo à vista. Com filtro ligado o desenho é de um recorte, e
-      // gravá-lo embaralharia o lugar dos nós no quadro inteiro.
-      if (!filtrando()) gravaPosicoes(cy.nodes());
-    }
+    // A câmera volta ao ângulo de sempre a cada troca de vista; o giro do
+    // relógio, não — ele é contínuo, e reiniciá-lo daria um salto na tela.
+    cam.yaw = 0;
+    cam.pitch = .42;
+    cam.zoom = 1;
+    cam.px = cam.py = 0;
 
-    cy.on('tap', 'node', e => seleciona(e.target.id()));
-    cy.on('tap', 'edge', e => selecionaVinculo(e.target));
-    cy.on('tap', evt => { if (evt.target === cy) limpaSelecao(); });
-    cy.on('dbltap', 'node', e => {
-      const id = e.target.id();
-      if (id.startsWith('op:') && vista === 'geral') openChannel('teia:' + id.slice(3));
-    });
-    cy.on('dragfree', 'node', e => gravaPosicoes(e.target));
+    layout3d();
+    criaCena(palco);
+    enquadra();
 
     legenda();
-    if (selecionado && cy.getElementById(selecionado).length) seleciona(selecionado);
-  }
-
-  async function gravaPosicoes(nos) {
-    const chave = chaveVista();
-    const linhas = [];
-    nos.forEach(n => {
-      if (n.id() === 'fukurou') return;        // o centro não é linha de banco
-      const p = n.position();
-      const { kind, id } = parte(n.id());
-      linhas.push({ view_key: chave, node_kind: kind, node_id: id,
-                    x: Math.round(p.x), y: Math.round(p.y), updated_by: me.id,
-                    updated_at: new Date().toISOString() });
-      (dados.pos[chave] = dados.pos[chave] || {})[kind + ':' + id] = { x: p.x, y: p.y };
-    });
-    if (!linhas.length) return;
-    const { error } = await sb.from('node_positions').upsert(linhas);
-    if (error) console.error('posições:', error);
+    foco = null;
+    if (selecionado && G.porId[selecionado]) seleciona(selecionado);
   }
 
   // ------------------------------------------------------------ seleção
   function limpaSelecao() {
     selecionado = null;
-    cy?.batch(() => cy.elements().removeClass('apagado foco'));
+    foco = null;
     // Fecha deslizando: a gaveta sai de cena pelo transform, não por display,
     // senão não haveria o que animar.
     root.querySelector('.tw-painel').classList.remove('aberto');
-    root.querySelector('.tw-dica').textContent =
-      'clique no nó → abre a ficha e destaca os vínculos · duplo clique na operação → abre a aba dela';
+    root.querySelector('.tw-dica').textContent = DICA;
   }
 
   function seleciona(id) {
-    const no = cy.getElementById(id);
-    if (!no.length) return;
+    const no = G.porId[id];
+    if (!no) return;
     selecionado = id;
 
-    // Destaca o nó e tudo que sai dele; o resto do grafo esmaece, para a
-    // ramificação ficar legível no meio de dezenas de linhas.
-    // Em lote: sem isto são dois recalculos de estilo sobre o grafo inteiro,
-    // e com dezenas de nós o clique trava antes de a ficha abrir.
-    const vizinhos = no.closedNeighborhood();
-    cy.batch(() => {
-      cy.elements().addClass('apagado').removeClass('foco');
-      vizinhos.removeClass('apagado').addClass('foco');
-    });
+    // O nó escolhido e tudo que sai dele ficam acesos; o resto do quadro
+    // esmaece, para a ramificação se ler no meio de dezenas de linhas.
+    const ligacoes = ligacoesDe(id);
+    foco = { nos: new Set([id]), arestas: new Set() };
+    ligacoes.forEach(a => { foco.arestas.add(a.id); foco.nos.add(a.de); foco.nos.add(a.para); });
 
-    const ligacoes = no.connectedEdges();
     root.querySelector('.tw-dica').textContent =
-      `nó selecionado: ${no.data('nome')} · ${ligacoes.length} vínculo(s) destacado(s)`;
+      `nó selecionado: ${no.nome} · ${ligacoes.length} vínculo(s) destacado(s)`;
     painelDoNo(id, ligacoes);
   }
 
@@ -553,19 +926,20 @@
       return;
     }
     const box = el('div', 'tw-p-rel');
-    lista.forEach(e => {
-      const outro = e.source().id() === meuId ? e.target() : e.source();
+    lista.forEach(a => {
+      const outroId = a.de === meuId ? a.para : a.de;
+      const outro = G.porId[outroId];
       const linha = el('button', 'tw-p-rel-l');
-      linha.append(el('span', 'n', outro.data('nome')));
-      const t = e.data('tipo');
-      const rot = e.data('rotulo') || (t === 'operacao' ? 'nesta operação' : TIPO_VINC[t]?.nome || t);
+      linha.append(el('span', 'n', outro?.nome || '—'));
+      const rot = a.rotulo ||
+        (a.tipo === 'operacao' ? 'nesta operação' : TIPO_VINC[a.tipo]?.nome || a.tipo);
       const marca = el('span', 'k', rot);
-      marca.style.color = e.data('cor');
-      if (e.data('conf') && e.data('conf') !== 'confirmado') {
-        marca.title = 'nível de confiança: ' + (CONF[e.data('conf')] || e.data('conf'));
+      marca.style.color = a.cor;
+      if (a.conf && a.conf !== 'confirmado') {
+        marca.title = 'nível de confiança: ' + (CONF[a.conf] || a.conf);
       }
       linha.append(marca);
-      linha.onclick = () => seleciona(outro.id());
+      linha.onclick = () => seleciona(outroId);
       box.append(linha);
     });
     corpo.append(box);
@@ -777,32 +1151,29 @@
     const procura = async () => {
       const q = inp.value.trim().toLowerCase();
       res.innerHTML = '';
-      if (!cy || q.length < 2) return;
+      if (!G.nos.length || q.length < 2) return;
 
-      let achados = cy.nodes().filter(n => n.data('nome').toLowerCase().includes(q));
-      const vistos = new Set(achados.map(n => n.id()));
+      const achados = G.nos.filter(n => n.nome.toLowerCase().includes(q));
+      const vistos = new Set(achados.map(n => n.id));
 
       // Apelido não está no grafo: ele vive no banco, e é lá que se procura.
       const { data } = await sb.from('entity_aliases')
         .select('entity_id').ilike('alias', `%${q.replace(/[,()"\\%]/g, ' ')}%`).limit(20);
       (data || []).forEach(r => {
-        const no = cy.getElementById(noEnt(r.entity_id));
-        if (no.length && !vistos.has(no.id())) { vistos.add(no.id()); achados = achados.merge(no); }
+        const no = G.porId[noEnt(r.entity_id)];
+        if (no && !vistos.has(no.id)) { vistos.add(no.id); achados.push(no); }
       });
 
-      if (!vistos.size) {
+      if (!achados.length) {
         res.append(el('p', 'tw-q-nada', '> nenhum nó com esse nome nesta vista.'));
         return;
       }
-      achados.sort((a, b) => a.data('nome').localeCompare(b.data('nome'))).forEach(n => {
+      achados.sort((a, b) => a.nome.localeCompare(b.nome)).forEach(n => {
         const b = el('button', 'tw-q-l');
-        b.append(el('span', 'n', n.data('nome')));
-        b.append(el('span', 'k', n.data('kind') === 'operacao'
-          ? 'OPERAÇÃO' : window.ENT.rotuloTipo(n.data('kind'))));
-        b.onclick = () => {
-          seleciona(n.id());
-          cy.animate({ center: { eles: n }, zoom: 1.1 }, { duration: 260 });
-        };
+        b.append(el('span', 'n', n.nome));
+        b.append(el('span', 'k', n.kind === 'operacao'
+          ? 'OPERAÇÃO' : window.ENT.rotuloTipo(n.kind)));
+        b.onclick = () => { seleciona(n.id); centraliza(n); };
         res.append(b);
       });
     };
@@ -923,27 +1294,26 @@
     };
   }
 
-  const selecionaSeExiste = id => { if (cy?.getElementById(id).length) seleciona(id); };
+  const selecionaSeExiste = id => { if (G.porId[id]) seleciona(id); };
 
   /** O formulário do vínculo manual. A outra ponta só pode ser um nó desta
       vista — o que já está na tela é, por definição, o que o agente alcança. */
   function formVinculo(deId, link) {
-    if (!cy) return;
+    if (!G.nos.length) return;
     const m = modal(link ? 'EDITAR VÍNCULO' : 'NOVO VÍNCULO');
 
-    const de = cy.getElementById(deId);
+    const de = G.porId[deId];
     m.body.append(el('h4', 'form-block', 'PONTAS'));
     const linha = el('p', 'tw-v-de');
-    linha.append(el('b', null, de.data('nome')), el('span', null, ' ⟷ '));
+    linha.append(el('b', null, de?.nome || '?'), el('span', null, ' ⟷ '));
     const alvoNome = el('b', null, '—');
     linha.append(alvoNome);
     m.body.append(linha);
 
     let alvo = null;
     if (link) {
-      const outro = link.source().id() === deId ? link.target() : link.source();
-      alvo = outro.id();
-      alvoNome.textContent = outro.data('nome');
+      alvo = link.de === deId ? link.para : link.de;
+      alvoNome.textContent = G.porId[alvo]?.nome || '—';
     } else {
       const w = el('label', 'fld');
       w.append(el('span', null, 'Ligar a'));
@@ -951,17 +1321,17 @@
       const vazio = el('option', null, '— escolha o outro nó —');
       vazio.value = '';
       sel.append(vazio);
-      cy.nodes()
-        .filter(n => n.id() !== deId && n.id() !== 'fukurou')
-        .sort((a, b) => a.data('nome').localeCompare(b.data('nome')))
+      G.nos
+        .filter(n => n.id !== deId && n.id !== 'fukurou')
+        .sort((a, b) => a.nome.localeCompare(b.nome))
         .forEach(n => {
-          const o = el('option', null, n.data('nome'));
-          o.value = n.id();
+          const o = el('option', null, n.nome);
+          o.value = n.id;
           sel.append(o);
         });
       sel.onchange = () => {
         alvo = sel.value || null;
-        alvoNome.textContent = alvo ? cy.getElementById(alvo).data('nome') : '—';
+        alvoNome.textContent = alvo ? (G.porId[alvo]?.nome || '—') : '—';
       };
       w.append(sel);
       m.body.append(w);
@@ -976,11 +1346,11 @@
       o.value = v;
       selTipo.append(o);
     });
-    selTipo.value = link?.data('tipo') || 'outro';
+    selTipo.value = link?.tipo || 'outro';
     wTipo.append(selTipo);
     m.body.append(wTipo);
 
-    const rotulo = field(m.body, 'Rótulo (opcional)', link?.data('rotulo') || '',
+    const rotulo = field(m.body, 'Rótulo (opcional)', link?.rotulo || '',
       { ph: 'o que aparece na linha: "irmão", "sócio"...' });
 
     const wConf = el('label', 'fld');
@@ -991,11 +1361,11 @@
       o.value = v;
       selConf.append(o);
     });
-    selConf.value = link?.data('conf') || 'provavel';
+    selConf.value = link?.conf || 'provavel';
     wConf.append(selConf);
     m.body.append(wConf);
 
-    const atual = link?.data('linkId') && dados.links.find(l => l.id === link.data('linkId'));
+    const atual = link?.linkId && dados.links.find(l => l.id === link.linkId);
     const nota = field(m.body, 'Observação', atual?.note || '', { area: true });
 
     const salvar = el('button', 'primary', link ? 'Salvar' : 'Criar vínculo');
@@ -1038,11 +1408,7 @@
       desenhou sozinho — entidade ligada à operação — se desfaz no dossiê. */
   function selecionaVinculo(aresta) {
     selecionado = null;
-    cy.batch(() => {
-      cy.elements().addClass('apagado').removeClass('foco');
-      aresta.removeClass('apagado').addClass('foco');
-      aresta.connectedNodes().removeClass('apagado');
-    });
+    foco = { nos: new Set([aresta.de, aresta.para]), arestas: new Set([aresta.id]) };
 
     const painel = root.querySelector('.tw-painel');
     painel.innerHTML = '';
@@ -1059,21 +1425,21 @@
     const corpo = el('div', 'tw-p-corpo');
     painel.append(corpo);
 
-    const a = aresta.source(), b = aresta.target();
+    const a = G.porId[aresta.de], b = G.porId[aresta.para];
     const par = el('p', 'tw-p-nome');
-    par.textContent = a.data('nome') + '  ⟷  ' + b.data('nome');
+    par.textContent = (a?.nome || '?') + '  ⟷  ' + (b?.nome || '?');
     corpo.append(par);
 
-    const linkId = aresta.data('linkId');
+    const linkId = aresta.linkId;
     const bruto = linkId && dados.links.find(l => l.id === linkId);
 
     if (!bruto) {
       corpo.append(el('p', 'tw-p-sub', 'DETECTADO AUTOMATICAMENTE'));
-      corpo.append(el('p', 'tw-p-res', aresta.data('tipo') === 'operacao'
+      corpo.append(el('p', 'tw-p-res', aresta.tipo === 'operacao'
         ? 'A entidade está vinculada a esta operação pelo dossiê. Para desfazer, ' +
           'tire-a do dossiê em ✎ Editar.'
         : 'Ligação da operação com o centro da teia.'));
-      if (aresta.hasClass('compartilhado')) {
+      if (aresta.compartilhado) {
         corpo.append(el('p', 'tw-p-alerta',
           '⚠ esta entidade aparece em mais de uma operação que você alcança.'));
       }
@@ -1093,7 +1459,7 @@
 
     const pe = el('div', 'tw-p-pe');
     const ed = el('button', 'ghost sm', '✎ EDITAR');
-    ed.onclick = () => formVinculo(a.id(), aresta);
+    ed.onclick = () => formVinculo(aresta.de, aresta);
     pe.append(ed);
     if (bruto.created_by === me.id || isStaff()) {
       const rm = el('button', 'ghost sm danger', 'EXCLUIR');
@@ -1173,7 +1539,7 @@
       root.querySelector('.tw-sub').textContent = 'acesso restrito';
       root.querySelector('.tw-cont').textContent = '';
       root.querySelector('.tw-dica').textContent = '';
-      cy?.destroy(); cy = null;
+      paraCena();
       root.querySelector('.tw-grafo').innerHTML = '';
       const vazio = root.querySelector('.tw-vazio');
       vazio.classList.remove('hide');
@@ -1184,6 +1550,10 @@
     }
 
     root.classList.remove('hide');
+    // A teia já redesenha o próprio quadro sessenta vezes por segundo. As
+    // listras do tubo e a varredura do CRT passariam a disputar a mesma GPU
+    // por nada — e é justamente aqui que a conta aperta.
+    document.documentElement.classList.add('teia-aberta');
     selecionado = null;
     // Filtro por operação não sobrevive à troca de aba: na teia individual ele
     // não quer dizer nada, e voltando para a geral seria um filtro invisível.
@@ -1210,8 +1580,8 @@
   function fecha() {
     if (!root) return;
     root.classList.add('hide');
-    cy?.destroy();
-    cy = null;
+    document.documentElement.classList.remove('teia-aberta');
+    paraCena();
   }
 
   /** Recarrega sem perder a seleção — usado pelo realtime e pelas edições. */
@@ -1226,7 +1596,7 @@
     const guardado = selecionado;
     await carrega();
     desenha();
-    if (guardado && cy?.getElementById(guardado).length) seleciona(guardado);
+    if (guardado && G.porId[guardado]) seleciona(guardado);
   }
 
   /**
@@ -1268,7 +1638,7 @@
         await openChannel('teia:' + v.operation_id);
       }
       const no = kind === 'op' ? noOp(id) : noEnt(id);
-      if (cy?.getElementById(no).length) { seleciona(no); cy.center(cy.getElementById(no)); }
+      if (G.porId[no]) { seleciona(no); centraliza(G.porId[no]); }
     },
   };
 })();
