@@ -1682,20 +1682,22 @@ create trigger links_touch before update on public.links
   for each row execute function public.touch_updated_at();
 
 -- ---------- posição dos nós ----------
--- Esta tabela está PARADA desde que a teia virou 3D: o lugar de cada nó passou
--- a ser calculado, e num plano que gira não existe "arrastar o nó para cá".
--- Fica de pé porque é barata e porque guarda o que já foi arrumado à mão — se
--- um dia voltar a arrumação, volta daqui, e não do zero.
+-- A teia é um quadro de investigação: onde cada nó foi parar é informação, e
+-- vale para todo mundo que abre a mesma aba — como a ordem da barra lateral.
+-- São três eixos desde que a teia virou 3D; o z entra por `alter` porque a
+-- coluna nasceu depois do resto, e este arquivo roda inteiro a cada mudança.
 create table if not exists public.node_positions (
   view_key   text not null,            -- 'geral' ou 'op:<uuid>'
   node_kind  text not null,
   node_id    uuid not null,
   x          double precision not null,
   y          double precision not null,
+  z          double precision not null default 0,
   updated_by uuid references public.profiles(id) on delete set null,
   updated_at timestamptz not null default now(),
   primary key (view_key, node_kind, node_id)
 );
+alter table public.node_positions add column if not exists z double precision not null default 0;
 
 -- ---------- quem entra na Teia Geral ----------
 -- A teia individual de uma operação segue o sigilo do canal dela: quem lê o

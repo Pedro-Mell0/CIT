@@ -459,12 +459,12 @@ volta; e cada entidade orbita a operação em que foi apurada. A que aparece em
 mais de uma flutua entre elas, acima do plano: é ali que ela de fato está.
 
 O plano **gira sozinho**, devagar e no sentido horário — uma volta a cada dois
-minutos —, mas sai do caminho na hora de ler: para enquanto o ponteiro está no
-palco, enquanto há nó selecionado e durante o arrasto, e volta uns segundos
-depois que a mão saiu. Movimento derruba a memória de onde as coisas estavam, e
-é nisso que a tela plana ganha da que gira. O lugar de cada nó é calculado, não
-sorteado: o quadro gira, mas não embaralha, e quem fechou a teia com uma pessoa
-à direita da operação a reencontra ali.
+minutos —, mas sai do caminho na hora de ler: **qualquer ação** — mexer o
+ponteiro, clicar, arrastar, girar a roda — zera a contagem, e o giro só volta
+depois de **cinco segundos** de quadro parado. Movimento derruba a memória de
+onde as coisas estavam, e é nisso que a tela plana ganha da que gira. O lugar
+de cada nó é calculado, não sorteado: o quadro gira, mas não embaralha, e quem
+fechou a teia com uma pessoa à direita da operação a reencontra ali.
 
 Não entra biblioteca 3D. O desenho é feito à mão num canvas, com a projeção em
 perspectiva calculada na página: são dezenas de nós e algumas centenas de
@@ -487,9 +487,13 @@ vermelha. Quem aparece em mais de uma operação leva uma **pastilha dourada** n
 canto — a linha automática pode estar atrás do nó, ou apagada por um filtro; a
 pastilha não.
 
-O que vai ficando para trás vai ficando **translúcido**, e o nome sai antes do
-nó. Dois nomes nunca se escrevem por cima: o da frente leva o lugar, e o que
-cedeu volta ao passar o ponteiro. O nome do centro escreve sempre.
+Duas coisas desbotam o nó. A **profundidade**: o que vai ficando para trás vai
+ficando translúcido, e o nome sai antes do nó. E **cobrir alguém**: o nó que cai
+em cima de outro fica translúcido para deixar ver através — pilha opaca é o que
+mais embaralha o quadro. O centro escapa das duas: ele é a âncora.
+
+Dois nomes nunca se escrevem por cima: o da frente leva o lugar, e o que cedeu
+volta ao passar o ponteiro. O nome do centro escreve sempre.
 
 A **cor da linha** diz o tipo do vínculo — comando, família, local/patrimônio,
 financeiro, social — e o **traço** diz a confiança: cheio é *confirmado*,
@@ -499,10 +503,14 @@ operação que você alcança. O **rótulo da linha** não fica escrito o tempo 
 cem palavrinhas cruzando o quadro é o que mais o suja. Ele aparece na linha sob
 o ponteiro e em todo o ramo do nó selecionado.
 
-- **Segurar ESPAÇO e arrastar** gira o plano à mão, nos dois eixos. Enquanto a
-  mão está no arrasto o giro automático espera; soltando, ele continua de onde
-  o agente deixou.
-- **Rolar** dá zoom; **arrastar** sem o ESPAÇO move a tela.
+- **Segurar ESPAÇO e arrastar** gira o plano à mão, nos dois eixos.
+- **Arrastar um nó** o move no espaço, e o lugar fica gravado para todo mundo
+  que abre a mesma aba — é quadro de investigação, não arrumação pessoal. Quem
+  vai junto depende de quem foi arrastado: o **centro** leva o quadro inteiro,
+  porque tudo pendura nele; a **operação** leva as entidades que só ela tem — a
+  que aparece em duas fica onde está, porque pertence às duas e arrastá-la
+  atrás de uma seria mentir sobre a outra; a **entidade** anda sozinha.
+- **Rolar** dá zoom; **arrastar o fundo** move a tela.
 - **Clicar no nó** faz a ficha dele entrar pela direita, de cima a baixo do
   palco (foto, galeria, resumo, apelidos, operações em que aparece e a lista
   de relacionamentos), e destaca todos os vínculos daquele nó, esmaecendo o

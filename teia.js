@@ -51,13 +51,14 @@
   let G = { nos: [], arestas: [], porId: {}, toca: {} };
   let vista = 'geral';          // 'geral' ou o id da operação
   let selecionado = null;
-  let dados = { ops: [], vincs: [], links: [], fotos: {}, conexoes: [] };
+  let dados = { ops: [], vincs: [], links: [], pos: {}, fotos: {}, conexoes: [] };
   let carregando = false;
   // `null` em qualquer um quer dizer "tudo": é o estado de quem nunca mexeu
   // nos filtros, e evita ter de encher três conjuntos a cada carregamento.
   let filtros = { tipos: null, vincs: null, ops: null };
   const filtrando = () => !!(filtros.tipos || filtros.vincs || filtros.ops);
 
+  const chaveVista = () => (vista === 'geral' ? 'geral' : 'op:' + vista);
   const noOp  = id => 'op:' + id;
   const noEnt = id => 'ent:' + id;
   const parte = id => ({ kind: id.slice(0, 3) === 'op:' ? 'op' : 'ent', id: id.slice(id.indexOf(':') + 1) });
@@ -155,6 +156,7 @@
   const TAU = Math.PI * 2;
   const FOCAL = 900;        // distância focal da projeção
   const GIRO = 0.055;       // rad/s — uma volta a cada ~114 segundos
+  const OCIO = 5000;        // ms de quadro parado antes de o giro voltar
   const DICA = 'clique no nó → ficha e vínculos · duplo clique na operação → abre a aba ' +
                'dela · segure ESPAÇO e arraste para girar o plano';
 
@@ -202,7 +204,7 @@
     G.nos.forEach(n => { n.centro = false; });
     if (centro) { centro.p = { x: 0, y: 0, z: 0 }; centro.centro = true; }
 
-    const R1 = 320 + ops.length * 42;
+    const R1 = 390 + ops.length * 58;
     ops.forEach((o, i) => {
       const a = (i / ops.length) * TAU;
       o.p = { x: Math.cos(a) * R1, y: (i % 2 ? 1 : -1) * R1 * .12, z: Math.sin(a) * R1 };
@@ -232,7 +234,7 @@
         // do centro — e aí a entidade compartilhada cobre o FUKUROU. Empurra
         // para fora, mantendo a direção: ela continua entre as duas.
         if (ps.length > 1) {
-          const minimo = Math.max(220, R1 * .55);
+          const minimo = Math.max(260, R1 * .55);
           const raio = Math.hypot(base.x, base.z);
           if (raio < minimo) {
             const ang = raio > 1 ? Math.atan2(base.z, base.x)
@@ -248,11 +250,21 @@
 
     grupos.forEach(g => {
       const n = g.itens.length;
-      const raio = (ops.length ? 145 : 290) * (.6 + Math.min(1, n / 16) * .9);
+      const raio = (ops.length ? 190 : 350) * (.65 + Math.min(1, n / 16) * .95);
       g.itens.forEach((e, i) => {
         const d = naEsfera(i, n);
         e.p = { x: g.base.x + d.x * raio, y: g.base.y + d.y * raio * .7, z: g.base.z + d.z * raio };
       });
+    });
+
+    // O que foi arrumado à mão vence o cálculo. É quadro de investigação: onde
+    // alguém pôs um nó é informação, e vale para todo mundo que abre a aba.
+    const salvas = dados.pos[chaveVista()] || {};
+    G.nos.forEach(n => {
+      if (n.id === 'fukurou') return;        // o centro não é linha de banco
+      const { kind, id } = parte(n.id);
+      const q = salvas[kind + ':' + id];
+      if (q) n.p = { x: q.x, y: q.y, z: q.z || 0 };
     });
 
     // A câmera fica longe o bastante para a perspectiva ser suave: de perto, o
@@ -430,6 +442,7 @@
     });
 
     const fila = G.nos.filter(n => n.s).sort((x, y) => y.s.prof - x.s.prof);
+    cena.atras.length = 0;
     fila.forEach(pintaNo);
 
     // Os nomes vêm por último, numa passada só e da frente para o fundo: assim
@@ -487,14 +500,20 @@
   function pintaNo(n) {
     const ctx = cena.ctx, s = n.s;
     const r = Math.max(6, (n.tam / 2) * s.k);
-    // Quem vai ficando para trás vai ficando translúcido. Sem isso o nó do
-    // fundo aparece inteiro por cima do de trás do da frente, e a pilha fica
-    // ilegível justamente onde o quadro é mais cheio.
-    // O centro é a âncora do quadro e não vai a lugar nenhum: ele fica na
-    // profundidade do meio para sempre, e desbotá-lo seria apagar justamente a
-    // referência de todo o resto.
-    ctx.globalAlpha = foco && !emFoco(n.id) ? .08
-      : n.centro ? 1 : 1 - fundura(s.prof) * .68;
+    // Duas coisas desbotam o nó. A primeira é a profundidade: quem vai ficando
+    // para trás vai ficando translúcido, e é isso que dá fundo ao quadro. O
+    // centro é a âncora e escapa dela — ele mora na profundidade do meio para
+    // sempre, e apagá-lo seria apagar a referência de todo o resto.
+    //
+    // A segunda é cobrir alguém: se este nó cai em cima de um que já foi
+    // desenhado — e desenhado antes quer dizer mais atrás —, ele fica
+    // translúcido para deixar ver através. Pilha opaca é o que mais embaralha
+    // o quadro, e abrir buraco nela custa menos do que esconder o de baixo.
+    const tapa = cena.atras.some(o =>
+      Math.hypot(o.x - s.x, o.y - s.y) < Math.max(r, o.r) * .95);
+    ctx.globalAlpha = (foco && !emFoco(n.id) ? .08
+      : n.centro ? 1 : 1 - fundura(s.prof) * .68) * (tapa ? .55 : 1);
+    cena.atras.push({ x: s.x, y: s.y, r });
 
     const fig = figura(n);
     if (fig) {
@@ -592,6 +611,61 @@
     return achada;
   }
 
+  /**
+   * Quem vai junto quando este nó é arrastado. O centro leva o quadro inteiro,
+   * porque tudo pendura nele. A operação leva as entidades que só ela tem — a
+   * que aparece em duas fica onde está, porque pertence às duas e arrastá-la
+   * atrás de uma seria mentir sobre a outra. A entidade anda sozinha.
+   */
+  function arrastaJunto(n) {
+    if (n.centro) return G.nos.filter(x => x.p);
+    if (n.nivel !== 1) return [n];
+    const leva = new Set([n]);
+    ligacoesDe(n.id).forEach(a => {
+      if (a.tipo !== 'operacao') return;
+      const e = G.porId[a.para];
+      if (e && !e.compartilhada) leva.add(e);
+    });
+    return [...leva];
+  }
+
+  /**
+   * Move os nós pela tela. O deslocamento vem em pixels e precisa voltar ao
+   * mundo: desfaz a escala da perspectiva na profundidade DAQUELE nó, depois o
+   * pitch, depois o giro. Sem desfazer na ordem inversa, arrastar para a
+   * direita com o plano virado jogaria o nó para o fundo.
+   */
+  function moveNos(nos, dx, dy, ref) {
+    const k = ref.s?.k || 1;
+    const a = cam.giro + cam.yaw;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    const cb = Math.cos(cam.pitch), sb = Math.sin(cam.pitch);
+    const dx1 = dx / k, dy2 = -dy / k;
+    const dY = dy2 * cb, dz1 = -dy2 * sb;
+    const dX = dx1 * ca - dz1 * sa;
+    const dZ = dx1 * sa + dz1 * ca;
+    nos.forEach(n => { n.p.x += dX; n.p.y += dY; n.p.z += dZ; });
+  }
+
+  /** Grava onde os nós foram parar. O centro da Teia Geral não é linha de banco. */
+  async function gravaPosicoes(nos) {
+    const chave = chaveVista();
+    const linhas = [];
+    nos.forEach(n => {
+      if (n.id === 'fukurou') return;
+      const { kind, id } = parte(n.id);
+      linhas.push({
+        view_key: chave, node_kind: kind, node_id: id,
+        x: Math.round(n.p.x), y: Math.round(n.p.y), z: Math.round(n.p.z),
+        updated_by: me.id, updated_at: new Date().toISOString(),
+      });
+      (dados.pos[chave] = dados.pos[chave] || {})[kind + ':' + id] = { ...n.p };
+    });
+    if (!linhas.length) return;
+    const { error } = await sb.from('node_positions').upsert(linhas);
+    if (error) console.error('posições:', error);
+  }
+
   /** Traz o nó para a frente da câmera e aproxima. O plano segue girando. */
   function centraliza(n) {
     if (!n?.p || !cena) return;
@@ -603,6 +677,8 @@
   }
 
   // ---------------------------------------------------------------- a cena
+  const agiu = () => { if (cena) cena.agir = performance.now(); };
+
   function liga(cv) {
     let arrasto = null;
     const ponto = e => {
@@ -610,25 +686,28 @@
       return { x: e.clientX - r.left, y: e.clientY - r.top };
     };
 
-    cv.addEventListener('pointerenter', () => { cena.ponteiro = true; });
-    cv.addEventListener('pointerleave', () => {
-      cena.ponteiro = false;
-      cena.saiu = performance.now();
-      cena.sobre = cena.sobreAresta = null;
-    });
+    cv.addEventListener('pointerleave', () => { cena.sobre = cena.sobreAresta = null; });
 
     cv.addEventListener('pointerdown', e => {
       if (e.button !== 0) return;
       cv.setPointerCapture(e.pointerId);
       const p = ponto(e);
-      arrasto = { x: p.x, y: p.y, gira: espaco, andou: 0 };
-      cena.parado = espaco;                   // girando à mão, o relógio espera
+      // Com ESPAÇO, gira a câmera. Em cima de um nó, arrasta o nó. No vazio,
+      // desloca a vista.
+      const alvo = espaco ? null : noEm(p.x, p.y);
+      arrasto = {
+        x: p.x, y: p.y, andou: 0,
+        modo: espaco ? 'gira' : alvo ? 'no' : 'vista',
+        no: alvo, junto: alvo ? arrastaJunto(alvo) : null,
+      };
+      cena.parado = true;                     // o relógio espera a mão sair
       cv.classList.toggle('girando', espaco);
+      agiu();
     });
 
     cv.addEventListener('pointermove', e => {
       const p = ponto(e);
-      cena.ponteiro = true;
+      agiu();
       if (!arrasto) {
         const n = noEm(p.x, p.y);
         cena.sobre = n ? n.id : null;
@@ -642,9 +721,11 @@
       const dx = p.x - arrasto.x, dy = p.y - arrasto.y;
       arrasto.andou += Math.abs(dx) + Math.abs(dy);
       arrasto.x = p.x; arrasto.y = p.y;
-      if (arrasto.gira) {
+      if (arrasto.modo === 'gira') {
         cam.yaw -= dx * .006;
         cam.pitch = Math.max(-1.35, Math.min(1.35, cam.pitch + dy * .005));
+      } else if (arrasto.modo === 'no') {
+        moveNos(arrasto.junto, dx, dy, arrasto.no);
       } else {
         cam.px += dx; cam.py += dy;
       }
@@ -653,9 +734,12 @@
     const solta = e => {
       if (!arrasto) return;
       const clique = arrasto.andou < 5;
+      const movido = !clique && arrasto.modo === 'no' ? arrasto.junto : null;
       arrasto = null;
       cena.parado = false;
       cv.classList.remove('girando');
+      agiu();
+      if (movido) return gravaPosicoes(movido);
       if (!clique) return;
       const p = ponto(e);
       const n = noEm(p.x, p.y);
@@ -670,6 +754,7 @@
     });
 
     cv.addEventListener('dblclick', e => {
+      agiu();
       const p = ponto(e);
       const n = noEm(p.x, p.y);
       if (n && n.kind === 'operacao' && vista === 'geral') openChannel('teia:' + n.id.slice(3));
@@ -677,6 +762,7 @@
 
     cv.addEventListener('wheel', e => {
       e.preventDefault();
+      agiu();
       cam.zoom = Math.max(.2, Math.min(6, cam.zoom * (e.deltaY > 0 ? 1 / 1.12 : 1.12)));
     }, { passive: false });
   }
@@ -688,14 +774,11 @@
     cena.t = t;
     if (document.hidden) return;              // aba escondida não gasta quadro
 
-    // O plano gira sozinho, mas sai do caminho na hora de ler: para enquanto o
-    // ponteiro está no palco, enquanto há nó selecionado e durante o arrasto, e
-    // volta uns segundos depois que a mão saiu. Girar por baixo de quem está
-    // lendo é o que mais atrapalha — movimento derruba a memória de onde as
-    // coisas estavam.
-    const lendo = cena.parado || cena.ponteiro || !!selecionado ||
-                  t - cena.saiu < 2500;
-    if (!lendo) cam.giro -= GIRO * dt;         // negativo = horário na tela
+    // O plano gira sozinho, mas sai do caminho na hora de ler: qualquer ação —
+    // mexer o ponteiro, clicar, arrastar, girar a roda — zera a contagem, e o
+    // giro só volta depois de cinco segundos de quadro parado. Girar por baixo
+    // de quem está lendo derruba a memória de onde as coisas estavam.
+    if (!cena.parado && t - cena.agir > OCIO) cam.giro -= GIRO * dt;
     pinta();
   }
 
@@ -705,7 +788,7 @@
     palco.append(cv);
     cena = { cv, ctx: cv.getContext('2d'), w: 1, h: 1, cx: 0, cy: 0,
              dpr: 1, raf: 0, t: performance.now(), parado: false, obs: null,
-             sobre: null, sobreAresta: null, ponteiro: false, saiu: 0, rotulos: [] };
+             sobre: null, sobreAresta: null, agir: 0, rotulos: [], atras: [] };
 
     const mede = () => {
       const w = palco.clientWidth || 1, h = palco.clientHeight || 1;
@@ -753,10 +836,11 @@
     if (carregando) return;
     carregando = true;
     try {
-      const [o, eo, ln, cx] = await Promise.all([
+      const [o, eo, ln, ps, cx] = await Promise.all([
         sb.from('operations').select('id,title,channel,status,images,entities_at'),
         sb.from('entity_operations').select('*'),
         sb.from('links').select('*'),
+        sb.from('node_positions').select('*'),
         // Só vem o que o agente alcança dos DOIS lados: resolver uma conexão
         // exige enxergar as duas operações.
         sb.from('auto_connections').select('*'),
@@ -778,6 +862,11 @@
       dados.vincs = (eo.data || []).filter(v => visiveis.has(v.operation_id));
       dados.links = ln.data || [];
       dados.conexoes = cx.data || [];
+      dados.pos = {};
+      (ps.data || []).forEach(r => {
+        (dados.pos[r.view_key] = dados.pos[r.view_key] || {})[r.node_kind + ':' + r.node_id] =
+          { x: r.x, y: r.y, z: r.z || 0 };
+      });
 
       // As entidades: as que estão em alguma operação e as que algum vínculo
       // manual alcança.
@@ -826,13 +915,13 @@
 
     if (geral) {
       nos.push({ id: 'fukurou', nome: 'FUKUROU', kind: 'fukurou', cor: '#9b5cff',
-                 tam: 80, img: svgCoruja('#9b5cff'), nivel: 0 });
+                 tam: 90, img: svgCoruja('#9b5cff'), nivel: 0 });
     }
 
     ops.forEach(o => {
       nos.push({
         id: noOp(o.id), nome: o.title, kind: 'operacao', cor: TIPO_NO.operacao.cor,
-        tam: geral ? 88 : 118, nivel: 1, sigiloso: sigilosa(o),
+        tam: geral ? 98 : 132, nivel: 1, sigiloso: sigilosa(o),
         status: o.status, canal: o.channel,
       });
       if (geral) {
@@ -849,7 +938,7 @@
       const t = TIPO_NO[e.kind] || TIPO_NO.pessoa;
       const capa = e.images?.[0] && dados.fotos[e.images[0]];
       nos.push({ id: noEnt(id), nome: e.name, kind: e.kind, cor: t.cor,
-                 tam: 40, img: capa || svgNo(e.kind, t.cor), nivel: 2,
+                 tam: 45, img: capa || svgNo(e.kind, t.cor), nivel: 2,
                  compartilhada: (porEntidade[id]?.size || 0) > 1 });
     });
 
@@ -1003,6 +1092,7 @@
     const no = G.porId[id];
     if (!no) return;
     selecionado = id;
+    agiu();
 
     // O nó escolhido e tudo que sai dele ficam acesos; o resto do quadro
     // esmaece, para a ramificação se ler no meio de dezenas de linhas.
