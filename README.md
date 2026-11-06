@@ -35,6 +35,13 @@ supabase/functions/sinal   Edge Function que manda o aviso no Discord
 
 > A chave `anon` pode ficar no código: a segurança vem das regras de RLS do `schema.sql`.
 
+### Publicar uma mudança
+
+Os arquivos locais são carregados com `?v=<data>` no `index.html`. **Suba esse
+número a cada publicação** — é o que faz o navegador buscar o arquivo de novo.
+Sem isso ele serve o que tem em cache e a correção simplesmente não chega: o
+agente continua vendo a versão antiga e jurando que nada mudou.
+
 ## Códigos de acesso
 
 Digitados uma única vez, no cadastro. Definem o cargo da conta.
@@ -629,6 +636,12 @@ aquele usuário acessa** — o RLS garante que nada fora disso aparece. Clicar e
 resultado abre o canal e salta até a mensagem ou dossiê.
 
 ## Manutenção
+
+**O quadro da teia nasceu torto**, com o centro num canto? Quer dizer que as
+posições gravadas em `node_positions` estão longe da origem, que é onde o
+centro mora. A própria teia conserta e grava o conserto ao abrir, mas dá para
+fazer na mão: subtraia de `x`, `y` e `z` o meio da caixa que os nós ocupam
+naquela `view_key`.
 
 **Trocar o codinome de um agente** é do ADMIN, pelo ✎ nome no painel ⚙. Como o
 login é derivado do codinome, o e-mail interno muda junto: o agente passa a

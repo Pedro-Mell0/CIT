@@ -265,12 +265,33 @@
     // zero — as da teia plana, por exemplo — para o quadro inteiro nascer num
     // canto, com o centro de fora. Arrastá-lo desloca a vista, não o mundo.
     const salvas = dados.pos[chaveVista()] || {};
+    const gravadas = [];
     G.nos.forEach(n => {
       if (n === centro || n.id === 'fukurou') return;
       const { kind, id } = parte(n.id);
       const q = salvas[kind + ':' + id];
-      if (q) n.p = { x: q.x, y: q.y, z: q.z || 0 };
+      if (q) { n.p = { x: q.x, y: q.y, z: q.z || 0 }; gravadas.push(n); }
     });
+
+    // Rede de segurança. O centro É a origem; se a nuvem inteira estiver longe
+    // dela, o quadro nasce torto, com o centro de fora. Já aconteceu duas
+    // vezes — com as coordenadas herdadas da teia plana e com uma versão
+    // antiga em cache, que gravava o mundo inteiro ao arrastar o centro. Aqui
+    // o conserto é feito E gravado: corrigir só na tela estragaria a posição
+    // relativa de quem fosse arrastado depois.
+    if (gravadas.length > 2) {
+      const meio = c => {
+        const v = gravadas.map(x => x.p[c]);
+        return (Math.min(...v) + Math.max(...v)) / 2;
+      };
+      const d = { x: meio('x'), y: meio('y'), z: meio('z') };
+      const raio = Math.max(...gravadas.map(x =>
+        Math.hypot(x.p.x - d.x, x.p.y - d.y, x.p.z - d.z)), 1);
+      if (Math.hypot(d.x, d.y, d.z) > raio * .45) {
+        gravadas.forEach(x => { x.p.x -= d.x; x.p.y -= d.y; x.p.z -= d.z; });
+        gravaPosicoes(gravadas);
+      }
+    }
 
     // A câmera fica longe o bastante para a perspectiva ser suave: de perto, o
     // nó da frente ficaria três vezes maior que o de trás e o quadro inteiro
