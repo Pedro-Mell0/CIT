@@ -1141,6 +1141,17 @@ function ordenaCols(mover, alvo, antes) {
 }
 
 (() => {
+  // Conserto de estrago antigo: até a versão passada, abrir o site no celular
+  // fazia o ajuste de larguras rodar com um teto calculado para o computador
+  // (`innerWidth - 480`), que numa tela de 390px dá negativo. O resultado era
+  // a barra de canais GRAVADA no mínimo de 150px — e ela voltava assim no
+  // computador, onde 150px não cabem um nome de canal. O ajuste não roda mais
+  // no celular, mas o valor que ficou gravado precisa de perdão explícito:
+  // exatamente o mínimo é assinatura de clamp, não de escolha de ninguém.
+  try {
+    if (+localStorage.getItem('cit.w3.side') <= COLS.side.min) localStorage.removeItem('cit.w3.side');
+  } catch {}
+
   Object.entries(COLS).forEach(([k, c]) => {
     if (!c.css) return;
     const w = +localStorage.getItem('cit.w3.' + k);
@@ -1559,6 +1570,14 @@ async function send() {
 // usuário arrastar. Duplo clique na alça volta para o automático.
 let msgH = +localStorage.getItem('cit.msgh') || 0;
 
+/**
+ * A altura arrastada à mão vale só no computador. No celular a alça nem
+ * aparece (ver o style.css), e a altura que sobrou gravada de uma sessão de
+ * PC — ou de um esbarrão — deixava um campo vazio ocupando um quarto da tela,
+ * sem nada ali que explicasse como desfazer.
+ */
+const alturaManual = () => msgH && !noCelular();
+
 // Auto-altura do campo de transmissão. Ler `scrollHeight` logo depois de
 // escrever `height:auto` obriga o navegador a refazer o layout ali mesmo,
 // dentro do evento da tecla — e com a lista de mensagens e as camadas fixas
@@ -1569,20 +1588,28 @@ let msgH = +localStorage.getItem('cit.msgh') || 0;
 let growPend = false;
 function grow() {
   const ta = $('#msg');
-  if (msgH) { ta.style.height = msgH + 'px'; return; }
+  if (alturaManual()) { ta.style.height = msgH + 'px'; return; }
   if (growPend) return;
   growPend = true;
   requestAnimationFrame(() => {
     growPend = false;
-    if (msgH) return;                      // viraram altura manual no meio
+    if (alturaManual()) return;            // viraram altura manual no meio
     const t = $('#msg');
     t.style.height = 'auto';
-    t.style.height = Math.min(180, t.scrollHeight) + 'px';
+    // No celular a tela é baixa e o teclado come metade dela: o teto de 180px
+    // do computador engoliria a conversa inteira. Um terço da altura é o que
+    // ainda deixa ver com quem se está falando enquanto se escreve.
+    const teto = noCelular() ? Math.max(90, Math.round(innerHeight * .3)) : 180;
+    t.style.height = Math.min(teto, t.scrollHeight) + 'px';
   });
 }
 
 (() => {
   const grip = $('#msg-grip');
+  // No celular a alça está escondida e a caixa cresce sozinha: não há o que
+  // armar, e armar assim mesmo deixaria o `touchstart` de pé num elemento
+  // colado na lista de mensagens.
+  if (noCelular()) { grow(); return; }
   let from = 0, base = 0, dragging = false;
   const y = e => (e.touches ? e.touches[0].clientY : e.clientY);
 

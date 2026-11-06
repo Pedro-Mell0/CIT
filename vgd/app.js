@@ -854,6 +854,14 @@ async function moveCanal(chanId, catId) {
     RAIZ.style.setProperty('--side-w', w + 'px');
     try { localStorage.setItem('vgd.sidew', String(w)); } catch {}
   };
+  // Conserto de estrago antigo: abrir o site no celular fazia esta conta
+  // rodar com o teto do computador, que numa tela de 390px dá negativo, e a
+  // barra ficava GRAVADA no mínimo — voltando assim no computador, onde
+  // 170px não cabem um nome de canal. Exatamente o mínimo é assinatura de
+  // clamp, não de escolha de ninguém.
+  try {
+    if (+localStorage.getItem('vgd.sidew') <= MIN) localStorage.removeItem('vgd.sidew');
+  } catch {}
   const salvo = +localStorage.getItem('vgd.sidew');
   if (salvo) RAIZ.style.setProperty('--side-w', Math.min(Math.max(salvo, MIN), MAX) + 'px');
 
@@ -1193,6 +1201,15 @@ async function send() {
 // usuário arrastar. Duplo clique na alça volta para o automático.
 let msgH = +localStorage.getItem('vgd.msgh') || 0;
 
+/**
+ * A altura arrastada à mão vale só no computador. No celular a alça nem
+ * aparece (ver o style.css), e a altura que sobrou gravada de uma sessão de
+ * PC — ou de um esbarrão, já que a alça fica encostada na lista de informes —
+ * deixava um campo vazio ocupando um quarto da tela, sem nada ali que
+ * explicasse como desfazer.
+ */
+const alturaManual = () => msgH && !TELA_CEL?.matches;
+
 // Ler `scrollHeight` logo depois de escrever `height:auto` obriga o navegador a
 // refazer o layout ali mesmo, dentro do evento da tecla — e essa conta não é
 // barata. A medição acontece uma vez por quadro: a tecla aparece na tela
@@ -1201,20 +1218,27 @@ let msgH = +localStorage.getItem('vgd.msgh') || 0;
 let growPend = false;
 function grow() {
   const ta = $('#msg');
-  if (msgH) { ta.style.height = msgH + 'px'; return; }
+  if (alturaManual()) { ta.style.height = msgH + 'px'; return; }
   if (growPend) return;
   growPend = true;
   requestAnimationFrame(() => {
     growPend = false;
-    if (msgH) return;                      // viraram altura manual no meio
+    if (alturaManual()) return;            // viraram altura manual no meio
     const t = $('#msg');
     t.style.height = 'auto';
-    t.style.height = Math.min(180, t.scrollHeight) + 'px';
+    // No celular a tela é baixa e o teclado come metade dela: o teto de 180px
+    // do computador engoliria a conversa inteira.
+    const teto = TELA_CEL?.matches ? Math.max(90, Math.round(innerHeight * .3)) : 180;
+    t.style.height = Math.min(teto, t.scrollHeight) + 'px';
   });
 }
 
 (() => {
   const grip = $('#msg-grip');
+  // No celular a alça está escondida e a caixa cresce sozinha: não há o que
+  // armar, e armar assim mesmo deixaria o `touchstart` de pé num elemento
+  // colado na lista de informes.
+  if (TELA_CEL?.matches) { grow(); return; }
   let from = 0, base = 0, puxando = false;
   const y = e => (e.touches ? e.touches[0].clientY : e.clientY);
 

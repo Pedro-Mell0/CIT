@@ -1171,23 +1171,53 @@ body{overflow:hidden;overscroll-behavior:none}
   /* cabeçalho em duas linhas: canal em cima, ferramentas e abas embaixo */
   #room-head{flex-wrap:wrap;gap:.4rem .5rem;padding:.5rem .6rem}
   #room-head h2{font-size:1rem;flex:1 1 auto;min-width:0}
-  /* `1 1 auto` e não `1 1 100%`: no celular em pé as ferramentas não cabem ao
-     lado do nome e descem sozinhas para a segunda linha; deitado, cabem, e
-     aí não faz sentido gastar uma linha inteira com elas. */
-  #room-head .tools{margin-left:0;flex:1 1 auto;flex-wrap:wrap;gap:.35rem;
+  /* `1 1 100%`, e isto é o conserto de um erro meu: com `1 1 auto` a caixa
+     das ferramentas encolhia para caber ao lado do nome do canal e as
+     quebras aconteciam DENTRO dela, jogando um botão solto para baixo e para
+     a esquerda, por fora da faixa — a imagem de cabeçalho torto. Ocupando a
+     linha inteira, a faixa quebra em grade e sempre no lugar previsto. */
+  #room-head .tools{margin-left:0;flex:1 1 100%;flex-wrap:wrap;gap:.35rem;
     justify-content:flex-start}
+
+  /* ---- a caixa de mensagem ----
+     A alça de redimensionar sai de cena no celular. Ela mora na borda de cima
+     da caixa, encostada na lista de mensagens: no dedo, é mais fácil pegá-la
+     sem querer durante a rolagem do que de propósito — e a altura ficava
+     GRAVADA, então um esbarrão deixava um quarto da tela ocupado por um campo
+     vazio até alguém descobrir o duplo clique. No celular a caixa cresce
+     sozinha com o texto, que é o que se espera ali. */
+  #msg-grip{display:none}
   #room-head .col-tgs{flex:1 1 100%;margin-left:0;gap:.3rem}
   #room-head .col-tg{flex:1}
+  /* No `# geral` não existem abas — ele é só a transmissão. Sem elas sobram
+     três ícones, que cabem folgados ao lado do nome do canal: gastar uma
+     faixa inteira de cabeçalho com eles seria tirar uma mensagem da tela à
+     toa. `0 0 auto` para a caixa não encolher e quebrar por dentro, que foi
+     o que entortou o cabeçalho antes. */
+  :root.view-chat-only #room-head .tools{flex:0 0 auto;margin-left:auto;
+    flex-wrap:nowrap;max-width:100%}
   #kick{font-size:.7rem}
   #menu{flex:none}
 
   /* ---- a gaveta de canais ---- */
-  /* Largura em `min()`: a fixa de 270px engolia uma tela de 320. E o teto da
-     largura some no celular — ver `maxCol` no app.js: a conta de desktop
-     devolvia o mínimo de 150px aqui, e a gaveta abria espremida. */
-  #side{width:min(var(--side-w),84vw);inset:0 auto 0 0;
+  /* A gaveta NÃO usa `--side-w`. Aquela variável é a largura da coluna no
+     computador, escolhida arrastando a alça e guardada no navegador — e
+     bastava um valor pequeno vindo de lá para a gaveta abrir espremida, com
+     o codinome partido no meio ("Her/mes") e os nomes dos canais cortados.
+     Era exatamente o que acontecia: a conta antiga de teto clampava a coluna
+     no mínimo de 150px enquanto o site era usado no celular, e a gaveta
+     herdava os 150px para sempre.
+     Aqui ela flutua por cima da sala e não divide espaço com ninguém, então
+     a largura é a que cabe na mão: 300px, ou 86% da tela no aparelho
+     estreito, o que for menor. */
+  #side{width:min(300px,86vw);inset:0 auto 0 0;
     padding:calc(1rem + env(safe-area-inset-top)) 1rem calc(1rem + env(safe-area-inset-bottom));
     box-shadow:none}
+  /* `break-all` parte a palavra em qualquer letra, e é assim que "Hermes"
+     virava "Her/mes" num espaço que cabia inteiro. `anywhere` só parte
+     quando não há mesmo como caber — que é o caso do codinome quilométrico
+     para o qual a regra original foi escrita. */
+  .me b{word-break:normal;overflow-wrap:anywhere}
   #side.open{box-shadow:0 10px 40px #000c}
   [data-grip="side"]{display:none!important}
 
@@ -1297,6 +1327,13 @@ body{overflow:hidden;overscroll-behavior:none}
      o dedo erra, e devolvem uma linha e meia de mensagem. */
   #room-head{padding:.35rem .5rem;gap:.3rem}
   #room-head .col-tg,#room-head .tools .ghost,#room-head .tools .primary{min-height:32px}
+  /* Deitado há largura de sobra: as ferramentas voltam para o lado do nome do
+     canal e devolvem uma faixa de altura, que é o que falta nessa orientação.
+     `nowrap` + rolagem lateral em vez de quebra: a quebra dentro da caixa é
+     justamente o que desalinhava o cabeçalho em pé. */
+  #room-head .tools{flex:0 1 auto;margin-left:auto;flex-wrap:nowrap;
+    overflow-x:auto;scrollbar-width:none}
+  #room-head .tools::-webkit-scrollbar{display:none}
   .col-head{padding:.3rem .6rem}
   .tw-head{padding:.35rem .6rem}
   .tw-stat{padding:0 .6rem .35rem}
