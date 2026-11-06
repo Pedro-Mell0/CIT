@@ -133,6 +133,8 @@
   const noDe = id => G.porId[id] || null;
   const ligacoesDe = id => G.toca[id] || [];
   const emFoco = id => !foco || foco.nos.has(id);
+  /** 0 para quem está na frente, 1 para quem está no fundo deste quadro. */
+  const fundura = prof => Math.max(0, Math.min(1, (prof - cena.pPerto) / cena.pFaixa));
   const corta = (t, n) => (String(t).length > n ? String(t).slice(0, n - 1) + '…' : String(t));
 
   // ---------------------------------------------------------------- lugares
@@ -158,7 +160,8 @@
     const nivel = n => G.nos.filter(x => x.nivel === n);
     const centro = nivel(0)[0] || nivel(1)[0] || null;
     const ops = nivel(1).filter(o => o !== centro);
-    if (centro) centro.p = { x: 0, y: 0, z: 0 };
+    G.nos.forEach(n => { n.centro = false; });
+    if (centro) { centro.p = { x: 0, y: 0, z: 0 }; centro.centro = true; }
 
     const R1 = 320 + ops.length * 42;
     ops.forEach((o, i) => {
@@ -367,6 +370,19 @@
 
     G.nos.forEach(n => { n.s = projeta(n.p); });
 
+    // A faixa de profundidade DESTE quadro, que é com o que o fundo desbota.
+    // Medida a cada quadro, e não uma vez: o plano gira, e quem estava na
+    // frente passa para trás. Amarrar isso à escala do nó não serve — a escala
+    // também responde ao zoom, e aí o quadro inteiro desbotaria junto.
+    let perto = Infinity, longe = -Infinity;
+    G.nos.forEach(n => {
+      if (!n.s) return;
+      perto = Math.min(perto, n.s.prof);
+      longe = Math.max(longe, n.s.prof);
+    });
+    cena.pPerto = perto;
+    cena.pFaixa = Math.max(1, longe - perto);
+
     // Rótulo em toda linha só faz sentido quando há poucas: na teia geral eles
     // viram um borrão. Com seleção aberta, o do ramo escolhido aparece sempre.
     const rotulos = G.arestas.length <= 40;
@@ -382,8 +398,9 @@
     const ctx = cena.ctx;
     const dentro = !foco || foco.arestas.has(a.id);
     const k = Math.min(1.5, (A.k + B.k) / 2);
-    ctx.globalAlpha = foco ? (dentro ? .95 : .05)
+    const base = foco ? (dentro ? .95 : .05)
       : a.conf === 'suposto' ? .28 : a.compartilhado ? .7 : .42;
+    ctx.globalAlpha = base * (1 - fundura((A.prof + B.prof) / 2) * .6);
     ctx.strokeStyle = a.cor;
     ctx.lineWidth = Math.max(.7, (foco && dentro ? 2.2 : a.compartilhado ? 1.5 : 1) * k);
     // Suposto é tracejado, provável é pontilhado curto, confirmado é cheio — e
@@ -415,8 +432,14 @@
   function pintaNo(n) {
     const ctx = cena.ctx, s = n.s;
     const r = Math.max(6, (n.tam / 2) * s.k);
-    // O que está longe esmaece um pouco: é o que dá profundidade ao quadro.
-    ctx.globalAlpha = foco && !emFoco(n.id) ? .1 : Math.max(.5, Math.min(1, s.k * 1.15));
+    // Quem vai ficando para trás vai ficando translúcido. Sem isso o nó do
+    // fundo aparece inteiro por cima do de trás do da frente, e a pilha fica
+    // ilegível justamente onde o quadro é mais cheio.
+    // O centro é a âncora do quadro e não vai a lugar nenhum: ele fica na
+    // profundidade do meio para sempre, e desbotá-lo seria apagar justamente a
+    // referência de todo o resto.
+    ctx.globalAlpha = foco && !emFoco(n.id) ? .08
+      : n.centro ? 1 : 1 - fundura(s.prof) * .68;
 
     const fig = figura(n);
     if (fig) {
@@ -434,7 +457,9 @@
     }
 
     if (n.kind === 'operacao') return;        // o nome dela já está dentro do nó
-    if (ctx.globalAlpha < .18) return;
+    // Rótulo do fundo some antes do nó: nome sobre nome é o que mais suja o
+    // quadro, e o nó ainda diz cor, tamanho e para onde as linhas vão.
+    if (ctx.globalAlpha < .42) return;
     const eCentro = n.kind === 'fukurou';
     const corpo = Math.max(7.5, Math.min(13, 9.5 * s.k));
     ctx.font = (eCentro ? '600 ' : '') + corpo + 'px ' +
