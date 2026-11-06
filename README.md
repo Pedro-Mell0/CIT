@@ -459,9 +459,10 @@ volta; e cada entidade orbita a operação em que foi apurada. A que aparece em
 mais de uma flutua entre elas, acima do plano: é ali que ela de fato está.
 
 O plano **gira sozinho**, devagar e no sentido horário — uma volta a cada dois
-minutos —, mas sai do caminho na hora de ler: **qualquer ação** — mexer o
-ponteiro, clicar, arrastar, girar a roda — zera a contagem, e o giro só volta
-depois de **cinco segundos** de quadro parado. Movimento derruba a memória de
+minutos —, mas sai do caminho na hora de ler: **clicar, arrastar ou girar a
+roda** zera a contagem, e ele só volta depois de **cinco segundos** parado. Só
+passar o ponteiro por cima não conta — senão a teia congelaria com o mouse
+esquecido em qualquer canto do palco. Movimento derruba a memória de
 onde as coisas estavam, e é nisso que a tela plana ganha da que gira. O lugar
 de cada nó é calculado, não sorteado: o quadro gira, mas não embaralha, e quem
 fechou a teia com uma pessoa à direita da operação a reencontra ali.
@@ -482,7 +483,9 @@ cinza, operação em ciano. A coruja do CIT fica para o único nó que é a casa
 FUKUROU, no centro da Teia Geral.
 
 O nó de operação não tem retrato: o **nome da operação** é o desenho dele,
-escrito no meio do círculo. Nó de operação sigilosa vem com borda dupla
+escrito no meio do círculo — e desce para baixo do nó quando o círculo fica
+pequeno demais para caber texto, que é o que acontece de longe ou com o quadro
+afastado. Nó de operação sigilosa vem com borda dupla
 vermelha. Quem aparece em mais de uma operação leva uma **pastilha dourada** no
 canto — a linha automática pode estar atrás do nó, ou apagada por um filtro; a
 pastilha não.
@@ -492,8 +495,9 @@ ficando translúcido, e o nome sai antes do nó. E **cobrir alguém**: o nó que
 em cima de outro fica translúcido para deixar ver através — pilha opaca é o que
 mais embaralha o quadro. O centro escapa das duas: ele é a âncora.
 
-Dois nomes nunca se escrevem por cima: o da frente leva o lugar, e o que cedeu
-volta ao passar o ponteiro. O nome do centro escreve sempre.
+Dois nomes nunca se escrevem por cima: embaixo do nó é o lugar de sempre, em
+cima é o plano B, e quem não achou lugar volta ao passar o ponteiro. O nome do
+centro escreve sempre.
 
 A **cor da linha** diz o tipo do vínculo — comando, família, local/patrimônio,
 financeiro, social — e o **traço** diz a confiança: cheio é *confirmado*,
@@ -505,11 +509,14 @@ o ponteiro e em todo o ramo do nó selecionado.
 
 - **Segurar ESPAÇO e arrastar** gira o plano à mão, nos dois eixos.
 - **Arrastar um nó** o move no espaço, e o lugar fica gravado para todo mundo
-  que abre a mesma aba — é quadro de investigação, não arrumação pessoal. Quem
-  vai junto depende de quem foi arrastado: o **centro** leva o quadro inteiro,
-  porque tudo pendura nele; a **operação** leva as entidades que só ela tem — a
-  que aparece em duas fica onde está, porque pertence às duas e arrastá-la
-  atrás de uma seria mentir sobre a outra; a **entidade** anda sozinha.
+  que abre a mesma aba — é quadro de investigação, não arrumação pessoal. A
+  **operação** leva junto as entidades que só ela tem; a que aparece em duas
+  fica onde está, porque pertence às duas e arrastá-la atrás de uma seria
+  mentir sobre a outra. A **entidade** anda sozinha.
+- O **centro** é a única posição que não se grava: ele mora na origem e ponto.
+  Arrastá-lo desloca a vista, e aí tudo vai junto sem nada sair do lugar no
+  mundo. Se ele pudesse ser gravado, bastaria uma posição vinda de outro ponto
+  zero para o quadro inteiro nascer num canto, com o centro de fora.
 - **Rolar** dá zoom; **arrastar o fundo** move a tela.
 - **Clicar no nó** faz a ficha dele entrar pela direita, de cima a baixo do
   palco (foto, galeria, resumo, apelidos, operações em que aparece e a lista

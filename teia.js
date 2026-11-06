@@ -165,7 +165,7 @@
   // `dist` é só a força da perspectiva — quanto o que está na frente cresce em
   // relação ao que está atrás. O tamanho na tela é `zoom`, à parte: misturar os
   // dois faria o enquadramento achatar ou esticar a profundidade junto.
-  const cam = { giro: 0, yaw: 0, pitch: .42, dist: 2400, zoom: 1, px: 0, py: 0 };
+  const cam = { giro: 0, yaw: 0, pitch: .62, dist: 2400, zoom: 1, px: 0, py: 0 };
 
   let cena = null;          // o canvas e o laço, enquanto a teia está aberta
   let foco = null;          // { nos:Set, arestas:Set } enquanto há seleção
@@ -259,9 +259,14 @@
 
     // O que foi arrumado à mão vence o cálculo. É quadro de investigação: onde
     // alguém pôs um nó é informação, e vale para todo mundo que abre a aba.
+    //
+    // O centro é a única exceção, e de propósito: ele mora na origem e ponto.
+    // Se ele pudesse ser gravado, bastaria uma posição vinda de outro ponto
+    // zero — as da teia plana, por exemplo — para o quadro inteiro nascer num
+    // canto, com o centro de fora. Arrastá-lo desloca a vista, não o mundo.
     const salvas = dados.pos[chaveVista()] || {};
     G.nos.forEach(n => {
-      if (n.id === 'fukurou') return;        // o centro não é linha de banco
+      if (n === centro || n.id === 'fukurou') return;
       const { kind, id } = parte(n.id);
       const q = salvas[kind + ':' + id];
       if (q) n.p = { x: q.x, y: q.y, z: q.z || 0 };
@@ -342,35 +347,46 @@
     return im.complete && im.naturalWidth ? im : null;
   }
 
-  /** O nome da operação, quebrado em linhas que cabem dentro do círculo. */
-  function escreveDentro(x, texto, c, r) {
-    const larg = r * 1.5;
-    for (const corpo of [16, 14, 12, 10, 9]) {
-      x.font = '600 ' + corpo + 'px "Chakra Petch", sans-serif';
-      const linhas = [];
-      let atual = '';
-      String(texto).split(/\s+/).forEach(p => {
-        const tenta = atual ? atual + ' ' + p : p;
-        if (x.measureText(tenta).width > larg && atual) { linhas.push(atual); atual = p; }
-        else atual = tenta;
-      });
-      if (atual) linhas.push(atual);
-      const cabe = linhas.every(l => x.measureText(l).width <= larg) &&
+  /** Quebra o texto nas linhas que cabem numa largura, na fonte já escolhida. */
+  function quebra(ctx, texto, larg) {
+    const linhas = [];
+    let atual = '';
+    String(texto).split(/\s+/).forEach(w => {
+      const tenta = atual ? atual + ' ' + w : w;
+      if (ctx.measureText(tenta).width > larg && atual) { linhas.push(atual); atual = w; }
+      else atual = tenta;
+    });
+    if (atual) linhas.push(atual);
+    return linhas;
+  }
+
+  /**
+   * O nome da operação, escrito dentro do círculo e no tamanho que couber ali.
+   * Não entra no desenho fixo do nó justamente por isto: o nó muda de tamanho
+   * com a distância e com o zoom, e um texto gravado junto encolheria com ele
+   * até virar um borrão de dois pixels.
+   */
+  function escreveDentro(ctx, texto, cx, cy, r) {
+    const larg = r * 1.45;
+    for (let corpo = Math.min(17, r * .3); corpo >= 7.5; corpo -= 1) {
+      ctx.font = '600 ' + corpo.toFixed(1) + 'px "Chakra Petch", sans-serif';
+      const linhas = quebra(ctx, texto, larg);
+      const cabe = linhas.every(l => ctx.measureText(l).width <= larg) &&
                    linhas.length * (corpo + 2) <= r * 1.7;
-      if (!cabe && corpo > 9) continue;
+      if (!cabe && corpo > 8.5) continue;
       const alt = corpo + 2;
-      const y0 = c - ((linhas.length - 1) * alt) / 2;
-      x.textAlign = 'center';
-      x.textBaseline = 'middle';
-      x.fillStyle = '#bff3ff';
-      linhas.forEach((l, i) => x.fillText(l, c, y0 + i * alt));
+      const y0 = cy - ((linhas.length - 1) * alt) / 2;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#bff3ff';
+      linhas.forEach((l, i) => ctx.fillText(l, cx, y0 + i * alt));
       return;
     }
   }
 
   function figura(n) {
     const chave = n.kind === 'operacao'
-      ? 'op|' + n.nome + '|' + (n.sigiloso ? 's' : '')
+      ? 'op|' + (n.sigiloso ? 's' : '')
       : n.kind + '|' + n.cor + '|' + n.img;
     if (figuras[chave]) return figuras[chave];
 
@@ -389,7 +405,6 @@
     x.beginPath(); x.arc(c, c, r, 0, TAU); x.clip();
     if (n.kind === 'operacao') {
       x.fillStyle = '#071a38'; x.fillRect(0, 0, L, L);
-      escreveDentro(x, n.nome, c, r);
     } else {
       x.fillStyle = FUNDO; x.fillRect(0, 0, L, L);
       const esc = L / Math.max(im.naturalWidth, im.naturalHeight);
@@ -545,26 +560,44 @@
 
   /** O nome do nó, com fundo próprio e sem pisar no nome de ninguém. */
   function pintaRotulo(n) {
-    if (n.kind === 'operacao') return;        // o nome dela já está dentro do nó
     const ctx = cena.ctx, s = n.s;
     const alfa = foco && !emFoco(n.id) ? 0
       : n.centro ? 1 : 1 - fundura(s.prof) * .68;
     if (alfa < .42) return;                   // o do fundo sai antes do nó
 
+    // A operação escreve o nome dentro de si — mas só enquanto couber. Longe,
+    // ou com o quadro afastado, o círculo fica pequeno demais para qualquer
+    // texto, e aí o nome desce para baixo do nó como o de todo mundo.
+    const raio = Math.max(6, (n.tam / 2) * s.k);
+    if (n.kind === 'operacao' && raio >= 24) {
+      ctx.globalAlpha = alfa;
+      escreveDentro(ctx, n.nome, s.x, s.y, raio);
+      return;
+    }
+
     const eCentro = n.kind === 'fukurou';
+    const opera = n.kind === 'operacao';
     const destaque = n.centro || n.id === selecionado || n.id === cena.sobre;
     const corpo = Math.max(8, Math.min(13, 9.5 * s.k));
-    ctx.font = (eCentro ? '600 ' : '') + corpo + 'px ' +
-      (eCentro ? '"Chakra Petch", sans-serif' : '"JetBrains Mono", monospace');
+    ctx.font = (eCentro || opera ? '600 ' : '') + corpo + 'px ' +
+      (eCentro || opera ? '"Chakra Petch", sans-serif' : '"JetBrains Mono", monospace');
     const texto = corta(n.nome, 26);
     const w = ctx.measureText(texto).width;
-    const r = Math.max(6, (n.tam / 2) * s.k);
-    const x = s.x, y = s.y + r + 4;
-    const cx = { x0: x - w / 2 - 4, x1: x + w / 2 + 4, y0: y - 1, y1: y + corpo + 4 };
+    const livre = c => !cena.rotulos.some(o =>
+      c.x0 < o.x1 && c.x1 > o.x0 && c.y0 < o.y1 && c.y1 > o.y0);
+    const caixaEm = yy => ({ x0: s.x - w / 2 - 4, x1: s.x + w / 2 + 4,
+                             y0: yy - 1, y1: yy + corpo + 4 });
 
-    // Quem o agente está olhando escreve sempre; o resto cede o lugar.
-    if (!destaque && cena.rotulos.some(c =>
-        cx.x0 < c.x1 && cx.x1 > c.x0 && cx.y0 < c.y1 && cx.y1 > c.y0)) return;
+    // Embaixo é o lugar de sempre; em cima é o plano B. Num anel visto de
+    // perfil os nós se espremem na horizontal e metade dos nomes ficaria de
+    // fora por brigar com o vizinho — alternar o lado recupera quase todos.
+    // Quem o agente está olhando escreve sempre, no lugar de sempre.
+    let cx = caixaEm(s.y + raio + 4);
+    if (!destaque && !livre(cx)) {
+      cx = caixaEm(s.y - raio - corpo - 6);
+      if (!livre(cx)) return;
+    }
+    const x = s.x, y = cx.y0 + 1;
     cena.rotulos.push(cx);
 
     // Fundo próprio: sem ele o nome no meio do quadro fica ilegível em cima
@@ -576,17 +609,17 @@
     ctx.globalAlpha = alfa;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillStyle = eCentro ? '#45e3ff'
+    ctx.fillStyle = eCentro || opera ? '#45e3ff'
       : (n.id === selecionado || n.id === cena.sobre) ? '#ffffff' : '#cfc9ff';
     ctx.fillText(texto, x, y + 1);
   }
 
   // ------------------------------------------------------------- apontar
-  function noEm(x, y) {
+  function noEm(x, y, folga = 4) {
     let achado = null;
     G.nos.forEach(n => {
       if (!n.s) return;
-      const r = Math.max(8, (n.tam / 2) * n.s.k) + 3;
+      const r = Math.max(8, (n.tam / 2) * n.s.k) + folga;
       if (Math.hypot(n.s.x - x, n.s.y - y) <= r &&
           (!achado || n.s.prof < achado.s.prof)) achado = n;
     });
@@ -612,13 +645,13 @@
   }
 
   /**
-   * Quem vai junto quando este nó é arrastado. O centro leva o quadro inteiro,
-   * porque tudo pendura nele. A operação leva as entidades que só ela tem — a
-   * que aparece em duas fica onde está, porque pertence às duas e arrastá-la
-   * atrás de uma seria mentir sobre a outra. A entidade anda sozinha.
+   * Quem vai junto quando este nó é arrastado. A operação leva as entidades que
+   * só ela tem — a que aparece em duas fica onde está, porque pertence às duas
+   * e arrastá-la atrás de uma seria mentir sobre a outra. A entidade anda
+   * sozinha. O centro não passa por aqui: arrastá-lo desloca a vista, e aí
+   * tudo vai junto sem que nada saia do lugar no mundo.
    */
   function arrastaJunto(n) {
-    if (n.centro) return G.nos.filter(x => x.p);
     if (n.nivel !== 1) return [n];
     const leva = new Set([n]);
     ligacoesDe(n.id).forEach(a => {
@@ -652,7 +685,7 @@
     const chave = chaveVista();
     const linhas = [];
     nos.forEach(n => {
-      if (n.id === 'fukurou') return;
+      if (n.centro || n.id === 'fukurou') return;
       const { kind, id } = parte(n.id);
       linhas.push({
         view_key: chave, node_kind: kind, node_id: id,
@@ -694,20 +727,22 @@
       const p = ponto(e);
       // Com ESPAÇO, gira a câmera. Em cima de um nó, arrasta o nó. No vazio,
       // desloca a vista.
-      const alvo = espaco ? null : noEm(p.x, p.y);
+      // Folga maior para pegar do que para apontar: com o quadro afastado o nó
+      // tem oito pixels de raio, e errar por dois vira "arrastar não funciona".
+      const alvo = espaco ? null : noEm(p.x, p.y, 12);
+      const pega = !!alvo && !alvo.centro;
       arrasto = {
         x: p.x, y: p.y, andou: 0,
-        modo: espaco ? 'gira' : alvo ? 'no' : 'vista',
-        no: alvo, junto: alvo ? arrastaJunto(alvo) : null,
+        modo: espaco ? 'gira' : pega ? 'no' : 'vista',
+        no: alvo, junto: pega ? arrastaJunto(alvo) : null,
       };
       cena.parado = true;                     // o relógio espera a mão sair
-      cv.classList.toggle('girando', espaco);
+      cv.classList.add('girando');
       agiu();
     });
 
     cv.addEventListener('pointermove', e => {
       const p = ponto(e);
-      agiu();
       if (!arrasto) {
         const n = noEm(p.x, p.y);
         cena.sobre = n ? n.id : null;
@@ -715,7 +750,8 @@
         // vínculo aparece, um de cada vez, em vez de todos ao mesmo tempo.
         const a = n ? null : arestaEm(p.x, p.y);
         cena.sobreAresta = a ? a.id : null;
-        cv.style.cursor = (n || a) ? 'pointer' : espaco ? 'grab' : 'default';
+        // Mão aberta em cima do nó: é o que diz que ele sai do lugar.
+        cv.style.cursor = n ? 'grab' : a ? 'pointer' : espaco ? 'grab' : 'default';
         return;
       }
       const dx = p.x - arrasto.x, dy = p.y - arrasto.y;
@@ -774,10 +810,10 @@
     cena.t = t;
     if (document.hidden) return;              // aba escondida não gasta quadro
 
-    // O plano gira sozinho, mas sai do caminho na hora de ler: qualquer ação —
-    // mexer o ponteiro, clicar, arrastar, girar a roda — zera a contagem, e o
-    // giro só volta depois de cinco segundos de quadro parado. Girar por baixo
-    // de quem está lendo derruba a memória de onde as coisas estavam.
+    // O plano gira sozinho, mas sai do caminho na hora de ler: clicar,
+    // arrastar ou girar a roda zera a contagem, e ele só volta depois de cinco
+    // segundos parado. Só passar o ponteiro por cima não conta — senão a teia
+    // congelaria com o mouse esquecido em qualquer canto do palco.
     if (!cena.parado && t - cena.agir > OCIO) cam.giro -= GIRO * dt;
     pinta();
   }
@@ -1065,7 +1101,7 @@
     // A câmera volta ao ângulo de sempre a cada troca de vista; o giro do
     // relógio, não — ele é contínuo, e reiniciá-lo daria um salto na tela.
     cam.yaw = 0;
-    cam.pitch = .42;
+    cam.pitch = .62;
     cam.zoom = 1;
     cam.px = cam.py = 0;
 
