@@ -13,13 +13,15 @@
    o que o agente não alcança. O que não vem do banco, não vira nó.
    =========================================================================== */
 (() => {
+  // Todo nó é redondo. Quem diz o tipo é a cor — da borda e do desenho de
+  // dentro. Forma variada só brigava com a moldura circular da miniatura.
   const TIPO_NO = {
-    operacao:    { forma: 'ellipse',         cor: '#45e3ff' },
-    pessoa:      { forma: 'ellipse',         cor: '#9b5cff' },
-    local:       { forma: 'round-rectangle', cor: '#ffc74d' },
-    veiculo:     { forma: 'round-rectangle', cor: '#3d8bff' },
-    organizacao: { forma: 'hexagon',         cor: '#00ffd5' },
-    informacao:  { forma: 'diamond',         cor: '#7d76b9' },
+    operacao:    { cor: '#45e3ff' },
+    pessoa:      { cor: '#9b5cff' },
+    local:       { cor: '#ffc74d' },
+    veiculo:     { cor: '#3d8bff' },
+    organizacao: { cor: '#00ffd5' },
+    informacao:  { cor: '#7d76b9' },
   };
 
   const TIPO_VINC = {
@@ -32,6 +34,15 @@
   };
 
   const CONF = { confirmado: 'confirmado', provavel: 'provável', suposto: 'suposto' };
+
+  // Como a entidade entrou na operação. Vira o rótulo da aresta quando o
+  // vínculo não traz um papel escrito — assim `role` fica livre para o que
+  // realmente acrescenta ("Capitã", "Dono da Mecânica") em vez de repetir o
+  // nome do campo em que a pessoa foi digitada.
+  const ROTULO_SLOT = {
+    place: 'Localização', suspects: 'Suspeito', agents: 'Agente',
+    witnesses: 'Testemunha', victims: 'Vítima',
+  };
 
   let root = null, cy = null;
   let vista = 'geral';          // 'geral' ou o id da operação
@@ -60,71 +71,31 @@
   const FUNDO = '#0a0622';
 
   /**
-   * Miniatura de quem não tem foto. Desenho vetorial, e não texto: fonte dentro
-   * de data-URI não carrega, o navegador cai numa qualquer e era isso que
-   * desenquadrava a sigla dentro do nó.
+   * Miniatura de quem não tem foto: a coruja do CIT, pintada na cor do tipo.
+   * É o símbolo da casa, e vale mais do que um ícone genérico por categoria —
+   * o tipo já se lê na cor.
    *
-   * Todo traço cabe numa caixa central de 44×44, que entra inteira no círculo,
-   * no retângulo, no hexágono e no losango — as formas que a teia usa. Sem isso,
-   * o que serve ao círculo vaza pela ponta do losango.
+   * Desenho vetorial, e não texto: fonte dentro de data-URI não carrega, o
+   * navegador cai numa qualquer e era isso que desenquadrava a sigla no nó.
+   * O traço todo cabe num raio de 31 a partir do centro, com folga para a
+   * borda do círculo de 80.
    */
   const cacheSvg = {};
 
-  function svgNo(kind, cor) {
-    const chave = kind + cor;
-    if (cacheSvg[chave]) return cacheSvg[chave];
+  function svgCoruja(cor) {
+    if (cacheSvg[cor]) return cacheSvg[cor];
     const c = escapaXml(cor);
-    const corpo = {
-      operacao:
-        `<path d="M24 20h20l14 13v27H24z" fill="${c}"/>` +
-        `<path d="M44 20l14 13H44z" fill="${FUNDO}" opacity=".5"/>` +
-        `<rect x="31" y="40" width="18" height="3" fill="${FUNDO}"/>` +
-        `<rect x="31" y="47" width="18" height="3" fill="${FUNDO}"/>` +
-        `<rect x="31" y="54" width="11" height="3" fill="${FUNDO}"/>`,
-      pessoa:
-        `<circle cx="40" cy="32" r="11" fill="${c}"/>` +
-        `<path d="M21 62c0-10.5 8.5-19 19-19s19 8.5 19 19z" fill="${c}"/>`,
-      local:
-        `<path d="M40 19c-8.3 0-15 6.7-15 15 0 11.2 15 28 15 28s15-16.8 15-28` +
-        ` c0-8.3-6.7-15-15-15z" fill="${c}"/>` +
-        `<circle cx="40" cy="33.5" r="6" fill="${FUNDO}"/>`,
-      veiculo:
-        `<path d="M21 45l5-13h28l5 13v9H21z" fill="${c}"/>` +
-        `<path d="M29 43l3-8h16l3 8z" fill="${FUNDO}"/>` +
-        `<circle cx="30" cy="55" r="5" fill="${c}"/>` +
-        `<circle cx="50" cy="55" r="5" fill="${c}"/>`,
-      organizacao:
-        `<path d="M23 26h19v36H23z" fill="${c}"/>` +
-        `<path d="M42 38h15v24H42z" fill="${c}"/>` +
-        `<g fill="${FUNDO}">` +
-        `<rect x="28" y="32" width="4" height="5"/><rect x="34" y="32" width="4" height="5"/>` +
-        `<rect x="28" y="42" width="4" height="5"/><rect x="34" y="42" width="4" height="5"/>` +
-        `<rect x="28" y="52" width="4" height="5"/><rect x="34" y="52" width="4" height="5"/>` +
-        `<rect x="46" y="44" width="4" height="5"/><rect x="51" y="44" width="4" height="5"/>` +
-        `<rect x="46" y="53" width="4" height="5"/><rect x="51" y="53" width="4" height="5"/>` +
-        `</g>`,
-      informacao:
-        `<circle cx="40" cy="40" r="19" fill="${c}"/>` +
-        `<circle cx="40" cy="31" r="3.4" fill="${FUNDO}"/>` +
-        `<rect x="37" y="37" width="6" height="15" rx="2.4" fill="${FUNDO}"/>`,
-    }[kind] || `<circle cx="40" cy="40" r="15" fill="${c}"/>`;
-
     const svg =
       `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80">` +
-      `<rect width="80" height="80" fill="${FUNDO}"/>${corpo}</svg>`;
-    return (cacheSvg[chave] = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg));
-  }
-
-  function svgCoruja() {
-    const svg =
-      `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">` +
-      `<rect width="64" height="64" fill="#0a0622"/>` +
-      `<g fill="none" stroke="#9b5cff" stroke-width="2.5" stroke-linejoin="round">` +
+      `<rect width="80" height="80" fill="${FUNDO}"/>` +
+      `<g transform="translate(12.5 12.5) scale(.86)">` +
+      `<g fill="none" stroke="${c}" stroke-width="2.5" stroke-linejoin="round">` +
       `<path d="M8 6l12 8h24l12-8v26c0 16-10 26-24 26S8 48 8 32z"/>` +
       `<circle cx="22" cy="30" r="8"/><circle cx="42" cy="30" r="8"/></g>` +
-      `<circle cx="22" cy="30" r="3.5" fill="#45e3ff"/><circle cx="42" cy="30" r="3.5" fill="#45e3ff"/>` +
-      `<path d="M28 40h8l-4 8z" fill="#9b5cff"/></svg>`;
-    return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+      `<circle cx="22" cy="30" r="3.5" fill="${c}"/>` +
+      `<circle cx="42" cy="30" r="3.5" fill="${c}"/>` +
+      `<path d="M28 40h8l-4 8z" fill="${c}"/></g></svg>`;
+    return (cacheSvg[cor] = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg));
   }
 
   const estilo = () => [
@@ -142,15 +113,29 @@
       'background-fit': 'cover',
       'border-width': 2,
       'border-color': 'data(cor)',
-      'shape': 'data(forma)',
+      'shape': 'ellipse',
       'width': 'data(tam)',
       'height': 'data(tam)',
       'transition-property': 'opacity',
       'transition-duration': '120ms',
     } },
     { selector: 'node.fukurou', style: {
-      'border-width': 3, 'font-size': 11, 'color': '#45e3ff',
+      'border-width': 3, 'font-size': 12, 'color': '#45e3ff',
       'text-margin-y': 9, 'font-family': 'Chakra Petch, sans-serif',
+    } },
+    // A operação não tem retrato: o nome dela É o desenho do nó. Rótulo no
+    // centro, quebrando em linhas dentro do círculo, e nada embaixo.
+    { selector: 'node.operacao', style: {
+      'background-image': 'none',
+      'background-color': '#071a38',
+      'text-valign': 'center',
+      'text-halign': 'center',
+      'text-margin-y': 0,
+      'text-wrap': 'wrap',
+      'text-max-width': 'data(larg)',
+      'font-family': 'Chakra Petch, sans-serif',
+      'font-size': 11,
+      'color': '#bff3ff',
     } },
     { selector: 'node.sigiloso', style: { 'border-style': 'double', 'border-color': '#ff2e5f' } },
     { selector: 'node:selected', style: { 'border-width': 4, 'border-color': '#fff' } },
@@ -267,7 +252,7 @@
     if (geral) {
       nos.push({ data: {
         id: 'fukurou', nome: 'FUKUROU', kind: 'fukurou', cor: '#9b5cff',
-        forma: 'ellipse', tam: 58, img: svgCoruja(), nivel: 0,
+        tam: 74, img: svgCoruja('#9b5cff'), nivel: 0,
       }, classes: 'fukurou' });
     }
 
@@ -276,11 +261,10 @@
       nos.push({
         data: {
           id: noOp(o.id), nome: o.title, kind: 'operacao', cor,
-          forma: TIPO_NO.operacao.forma, tam: geral ? 34 : 40,
-          img: svgNo('operacao', cor), nivel: 1,
+          tam: geral ? 84 : 96, larg: geral ? 60 : 70, nivel: 1,
           status: o.status, canal: o.channel,
         },
-        classes: sigilosa(o) ? 'sigiloso' : '',
+        classes: 'operacao' + (sigilosa(o) ? ' sigiloso' : ''),
       });
       if (geral) {
         arestas.push({ data: {
@@ -297,8 +281,8 @@
       const t = TIPO_NO[e.kind] || TIPO_NO.pessoa;
       const capa = e.images?.[0] && dados.fotos[e.images[0]];
       nos.push({ data: {
-        id: noEnt(id), nome: e.name, kind: e.kind, cor: t.cor, forma: t.forma,
-        tam: 28, img: capa || svgNo(e.kind, t.cor), nivel: 2,
+        id: noEnt(id), nome: e.name, kind: e.kind, cor: t.cor,
+        tam: 36, img: capa || svgCoruja(t.cor), nivel: 2,
       } });
     });
 
@@ -310,7 +294,8 @@
           id: 'eo:' + v.entity_id + ':' + v.operation_id,
           source: noOp(v.operation_id), target: noEnt(v.entity_id),
           cor: compartilhada ? '#ffc74d' : TIPO_VINC.outro.cor,
-          rotulo: v.role || '', tipo: 'operacao', conf: 'confirmado', auto: true,
+          rotulo: v.role || ROTULO_SLOT[v.slot] || '',
+          tipo: 'operacao', conf: 'confirmado', auto: true,
         },
         classes: compartilhada ? 'compartilhado' : '',
       });
@@ -441,8 +426,8 @@
         ? { name: 'preset', positions: n => salvas[n.id()] || { x: 0, y: 0 }, fit: true, padding: 60 }
         : vista === 'geral'
           ? { name: 'concentric', concentric: n => 3 - (n.data('nivel') ?? 2),
-              levelWidth: () => 1, minNodeSpacing: 46, padding: 60, animate: false }
-          : { name: 'cose', idealEdgeLength: 110, nodeRepulsion: 9000, padding: 60,
+              levelWidth: () => 1, minNodeSpacing: 64, padding: 60, animate: false }
+          : { name: 'cose', idealEdgeLength: 150, nodeRepulsion: 14000, padding: 60,
               animate: false, randomize: true },
     });
 

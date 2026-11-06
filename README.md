@@ -376,13 +376,15 @@ No formulário da operação, os campos **Local**, **Suspeitos**, **Agentes**,
 **Testemunhas** e **Vítimas** não são mais caixas de texto: você busca a
 entidade pelo nome ou apelido e escolhe, ou cadastra na hora pelo
 *+ cadastrar “…” como entidade nova*. Ao lado de cada uma cabe um **papel**
-("chefe", "capanga", "ponto de encontro"), que é o rótulo do vínculo na teia.
+("chefe", "capanga", "ponto de encontro"), que é o rótulo do vínculo na teia —
+sem papel escrito, a linha mostra o campo em que a entidade foi digitada
+(*Suspeito*, *Testemunha*, *Agente*, *Localização*, *Vítima*).
 A mesma pessoa pode ser chefe numa operação e testemunha em outra sem virar
 dois cadastros: o tipo é da entidade, o papel é da ligação.
 
 Cada entidade tem tipo, nome, **sigla** (a legenda nas fichas e nos chips do
 dossiê), apelidos, resumo, tags e imagens. A primeira imagem é a miniatura do
-nó. Ficam num bucket privado próprio (`entidades`), servido por URL assinada de
+nó; sem nenhuma, o nó fica com a coruja. Ficam num bucket privado próprio (`entidades`), servido por URL assinada de
 1 hora.
 
 **Possível duplicata**: ao digitar o nome, o site procura cadastro parecido —
@@ -451,12 +453,12 @@ de uma operação segue o sigilo do canal dela: quem lê o canal, abre a aba.
 
 ### Lendo o quadro
 
-A **forma e a cor** do nó dizem o tipo: pessoa em violeta, local em dourado,
-veículo em azul, organização em ciano, informação em cinza, operação em ciano
-no formato redondo. Com foto, o nó mostra a miniatura; sem foto, um ícone do
-tipo — vulto para pessoa, alfinete para local, carro para veículo, prédio para
-organização, dossiê para operação. Nó de operação sigilosa vem com borda dupla
-vermelha.
+Todo nó é redondo, e quem diz o tipo é a **cor**: pessoa em violeta, local em
+dourado, veículo em azul, organização em ciano, informação em cinza, operação
+em ciano. Com foto, o nó mostra a miniatura; sem foto, a coruja do CIT pintada
+na cor do tipo. O nó de operação não tem retrato: o **nome da operação** é o
+desenho dele, escrito no meio do círculo. Nó de operação sigilosa vem com borda
+dupla vermelha.
 
 A **cor da linha** diz o tipo do vínculo — comando, família, local/patrimônio,
 financeiro, social — e o **traço** diz a confiança: cheio é *confirmado*,
