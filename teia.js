@@ -188,11 +188,22 @@
   }
 
   /**
-   * O lugar de cada nó no espaço. O centro — FUKUROU na teia geral, a própria
-   * operação na teia de um canal — fica na origem; as operações se abrem num
-   * anel em volta; e cada entidade orbita a operação em que foi apurada. A que
-   * aparece em mais de uma fica no meio do caminho entre elas, um pouco acima:
-   * é ali que ela de fato está, e é isso que o quadro tem de mostrar.
+   * O lugar de cada nó no espaço.
+   *
+   * Na teia de uma operação, ela fica na origem e as entidades se espalham
+   * numa esfera em volta: é uma coisa só no meio e o resto orbitando.
+   *
+   * Na Teia Geral o desenho é uma flor. O FUKUROU na origem, as operações num
+   * anel em volta dele, e as entidades num anel MAIOR, por fora das operações
+   * — cada uma na fatia de círculo da operação que a apurou. A fatia é
+   * proporcional ao tamanho da operação: a que carrega vinte pessoas recebe
+   * mais céu do que a que carrega quatro.
+   *
+   * Por fora, e não em volta: a versão anterior punha cada grupo numa esfera
+   * centrada NA operação, e o resultado era a operação enterrada dentro da
+   * própria nuvem, com o nome ilegível e as entidades de duas operações
+   * vizinhas se misturando no meio do caminho. Com as entidades do lado de
+   * fora, toda linha sai do centro para a borda e nenhuma volta.
    *
    * A conta é determinística de propósito. O plano gira, mas não embaralha:
    * quem fechou a teia com uma pessoa à direita da operação a reencontra ali.
@@ -204,58 +215,110 @@
     G.nos.forEach(n => { n.centro = false; });
     if (centro) { centro.p = { x: 0, y: 0, z: 0 }; centro.centro = true; }
 
-    const R1 = 390 + ops.length * 58;
-    ops.forEach((o, i) => {
-      const a = (i / ops.length) * TAU;
-      o.p = { x: Math.cos(a) * R1, y: (i % 2 ? 1 : -1) * R1 * .12, z: Math.sin(a) * R1 };
-    });
-
     // De que operação é cada entidade, nesta vista.
     const donos = {};
     G.arestas.forEach(a => {
       if (a.tipo !== 'operacao') return;
       (donos[a.para] = donos[a.para] || []).push(a.de);
     });
+    const ents = nivel(2);
 
-    // Entidades do mesmo conjunto de operações viram um grupo, e o grupo
-    // inteiro se distribui numa esfera em volta do ponto médio dos donos.
-    const grupos = new Map();
-    nivel(2).forEach(e => {
-      const meus = [...new Set(donos[e.id] || [])].sort();
-      const chave = meus.join('|') || 'solto';
-      let g = grupos.get(chave);
-      if (!g) {
-        const ps = meus.map(id => noDe(id)?.p).filter(Boolean);
-        const m = (c) => ps.reduce((s, p) => s + p[c], 0) / ps.length;
-        const base = ps.length
-          ? { x: m('x'), y: m('y') + (ps.length > 1 ? 170 : 0), z: m('z') }
-          : { x: 0, y: 0, z: 0 };
-        // Duas operações em lados opostos do anel dão ponto médio bem em cima
-        // do centro — e aí a entidade compartilhada cobre o FUKUROU. Empurra
-        // para fora, mantendo a direção: ela continua entre as duas.
-        if (ps.length > 1) {
-          const minimo = Math.max(260, R1 * .55);
-          const raio = Math.hypot(base.x, base.z);
-          if (raio < minimo) {
-            const ang = raio > 1 ? Math.atan2(base.z, base.x)
-                                 : Math.atan2(ps[0].z, ps[0].x);
-            base.x = Math.cos(ang) * minimo;
-            base.z = Math.sin(ang) * minimo;
-          }
-        }
-        grupos.set(chave, (g = { base, itens: [] }));
-      }
-      g.itens.push(e);
-    });
-
-    grupos.forEach(g => {
-      const n = g.itens.length;
-      const raio = (ops.length ? 190 : 350) * (.65 + Math.min(1, n / 16) * .95);
-      g.itens.forEach((e, i) => {
+    if (!ops.length) {
+      // Teia de uma operação: ela no meio, todo mundo numa esfera em volta.
+      const n = ents.length;
+      const raio = 350 * (.65 + Math.min(1, n / 16) * .95);
+      ents.forEach((e, i) => {
         const d = naEsfera(i, n);
-        e.p = { x: g.base.x + d.x * raio, y: g.base.y + d.y * raio * .7, z: g.base.z + d.z * raio };
+        e.p = { x: d.x * raio, y: d.y * raio * .7, z: d.z * raio };
       });
-    });
+    } else {
+      // Quem é de uma operação só, e quem é de mais de uma.
+      const minhas = {}, compart = [];
+      const peso = o => 1 + (minhas[o.id] || []).length;
+      ents.forEach(e => {
+        const meus = [...new Set(donos[e.id] || [])].sort();
+        if (meus.length === 1) (minhas[meus[0]] = minhas[meus[0]] || []).push(e);
+        else compart.push({ e, meus });
+      });
+
+      // Vizinhas no anel são as que têm gente em comum. Em ordem alfabética,
+      // duas operações que compartilham três suspeitos podiam cair em lados
+      // opostos, e a linha dourada cruzava o quadro inteiro para ligá-las —
+      // justamente a linha que o agente mais precisa enxergar.
+      const parentesco = {};
+      compart.forEach(c => c.meus.forEach(a => c.meus.forEach(b => {
+        if (a !== b) parentesco[a + '>' + b] = (parentesco[a + '>' + b] || 0) + 1;
+      })));
+      const fila = ops.slice().sort((a, b) =>
+        peso(b) - peso(a) || a.id.localeCompare(b.id));
+      const anel = fila.length ? [fila.shift()] : [];
+      while (fila.length) {
+        const u = anel[anel.length - 1].id;
+        let melhor = 0;
+        fila.forEach((o, i) => {
+          const v = parentesco[u + '>' + o.id] || 0;
+          const m = parentesco[u + '>' + fila[melhor].id] || 0;
+          if (v > m) melhor = i;
+        });
+        anel.push(fila.splice(melhor, 1)[0]);
+      }
+
+      const soma = ops.reduce((t, o) => t + peso(o), 0);
+      const R1 = 300 + ops.length * 46;
+      const R2 = R1 + 420 + Math.min(soma, 44) * 9;
+
+      const fatia = {};
+      let giro = 0;
+      anel.forEach((o, i) => {
+        const larg = (peso(o) / soma) * TAU;
+        const meio = giro + larg / 2;
+        giro += larg;
+        fatia[o.id] = { meio, larg };
+        o.p = { x: Math.cos(meio) * R1, y: (i % 2 ? 1 : -1) * R1 * .1,
+                z: Math.sin(meio) * R1 };
+      });
+
+      ops.forEach(o => {
+        const lista = minhas[o.id] || [];
+        const { meio, larg } = fatia[o.id];
+        const n = lista.length;
+        lista.forEach((e, i) => {
+          // Dentro da fatia, em três distâncias e cinco alturas alternadas.
+          // Num anel só, de uma altura só, quarenta nomes viram uma cerca.
+          const t = n < 2 ? 0 : i / (n - 1) - .5;
+          const th = meio + t * larg * .84;
+          const rr = R2 * (1 + ((i % 3) - 1) * .09);
+          e.p = { x: Math.cos(th) * rr, y: [0, 1, -1, .5, -.5][i % 5] * 155,
+                  z: Math.sin(th) * rr };
+        });
+      });
+
+      // A entidade de duas operações vai para o limite entre as duas fatias,
+      // um pouco mais longe e um pouco mais alta. Mais longe porque a linha
+      // dourada tem de passar por fora: cortando o meio, ela atravessaria o
+      // quadro inteiro. Mais alta porque é ela que o agente procura.
+      const juntas = new Map();
+      compart.forEach(c => {
+        const k = c.meus.join('|');
+        (juntas.get(k) || juntas.set(k, []).get(k)).push(c.e);
+      });
+      juntas.forEach((lista, k) => {
+        const as = k ? k.split('|').map(id => fatia[id]?.meio)
+                        .filter(v => v != null) : [];
+        // Média circular: dois ângulos em lados opostos do anel não têm média
+        // aritmética que signifique alguma coisa.
+        const cx = as.reduce((t, v) => t + Math.cos(v), 0);
+        const cz = as.reduce((t, v) => t + Math.sin(v), 0);
+        const base = as.length ? Math.atan2(cz, cx) : 0;
+        lista.forEach((e, i) => {
+          const t = lista.length < 2 ? 0 : i / (lista.length - 1) - .5;
+          const th = base + t * .40;
+          const rr = R2 * (as.length ? 1.17 : 1.34);
+          e.p = { x: Math.cos(th) * rr, y: 180 + (i % 2 ? 95 : -95),
+                  z: Math.sin(th) * rr };
+        });
+      });
+    }
 
     // O que foi arrumado à mão vence o cálculo. É quadro de investigação: onde
     // alguém pôs um nó é informação, e vale para todo mundo que abre a aba.

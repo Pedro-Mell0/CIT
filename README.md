@@ -460,10 +460,24 @@ de uma operação segue o sigilo do canal dela: quem lê o canal, abre a aba.
 
 ### Lendo o quadro
 
-A teia é **tridimensional**. O centro — FUKUROU na Teia Geral, a própria
-operação na aba de um canal — fica no meio; as operações se abrem num anel em
-volta; e cada entidade orbita a operação em que foi apurada. A que aparece em
-mais de uma flutua entre elas, acima do plano: é ali que ela de fato está.
+A teia é **tridimensional**. Na aba de um canal a operação fica no meio e as
+entidades se espalham numa esfera em volta dela. Na Teia Geral o desenho é uma
+**flor**: o FUKUROU na origem, as operações num anel em volta dele e as
+entidades num anel **maior, por fora das operações** — cada uma na fatia de
+círculo da operação que a apurou. A fatia é proporcional ao tamanho da
+operação: a que carrega vinte pessoas recebe mais céu do que a que carrega
+quatro. A entidade que aparece em mais de uma operação vai para o limite entre
+as fatias, mais longe e mais alta — mais longe para a linha dourada passar por
+fora em vez de cortar o meio do quadro, mais alta porque é ela que o agente
+procura.
+
+Por fora, e não em volta de cada operação: a primeira versão punha cada grupo
+numa esfera centrada **na** operação, e o resultado era a operação enterrada
+dentro da própria nuvem, com o nome ilegível e as entidades de duas operações
+vizinhas se misturando no meio do caminho. Pela mesma razão as vizinhas no anel
+são as que têm gente em comum: em ordem alfabética, duas operações que
+compartilham três suspeitos podiam cair em lados opostos, e a linha dourada
+cruzava o quadro inteiro justamente onde o agente mais precisa enxergar.
 
 O plano **gira sozinho**, devagar e no sentido horário — uma volta a cada dois
 minutos —, mas sai do caminho na hora de ler: **clicar, arrastar ou girar a
