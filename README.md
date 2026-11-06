@@ -459,9 +459,12 @@ volta; e cada entidade orbita a operação em que foi apurada. A que aparece em
 mais de uma flutua entre elas, acima do plano: é ali que ela de fato está.
 
 O plano **gira sozinho**, devagar e no sentido horário — uma volta a cada dois
-minutos. O lugar de cada nó é calculado, não sorteado: o quadro gira, mas não
-embaralha, e quem fechou a teia com uma pessoa à direita da operação a
-reencontra ali.
+minutos —, mas sai do caminho na hora de ler: para enquanto o ponteiro está no
+palco, enquanto há nó selecionado e durante o arrasto, e volta uns segundos
+depois que a mão saiu. Movimento derruba a memória de onde as coisas estavam, e
+é nisso que a tela plana ganha da que gira. O lugar de cada nó é calculado, não
+sorteado: o quadro gira, mas não embaralha, e quem fechou a teia com uma pessoa
+à direita da operação a reencontra ali.
 
 Não entra biblioteca 3D. O desenho é feito à mão num canvas, com a projeção em
 perspectiva calculada na página: são dezenas de nós e algumas centenas de
@@ -470,18 +473,31 @@ quadro sai com a fonte e as cores do site. Enquanto a teia está aberta o ruído
 de CRT se cala, porque ali cada quadro já tem dono. O botão ⏹ não é mexido: ao
 sair da página o tubo volta como estava.
 
-Todo nó é redondo, e quem diz o tipo é a **cor**: pessoa em violeta, local em
-dourado, veículo em azul, organização em ciano, informação em cinza, operação
-em ciano. Com foto, o nó mostra a miniatura; sem foto, a coruja do CIT pintada
-na cor do tipo. O nó de operação não tem retrato: o **nome da operação** é o
-desenho dele, escrito no meio do círculo. Nó de operação sigilosa vem com borda
-dupla vermelha.
+Todo nó é redondo. Com foto, mostra a miniatura; sem foto, o **ícone do tipo** —
+vulto para pessoa, alfinete para local, carro para veículo, prédio para
+organização. É a convenção de toda ferramenta de análise de vínculo: o desenho
+diz o que a coisa é antes de qualquer leitura, e a **cor** confirma — pessoa em
+violeta, local em dourado, veículo em azul, organização em ciano, informação em
+cinza, operação em ciano. A coruja do CIT fica para o único nó que é a casa: o
+FUKUROU, no centro da Teia Geral.
+
+O nó de operação não tem retrato: o **nome da operação** é o desenho dele,
+escrito no meio do círculo. Nó de operação sigilosa vem com borda dupla
+vermelha. Quem aparece em mais de uma operação leva uma **pastilha dourada** no
+canto — a linha automática pode estar atrás do nó, ou apagada por um filtro; a
+pastilha não.
+
+O que vai ficando para trás vai ficando **translúcido**, e o nome sai antes do
+nó. Dois nomes nunca se escrevem por cima: o da frente leva o lugar, e o que
+cedeu volta ao passar o ponteiro. O nome do centro escreve sempre.
 
 A **cor da linha** diz o tipo do vínculo — comando, família, local/patrimônio,
 financeiro, social — e o **traço** diz a confiança: cheio é *confirmado*,
 pontilhado é *provável*, tracejado é *suposto*. Linha tracejada dourada é a
 **conexão detectada automaticamente**: aquela entidade aparece em mais de uma
-operação que você alcança.
+operação que você alcança. O **rótulo da linha** não fica escrito o tempo todo —
+cem palavrinhas cruzando o quadro é o que mais o suja. Ele aparece na linha sob
+o ponteiro e em todo o ramo do nó selecionado.
 
 - **Segurar ESPAÇO e arrastar** gira o plano à mão, nos dois eixos. Enquanto a
   mão está no arrasto o giro automático espera; soltando, ele continua de onde

@@ -74,16 +74,55 @@
   const FUNDO = '#0a0622';
 
   /**
-   * Miniatura de quem não tem foto: a coruja do CIT, pintada na cor do tipo.
-   * É o símbolo da casa, e vale mais do que um ícone genérico por categoria —
-   * o tipo já se lê na cor.
+   * Miniatura de quem não tem foto: o ícone do TIPO. É a convenção de toda
+   * ferramenta de análise de vínculo — o desenho diz o que a coisa é antes de
+   * qualquer leitura, e a cor só confirma. A coruja do CIT fica para o único
+   * nó que é a casa: o FUKUROU, no centro da Teia Geral.
    *
    * Desenho vetorial, e não texto: fonte dentro de data-URI não carrega, o
    * navegador cai numa qualquer e era isso que desenquadrava a sigla no nó.
-   * O traço todo cabe num raio de 31 a partir do centro, com folga para a
-   * borda do círculo de 80.
+   * Todo traço cabe numa caixa central de 44×44, com folga para a borda.
    */
   const cacheSvg = {};
+
+  function svgNo(kind, cor) {
+    const chave = kind + cor;
+    if (cacheSvg[chave]) return cacheSvg[chave];
+    const c = escapaXml(cor);
+    const corpo = {
+      pessoa:
+        `<circle cx="40" cy="32" r="11" fill="${c}"/>` +
+        `<path d="M21 62c0-10.5 8.5-19 19-19s19 8.5 19 19z" fill="${c}"/>`,
+      local:
+        `<path d="M40 19c-8.3 0-15 6.7-15 15 0 11.2 15 28 15 28s15-16.8 15-28` +
+        ` c0-8.3-6.7-15-15-15z" fill="${c}"/>` +
+        `<circle cx="40" cy="33.5" r="6" fill="${FUNDO}"/>`,
+      veiculo:
+        `<path d="M21 45l5-13h28l5 13v9H21z" fill="${c}"/>` +
+        `<path d="M29 43l3-8h16l3 8z" fill="${FUNDO}"/>` +
+        `<circle cx="30" cy="55" r="5" fill="${c}"/>` +
+        `<circle cx="50" cy="55" r="5" fill="${c}"/>`,
+      organizacao:
+        `<path d="M23 26h19v36H23z" fill="${c}"/>` +
+        `<path d="M42 38h15v24H42z" fill="${c}"/>` +
+        `<g fill="${FUNDO}">` +
+        `<rect x="28" y="32" width="4" height="5"/><rect x="34" y="32" width="4" height="5"/>` +
+        `<rect x="28" y="42" width="4" height="5"/><rect x="34" y="42" width="4" height="5"/>` +
+        `<rect x="28" y="52" width="4" height="5"/><rect x="34" y="52" width="4" height="5"/>` +
+        `<rect x="46" y="44" width="4" height="5"/><rect x="51" y="44" width="4" height="5"/>` +
+        `<rect x="46" y="53" width="4" height="5"/><rect x="51" y="53" width="4" height="5"/>` +
+        `</g>`,
+      informacao:
+        `<circle cx="40" cy="40" r="19" fill="${c}"/>` +
+        `<circle cx="40" cy="31" r="3.4" fill="${FUNDO}"/>` +
+        `<rect x="37" y="37" width="6" height="15" rx="2.4" fill="${FUNDO}"/>`,
+    }[kind] || `<circle cx="40" cy="40" r="15" fill="${c}"/>`;
+
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80">` +
+      `<rect width="80" height="80" fill="${FUNDO}"/>${corpo}</svg>`;
+    return (cacheSvg[chave] = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg));
+  }
 
   function svgCoruja(cor) {
     if (cacheSvg[cor]) return cacheSvg[cor];
@@ -347,12 +386,14 @@
     }
     x.restore();
 
-    x.lineWidth = 5;
+    // Anel fino. Grosso, cinquenta deles viram uma grade de argolas e o que
+    // está DENTRO do nó — que é a informação — some atrás da moldura.
+    x.lineWidth = 3.5;
     x.strokeStyle = n.cor;
     x.beginPath(); x.arc(c, c, r - 2, 0, TAU); x.stroke();
     if (n.sigiloso) {
-      x.lineWidth = 3; x.strokeStyle = '#ff2e5f';
-      x.beginPath(); x.arc(c, c, r - 9, 0, TAU); x.stroke();
+      x.lineWidth = 2.5; x.strokeStyle = '#ff2e5f';
+      x.beginPath(); x.arc(c, c, r - 8, 0, TAU); x.stroke();
     }
     return (figuras[chave] = cv);
   }
@@ -383,23 +424,35 @@
     cena.pPerto = perto;
     cena.pFaixa = Math.max(1, longe - perto);
 
-    // Rótulo em toda linha só faz sentido quando há poucas: na teia geral eles
-    // viram um borrão. Com seleção aberta, o do ramo escolhido aparece sempre.
-    const rotulos = G.arestas.length <= 40;
     G.arestas.forEach(a => {
       const A = noDe(a.de)?.s, B = noDe(a.para)?.s;
-      if (A && B) pintaAresta(a, A, B, rotulos);
+      if (A && B) pintaAresta(a, A, B);
     });
 
-    G.nos.filter(n => n.s).sort((x, y) => y.s.prof - x.s.prof).forEach(pintaNo);
+    const fila = G.nos.filter(n => n.s).sort((x, y) => y.s.prof - x.s.prof);
+    fila.forEach(pintaNo);
+
+    // Os nomes vêm por último, numa passada só e da frente para o fundo: assim
+    // nenhum nome fica metade escondido atrás de um nó, e quando dois querem o
+    // mesmo pedaço de tela o da frente leva. Nome sobre nome é o que mais suja
+    // o quadro — e quem perdeu o lugar continua a um passar de mouse.
+    cena.rotulos.length = 0;
+    const nomes = fila.slice().reverse();
+    const i0 = nomes.findIndex(n => n.centro);
+    if (i0 > 0) nomes.unshift(nomes.splice(i0, 1)[0]);
+    [selecionado, cena.sobre].forEach(id => {
+      const i = nomes.findIndex(n => n.id === id);
+      if (i > 0) nomes.unshift(nomes.splice(i, 1)[0]);
+    });
+    nomes.forEach(pintaRotulo);
   }
 
-  function pintaAresta(a, A, B, rotulos) {
+  function pintaAresta(a, A, B) {
     const ctx = cena.ctx;
     const dentro = !foco || foco.arestas.has(a.id);
     const k = Math.min(1.5, (A.k + B.k) / 2);
     const base = foco ? (dentro ? .95 : .05)
-      : a.conf === 'suposto' ? .28 : a.compartilhado ? .7 : .42;
+      : a.conf === 'suposto' ? .24 : a.compartilhado ? .6 : .34;
     ctx.globalAlpha = base * (1 - fundura((A.prof + B.prof) / 2) * .6);
     ctx.strokeStyle = a.cor;
     ctx.lineWidth = Math.max(.7, (foco && dentro ? 2.2 : a.compartilhado ? 1.5 : 1) * k);
@@ -414,8 +467,10 @@
     ctx.stroke();
     ctx.setLineDash([]);
 
-    if (!a.rotulo || ctx.globalAlpha < .3) return;
-    if (!rotulos && !(foco && dentro)) return;
+    // Rótulo de linha só no ramo selecionado e na linha sob o ponteiro. Todos
+    // de uma vez eram cem palavrinhas cinzas cruzando o quadro.
+    if (!a.rotulo || !((foco && dentro) || a.id === cena.sobreAresta)) return;
+    ctx.globalAlpha = Math.max(.8, ctx.globalAlpha);
     const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2;
     const corpo = Math.max(7, Math.min(10, 8 * k));
     ctx.font = corpo + 'px "JetBrains Mono", monospace';
@@ -449,25 +504,62 @@
       ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, TAU); ctx.fill(); ctx.stroke();
     }
 
+    // Quem aparece em mais de uma operação ganha a pastilha dourada. É a cor
+    // da linha que o sistema desenhou sozinho, mas lida no próprio nó: a linha
+    // pode estar atrás dele, ou apagada por um filtro.
+    if (n.compartilhada) {
+      const g = Math.max(2.5, r * .26);
+      const bx = s.x + r * .7, by = s.y - r * .7;
+      ctx.fillStyle = FUNDO;
+      ctx.beginPath(); ctx.arc(bx, by, g + 1.6, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#ffc74d';
+      ctx.beginPath(); ctx.arc(bx, by, g, 0, TAU); ctx.fill();
+    }
+
     if (n.id === selecionado || n.id === cena.sobre) {
       ctx.globalAlpha = Math.min(1, ctx.globalAlpha + .3);
       ctx.strokeStyle = n.id === selecionado ? '#fff' : n.cor;
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(s.x, s.y, r + 5, 0, TAU); ctx.stroke();
     }
+  }
 
+  /** O nome do nó, com fundo próprio e sem pisar no nome de ninguém. */
+  function pintaRotulo(n) {
     if (n.kind === 'operacao') return;        // o nome dela já está dentro do nó
-    // Rótulo do fundo some antes do nó: nome sobre nome é o que mais suja o
-    // quadro, e o nó ainda diz cor, tamanho e para onde as linhas vão.
-    if (ctx.globalAlpha < .42) return;
+    const ctx = cena.ctx, s = n.s;
+    const alfa = foco && !emFoco(n.id) ? 0
+      : n.centro ? 1 : 1 - fundura(s.prof) * .68;
+    if (alfa < .42) return;                   // o do fundo sai antes do nó
+
     const eCentro = n.kind === 'fukurou';
-    const corpo = Math.max(7.5, Math.min(13, 9.5 * s.k));
+    const destaque = n.centro || n.id === selecionado || n.id === cena.sobre;
+    const corpo = Math.max(8, Math.min(13, 9.5 * s.k));
     ctx.font = (eCentro ? '600 ' : '') + corpo + 'px ' +
       (eCentro ? '"Chakra Petch", sans-serif' : '"JetBrains Mono", monospace');
+    const texto = corta(n.nome, 26);
+    const w = ctx.measureText(texto).width;
+    const r = Math.max(6, (n.tam / 2) * s.k);
+    const x = s.x, y = s.y + r + 4;
+    const cx = { x0: x - w / 2 - 4, x1: x + w / 2 + 4, y0: y - 1, y1: y + corpo + 4 };
+
+    // Quem o agente está olhando escreve sempre; o resto cede o lugar.
+    if (!destaque && cena.rotulos.some(c =>
+        cx.x0 < c.x1 && cx.x1 > c.x0 && cx.y0 < c.y1 && cx.y1 > c.y0)) return;
+    cena.rotulos.push(cx);
+
+    // Fundo próprio: sem ele o nome no meio do quadro fica ilegível em cima
+    // das linhas, por mais claro que seja.
+    ctx.globalAlpha = alfa * .78;
+    ctx.fillStyle = '#04020c';
+    ctx.fillRect(cx.x0, cx.y0, cx.x1 - cx.x0, cx.y1 - cx.y0);
+
+    ctx.globalAlpha = alfa;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillStyle = eCentro ? '#45e3ff' : '#cfc9ff';
-    ctx.fillText(corta(n.nome, 24), s.x, s.y + r + 4);
+    ctx.fillStyle = eCentro ? '#45e3ff'
+      : (n.id === selecionado || n.id === cena.sobre) ? '#ffffff' : '#cfc9ff';
+    ctx.fillText(texto, x, y + 1);
   }
 
   // ------------------------------------------------------------- apontar
@@ -518,6 +610,13 @@
       return { x: e.clientX - r.left, y: e.clientY - r.top };
     };
 
+    cv.addEventListener('pointerenter', () => { cena.ponteiro = true; });
+    cv.addEventListener('pointerleave', () => {
+      cena.ponteiro = false;
+      cena.saiu = performance.now();
+      cena.sobre = cena.sobreAresta = null;
+    });
+
     cv.addEventListener('pointerdown', e => {
       if (e.button !== 0) return;
       cv.setPointerCapture(e.pointerId);
@@ -529,10 +628,15 @@
 
     cv.addEventListener('pointermove', e => {
       const p = ponto(e);
+      cena.ponteiro = true;
       if (!arrasto) {
         const n = noEm(p.x, p.y);
         cena.sobre = n ? n.id : null;
-        cv.style.cursor = n ? 'pointer' : espaco ? 'grab' : 'default';
+        // Sem nó debaixo do ponteiro, procura linha: é assim que o rótulo do
+        // vínculo aparece, um de cada vez, em vez de todos ao mesmo tempo.
+        const a = n ? null : arestaEm(p.x, p.y);
+        cena.sobreAresta = a ? a.id : null;
+        cv.style.cursor = (n || a) ? 'pointer' : espaco ? 'grab' : 'default';
         return;
       }
       const dx = p.x - arrasto.x, dy = p.y - arrasto.y;
@@ -583,7 +687,15 @@
     const dt = Math.min(.05, (t - cena.t) / 1000);
     cena.t = t;
     if (document.hidden) return;              // aba escondida não gasta quadro
-    if (!cena.parado) cam.giro -= GIRO * dt;  // negativo = horário na tela
+
+    // O plano gira sozinho, mas sai do caminho na hora de ler: para enquanto o
+    // ponteiro está no palco, enquanto há nó selecionado e durante o arrasto, e
+    // volta uns segundos depois que a mão saiu. Girar por baixo de quem está
+    // lendo é o que mais atrapalha — movimento derruba a memória de onde as
+    // coisas estavam.
+    const lendo = cena.parado || cena.ponteiro || !!selecionado ||
+                  t - cena.saiu < 2500;
+    if (!lendo) cam.giro -= GIRO * dt;         // negativo = horário na tela
     pinta();
   }
 
@@ -592,7 +704,8 @@
     palco.innerHTML = '';
     palco.append(cv);
     cena = { cv, ctx: cv.getContext('2d'), w: 1, h: 1, cx: 0, cy: 0,
-             dpr: 1, raf: 0, t: performance.now(), parado: false, sobre: null, obs: null };
+             dpr: 1, raf: 0, t: performance.now(), parado: false, obs: null,
+             sobre: null, sobreAresta: null, ponteiro: false, saiu: 0, rotulos: [] };
 
     const mede = () => {
       const w = palco.clientWidth || 1, h = palco.clientHeight || 1;
@@ -713,13 +826,13 @@
 
     if (geral) {
       nos.push({ id: 'fukurou', nome: 'FUKUROU', kind: 'fukurou', cor: '#9b5cff',
-                 tam: 86, img: svgCoruja('#9b5cff'), nivel: 0 });
+                 tam: 80, img: svgCoruja('#9b5cff'), nivel: 0 });
     }
 
     ops.forEach(o => {
       nos.push({
         id: noOp(o.id), nome: o.title, kind: 'operacao', cor: TIPO_NO.operacao.cor,
-        tam: geral ? 96 : 130, nivel: 1, sigiloso: sigilosa(o),
+        tam: geral ? 88 : 118, nivel: 1, sigiloso: sigilosa(o),
         status: o.status, canal: o.channel,
       });
       if (geral) {
@@ -736,7 +849,8 @@
       const t = TIPO_NO[e.kind] || TIPO_NO.pessoa;
       const capa = e.images?.[0] && dados.fotos[e.images[0]];
       nos.push({ id: noEnt(id), nome: e.name, kind: e.kind, cor: t.cor,
-                 tam: 46, img: capa || svgCoruja(t.cor), nivel: 2 });
+                 tam: 40, img: capa || svgNo(e.kind, t.cor), nivel: 2,
+                 compartilhada: (porEntidade[id]?.size || 0) > 1 });
     });
 
     vincs.forEach(v => {
