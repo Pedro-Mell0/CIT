@@ -462,6 +462,8 @@ alter table public.messages add column if not exists fukurou boolean not null de
 create or replace function public.marca_fukurou()
 returns trigger language plpgsql set search_path = public as $fn$
 begin
+  -- Mensagem voltando da lixeira já vem com o prefixo tirado e a marca certa.
+  if current_setting('cit.restaurando', true) = 'on' then return new; end if;
   new.fukurou := new.body ~* '^\s*/fukurou(\s|$)';
   if new.fukurou then
     new.body := regexp_replace(new.body, '^\s*/fukurou\s*', '', 'i');
@@ -1277,6 +1279,8 @@ returns trigger language plpgsql security definer set search_path = public as $f
 declare ids text[]; texto text;
 begin
   if not new.fukurou then return null; end if;
+  -- Mensagem voltando da lixeira não é mensagem nova: ninguém é chamado de novo.
+  if current_setting('cit.restaurando', true) = 'on' then return null; end if;
   if not exists (select 1 from public.discord_config where id) then return null; end if;
 
   with alvo as (
@@ -1881,6 +1885,8 @@ declare
   chave      text;
   autor      uuid := auth.uid();
 begin
+  -- Vínculo voltando da lixeira: a conexão e o aviso dela voltam de lá também.
+  if current_setting('cit.restaurando', true) = 'on' then return new; end if;
   select channel into canal_novo from public.operations where id = new.operation_id;
   if canal_novo is null then return new; end if;
 
@@ -1978,7 +1984,177 @@ create policy conex_update on public.auto_connections for update to authenticate
                        where o.id = op_b and public.can_read_channel(o.channel)));
 
 -- ============================================================================
--- 8. REALTIME
+-- 8. LIXEIRA (30 DIAS)
+-- ============================================================================
+-- Tudo o que se apaga no site é definitivo: a linha some e a cascata leva
+-- junto o que dependia dela (relatos, vínculos, posições na teia). O plano
+-- gratuito do Supabase não tem backup para voltar atrás. Daqui em diante,
+-- antes de sumir, cada linha apagada deixa uma cópia aqui, inteira, em JSON,
+-- com quem apagou e quando. A cópia vive 30 dias.
+--
+-- `lote` é o número da transação: tudo o que caiu junto (a operação e os
+-- relatos que a cascata levou, por exemplo) tem o mesmo lote, e é por lote
+-- que se restaura.
+create table if not exists public.lixeira (
+  id             bigint generated always as identity primary key,
+  lote           bigint not null,
+  tabela         text not null,
+  linha          jsonb not null,
+  apagado_por    uuid,
+  apagado_em     timestamptz not null default now(),
+  restaurado_em  timestamptz,
+  restaurado_por uuid
+);
+create index if not exists lixeira_quando_idx on public.lixeira (apagado_em desc);
+create index if not exists lixeira_lote_idx   on public.lixeira (lote);
+
+-- Quem enxerga a lixeira. Pelo id, não pelo codinome: o codinome muda, e outro
+-- agente poderia assumir o antigo. Para incluir outra conta:
+--   insert into public.lixeira_acesso (profile_id)
+--     select id from public.profiles where codename = '...';
+create table if not exists public.lixeira_acesso (
+  profile_id uuid primary key references public.profiles(id) on delete cascade
+);
+
+insert into public.lixeira_acesso (profile_id)
+select id from public.profiles where lower(codename) in ('hermes', 'nemesis')
+on conflict do nothing;
+
+create or replace function public.pode_ver_lixeira()
+returns boolean language sql stable security definer set search_path = public as $fn$
+  select exists (select 1 from public.lixeira_acesso where profile_id = auth.uid())
+$fn$;
+
+-- A cópia. Roda depois do DELETE de cada linha, inclusive das que a cascata
+-- ou outro gatilho apagaram, então nada escapa por caminho lateral.
+create or replace function public.guarda_na_lixeira()
+returns trigger language plpgsql security definer set search_path = public as $fn$
+begin
+  insert into public.lixeira (lote, tabela, linha, apagado_por)
+  values (txid_current(), tg_table_name, to_jsonb(old), auth.uid());
+  return old;
+end $fn$;
+
+-- O que tem conteúdo de alguém. De fora ficam os avisos (são notificação,
+-- e o agente apaga os próprios), a ordem da barra, os perfis (voltar um perfil
+-- exigiria voltar a conta de login, que não é deste schema) e as tabelas do bot.
+do $do$
+declare t text;
+begin
+  foreach t in array array['categories','category_members','category_locks',
+                           'channels','channel_members','channel_locks',
+                           'messages','operations','operation_entries',
+                           'entities','entity_aliases','entity_operations',
+                           'links','node_positions','auto_connections']
+  loop
+    if to_regclass('public.' || t) is null then continue; end if;
+    execute format('drop trigger if exists %I on public.%I', 'lixeira_' || t, t);
+    execute format('create trigger %I after delete on public.%I for each row '
+                   'execute function public.guarda_na_lixeira()', 'lixeira_' || t, t);
+  end loop;
+end $do$;
+
+-- Restaura os lotes pedidos. As linhas voltam com o id e as datas que
+-- tinham, então o que apontava para elas (relato → operação, mensagem →
+-- canal) volta a se encaixar.
+--
+-- A ordem em que a cascata apagou não é garantida, então a volta vai em
+-- passadas: o que esbarra em chave estrangeira (o filho antes do pai) espera a
+-- próxima passada. Para quando uma passada inteira não consegue mais nada.
+-- Linha que já existe de novo conta como restaurada.
+--
+-- `cit.restaurando` desliga, só nesta transação, os gatilhos que reagem a
+-- INSERT como se fosse coisa nova: o aviso no Discord, o /fukurou e o aviso
+-- de conexão entre operações. Mensagem antiga não chama ninguém de novo.
+create or replace function public.restaura_lixeira(lotes bigint[])
+returns jsonb language plpgsql security definer set search_path = public as $fn$
+declare
+  pend     bigint[];
+  r        record;
+  cols     text;
+  andou    boolean := true;
+  ok       int := 0;
+  ja       int := 0;
+  erros    jsonb := '[]'::jsonb;
+  motivo   jsonb := '{}'::jsonb;
+begin
+  if not public.pode_ver_lixeira() then
+    raise exception 'Sem acesso à lixeira.';
+  end if;
+  perform set_config('cit.restaurando', 'on', true);
+
+  select array_agg(id order by id) into pend
+    from public.lixeira
+   where lote = any(lotes) and restaurado_em is null
+     and apagado_em > now() - interval '30 days';
+  pend := coalesce(pend, '{}');
+
+  while andou and cardinality(pend) > 0 loop
+    andou := false;
+    for r in select * from public.lixeira where id = any(pend) order by id loop
+      begin
+        select string_agg(quote_ident(a.attname), ', ' order by a.attnum) into cols
+          from pg_attribute a
+         where a.attrelid = format('public.%I', r.tabela)::regclass
+           and a.attnum > 0 and not a.attisdropped and a.attgenerated = ''
+           and r.linha ? a.attname;
+        execute format('insert into public.%I (%s) select %s from jsonb_populate_record(null::public.%I, $1)',
+                       r.tabela, cols, cols, r.tabela)
+          using r.linha;
+        ok := ok + 1;
+      exception
+        when unique_violation then ja := ja + 1;
+        when foreign_key_violation then
+          motivo := motivo || jsonb_build_object(r.id::text, sqlerrm);
+          continue;
+        when others then
+          erros := erros || jsonb_build_object('tabela', r.tabela, 'erro', sqlerrm);
+          pend := array_remove(pend, r.id);
+          continue;
+      end;
+      update public.lixeira set restaurado_em = now(), restaurado_por = auth.uid()
+       where id = r.id;
+      pend := array_remove(pend, r.id);
+      andou := true;
+    end loop;
+  end loop;
+
+  -- O que sobrou depende de algo que não está nem no banco nem na lixeira
+  -- (um perfil excluído, um canal que passou dos 30 dias).
+  select erros || coalesce(jsonb_agg(jsonb_build_object('tabela', l.tabela, 'erro', motivo ->> l.id::text)), '[]')
+    into erros
+    from public.lixeira l where l.id = any(pend);
+
+  return jsonb_build_object('restaurados', ok, 'ja_existiam', ja,
+                            'falharam', jsonb_array_length(erros), 'erros', erros);
+end $fn$;
+
+revoke all on function public.restaura_lixeira(bigint[]) from public, anon;
+grant execute on function public.restaura_lixeira(bigint[]) to authenticated;
+
+-- Só quem está em lixeira_acesso lê, e só o que tem menos de 30 dias. Ninguém
+-- escreve pelo site: quem grava é o gatilho, e quem marca a restauração é a
+-- função acima, ambos como definer.
+alter table public.lixeira        enable row level security;
+alter table public.lixeira_acesso enable row level security;
+drop policy if exists lixeira_read on public.lixeira;
+create policy lixeira_read on public.lixeira for select to authenticated
+  using (public.pode_ver_lixeira() and apagado_em > now() - interval '30 days');
+revoke insert, update, delete on public.lixeira from anon, authenticated;
+
+-- A faxina: uma vez por dia some o que passou dos 30 dias. Sem pg_cron a
+-- cópia velha só fica escondida (a policy acima já não a mostra).
+do $do$
+begin
+  create extension if not exists pg_cron;
+  perform cron.schedule('lixeira-30-dias', '17 4 * * *',
+                        $$delete from public.lixeira where apagado_em < now() - interval '30 days'$$);
+exception when others then
+  raise warning 'lixeira-30-dias não agendada: %', sqlerrm;
+end $do$;
+
+-- ============================================================================
+-- 9. REALTIME
 -- ============================================================================
 do $do$
 declare t text;
@@ -2017,7 +2193,7 @@ alter table public.notices           replica identity full;
 alter table public.auto_connections  replica identity full;
 
 -- ============================================================================
--- 9. RECARGA DO CACHE
+-- 10. RECARGA DO CACHE
 -- ============================================================================
 -- O PostgREST guarda um retrato do schema; sem este aviso, uma tabela ou
 -- função recém-criada pode demorar a aparecer para o site, com o erro

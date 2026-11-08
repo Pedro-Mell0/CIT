@@ -21,6 +21,7 @@ teia.js      Teia de Vínculos: o grafo geral e o de cada operação
 avisos.js    caixa de avisos (conexões encontradas entre operações)
 search.js    varredura global (Ctrl+F)
 fukurou.js   página do bot (Fukurou), só para MASTER
+lixeira.js   o que foi apagado nos últimos 30 dias, e o botão de restaurar
 schema.sql   banco de dados completo
 supabase/functions/sinal   Edge Function que manda o aviso no Discord
 ```
@@ -747,3 +748,21 @@ update profiles set role = 'admin' where codename = 'Fulano';
 
 Se o cadastro falhar com *Database error saving new user*, o código de acesso
 digitado não existe em `invite_codes`.
+
+## Lixeira (30 dias)
+
+Tudo o que se apaga no site (operações, relatos, mensagens, canais,
+categorias, entidades, vínculos da teia) deixa uma cópia na tabela `lixeira`
+antes de sumir, com quem apagou e quando. A cópia vive 30 dias, e uma faxina
+diária do `pg_cron` apaga o que passou disso. Quem vê e restaura é só quem está em
+`lixeira_acesso`: hoje, **Hermes** e **Nemesis**, pelo botão *♻ Lixeira* em
+Administração. Para incluir outra conta:
+
+```sql
+insert into lixeira_acesso (profile_id)
+  select id from profiles where codename = '...';
+```
+
+A restauração volta a linha com o mesmo id, autor e data. O que foi apagado
+**antes** de a lixeira existir não está nela: o plano gratuito do Supabase
+não tem backup.

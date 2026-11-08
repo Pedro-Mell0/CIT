@@ -1356,3 +1356,29 @@ body{overflow:hidden;overscroll-behavior:none}
   html,body{height:auto!important;overflow:visible!important}
   #auth{height:auto;overflow:visible;padding:0}
 }
+
+/* ---------- Lixeira (Hermes e Nemesis) ---------- */
+/* Modal largo com um cartão por evento apagado; o restaurado fica apagado. */
+#chans button.lixeira-nav{color:var(--gold)}
+#chans button.lixeira-nav:hover{color:var(--text);text-shadow:0 0 10px var(--gold)}
+.modal-box.lx-box{width:min(820px,100%)}
+.lx-box .modal-body{gap:.5rem}
+.lx-ev{border:1px solid var(--line);background:#0a0622;padding:.7rem .8rem;display:grid;gap:.4rem}
+.lx-ev.menor{border-style:dashed}
+.lx-ev.feito{opacity:.55}
+.lx-head{display:flex;gap:.8rem;align-items:flex-start;justify-content:space-between}
+.lx-txt{display:grid;gap:.2rem;min-width:0}
+.lx-txt b{font-weight:600;overflow-wrap:anywhere}
+.lx-txt small{color:var(--dim);font-size:.72rem}
+.lx-txt .lx-resumo{color:var(--cyan)}
+.lx-head .primary{flex:none}
+.lx-ok{color:var(--live);font-size:.72rem;flex:none;text-align:right;max-width:45%}
+.lx-det summary{cursor:pointer;color:var(--dim);font-size:.72rem;letter-spacing:.06em}
+.lx-det ul{margin:.4rem 0 0;padding-left:1.1rem;display:grid;gap:.2rem;font-size:.8rem;overflow-wrap:anywhere}
+.lx-det li.feito{text-decoration:line-through;color:var(--dim)}
+.lx-det li.lx-aux{list-style:none;margin-left:-1.1rem;color:var(--dim);font-size:.72rem}
+.lx-filtro{margin-right:auto;display:flex;gap:.4rem;align-items:center;color:var(--dim);font-size:.72rem}
+@media (max-width:640px){
+  .lx-head{flex-direction:column}
+  .lx-ok{max-width:none;text-align:left}
+}

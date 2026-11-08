@@ -237,6 +237,7 @@ async function start() {
   // a lista de operações visíveis chega, sem segurar a entrada do agente.
   window.TEIA?.prepara?.();
   window.AVISOS?.carrega?.();
+  window.LIXEIRA?.prepara?.();
 
   if (!isMaster()) await garanteNomeReal();
 }
@@ -549,10 +550,18 @@ function drawChannels() {
     nav.prepend(box);
   }
 
-  if (isAdmin()) {
+  const lixeira = window.LIXEIRA?.pode;
+  if (isAdmin() || lixeira) {
     const box = el('div', 'nav-item');
     box.append(el('h3', null, 'Administração'));
-    navBtn(box, 'manage', 'Gerenciar usuários', '⚙', 'gear');
+    if (isAdmin()) navBtn(box, 'manage', 'Gerenciar usuários', '⚙', 'gear');
+    // A lixeira também não é canal: abre por cima, como o Fukurou (lixeira.js).
+    if (lixeira) {
+      const b = el('button', 'lixeira-nav');
+      b.append(el('span', 'ic', '♻'), el('span', 'nm', 'Lixeira · 30 dias'));
+      b.onclick = () => { window.LIXEIRA.open(); gaveta(false); };
+      box.append(b);
+    }
     // Não é canal da sala: abre a página do bot por cima dela (fukurou.js).
     if (isMaster()) {
       const b = el('button', 'fukurou-nav');
