@@ -2,7 +2,7 @@
 
 Site estático (sem build). Backend: Supabase. Hospedagem: Vercel.
 
-Irmão do CIT, que vive na raiz deste repositório — mesmo jeito de fazer as
+Irmão do CIT, que vive em [`../cit/`](../cit/) neste mesmo repositório do DPP — mesmo jeito de fazer as
 coisas, **banco separado**. Nenhuma conta, nenhuma tabela e nenhum informe é
 compartilhado entre os dois.
 
