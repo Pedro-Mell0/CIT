@@ -40,10 +40,11 @@ seu *Root Directory*:
 
 | Projeto Vercel | Root Directory |
 |----------------|----------------|
-| CIT            | `cit`          |
-| VGD            | `vgd`          |
+| `cit00`        | `cit`          |
+| `vgd00`        | `vgd`          |
 
-A raiz do repositório não é um site. O `vercel.json` daqui manda a Vercel
-ignorar qualquer build feito a partir dela (`ignoreCommand: exit 0`), para que
-um projeto configurado sem *Root Directory* nunca publique a raiz — com os
-READMEs, a pasta da outra unidade e o que mais estiver aqui — no lugar do site.
+A raiz do repositório não é um site: nenhum projeto deve apontar para ela.
+
+> Não ponha um `vercel.json` na raiz. A Vercel o lê mesmo nos projetos com
+> *Root Directory* numa subpasta — um `ignoreCommand` aqui já cancelou o
+> deploy da VGD.
