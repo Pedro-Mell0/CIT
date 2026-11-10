@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PRD — DPP HUB</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f6f3ec; --paper:#fffdf8; --ink:#16213a; --ink2:#4a5672; --rule:#dcd5c6;
+  --navy:#14284b; --navy-ink:#f6f3ec; --gold:#a8822c; --gold-soft:#f1e7cf; --link:#3d4fb3;
+  --code:#efe9db;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1527; --paper:#141d33; --ink:#e9e5da; --ink2:#a4adc2; --rule:#2a3552;
+    --navy:#0a1222; --navy-ink:#e9e5da; --gold:#d4ad55; --gold-soft:#2b2a22; --link:#9aa8ff; --code:#1d2742;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1527; --paper:#141d33; --ink:#e9e5da; --ink2:#a4adc2; --rule:#2a3552;
+  --navy:#0a1222; --navy-ink:#e9e5da; --gold:#d4ad55; --gold-soft:#2b2a22; --link:#9aa8ff; --code:#1d2742;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:16px}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 Inter,system-ui,sans-serif;-webkit-text-size-adjust:100%}
+a{color:var(--link)}
+header.cover{background:var(--navy);color:var(--navy-ink);padding:56px 16px 48px;border-bottom:4px solid var(--gold)}
+.cover .in{max-width:1080px;margin:0 auto}
+.crest{display:inline-flex;align-items:center;gap:10px;font:600 12px/1 Inter,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:var(--gold)}
+.crest svg{width:28px;height:28px}
+.cover h1{font:700 clamp(34px,6vw,56px)/1.05 "Source Serif 4",Georgia,serif;margin:18px 0 10px}
+.cover p{margin:0;max-width:640px;opacity:.85}
+.meta{margin-top:22px;font-size:13px;opacity:.7}
+.wrap{max-width:1080px;margin:0 auto;padding:32px 16px 80px;display:grid;grid-template-columns:220px minmax(0,1fr);gap:40px}
+nav.toc{position:sticky;top:16px;align-self:start;font-size:14px}
+.toc h4{font:600 11px/1 Inter,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--ink2);margin:0 0 12px}
+.toc ol{list-style:none;margin:0;padding:0;border-left:1px solid var(--rule)}
+.toc a{display:flex;gap:10px;padding:5px 0 5px 14px;color:var(--ink2);text-decoration:none}
+.toc a:hover{color:var(--ink)}
+.toc .n{color:var(--gold);font-variant-numeric:tabular-nums;min-width:18px}
+main{min-width:0}
+section{background:var(--paper);border:1px solid var(--rule);border-radius:10px;padding:32px 36px;margin-bottom:24px}
+section#s1{border-top:3px solid var(--gold)}
+h2{font:700 28px/1.2 "Source Serif 4",Georgia,serif;margin:0 0 18px;display:flex;gap:14px;align-items:baseline}
+h2 .n{font-size:18px;color:var(--gold)}
+h3{font:600 20px/1.3 "Source Serif 4",Georgia,serif;margin:28px 0 8px;padding-top:18px;border-top:1px solid var(--rule)}
+p{margin:0 0 14px}
+p.lbl{margin:22px 0 8px;font-size:13px;letter-spacing:.08em;text-transform:uppercase}
+p.lbl strong{font-weight:600;color:var(--ink2)}
+ul,ol{margin:0 0 14px;padding-left:22px}
+li{margin:4px 0}
+li::marker{color:var(--gold)}
+code{font:13px/1.4 ui-monospace,Consolas,monospace;background:var(--code);padding:1px 5px;border-radius:4px;word-break:break-word}
+.tbl{overflow-x:auto;margin:6px 0 18px;border:1px solid var(--rule);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{background:var(--navy);color:var(--navy-ink);text-align:left;font-weight:600;padding:10px 12px}
+td{padding:9px 12px;border-top:1px solid var(--rule);vertical-align:top}
+tbody tr:nth-child(even) td{background:color-mix(in srgb,var(--bg) 55%,transparent)}
+ul.check{list-style:none;padding:0}
+ul.check li{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--rule);margin:0}
+ul.check li:last-child{border-bottom:0}
+ul.check .bx{flex:none;width:16px;height:16px;margin-top:4px;border:1.5px solid var(--gold);border-radius:3px}
+.fig{margin:18px 0 22px;padding:16px;border:1px solid var(--rule);border-radius:8px;background:var(--bg)}
+.fig svg{display:block;width:100%;height:auto;font:11.5px Inter,sans-serif}
+.fig figcaption{margin-top:8px;font-size:12px;color:var(--ink2);text-align:center}
+.fig .ttl{font-size:15px;font-weight:600;fill:var(--ink)}
+.fig .nm{font-size:13px;font-weight:600;fill:var(--ink)}
+.fig .q{fill:var(--ink2)}
+.fig .i{fill:var(--ink)}
+.fig .bx{fill:none;stroke:var(--ink2);stroke-width:1.25}
+.fig .bx-main{fill:var(--gold-soft);stroke:var(--gold);stroke-width:2}
+.fig .ln path{fill:none;stroke:var(--ink2);stroke-width:1.25}
+.fig .ah,.fig .gate{fill:var(--ink2)}
+.theme{position:fixed;right:16px;bottom:16px;border:1px solid var(--rule);background:var(--paper);color:var(--ink);border-radius:999px;padding:8px 14px;font:500 13px Inter,sans-serif;cursor:pointer}
+footer{text-align:center;color:var(--ink2);font-size:12px;padding-bottom:40px}
+@media (max-width:860px){
+  .wrap{grid-template-columns:minmax(0,1fr);gap:20px;padding-top:20px}
+  nav.toc{position:static;background:var(--paper);border:1px solid var(--rule);border-radius:10px;padding:16px}
+  section{padding:22px 18px}
+  h2{font-size:23px}
+  .fig{padding:8px;overflow-x:auto}
+  .fig svg{min-width:560px}
+  /* tables become cards */
+  .tbl{border:0;overflow:visible}
+  table,thead,tbody,tr,td{display:block}
+  thead{display:none}
+  tr{border:1px solid var(--rule);border-radius:8px;margin-bottom:10px;overflow:hidden}
+  td{border-top:1px solid var(--rule);padding:8px 12px}
+  td:first-child{border-top:0;background:var(--gold-soft)!important;font-weight:600}
+  td::before{content:attr(data-h);display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);font-weight:500}
+  tbody tr:nth-child(even) td{background:none}
+}
+@media print{
+  .theme,nav.toc{display:none}
+  .wrap{display:block}
+  section{break-inside:avoid-page;border:0;padding:0 0 18px}
+  header.cover{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+<header class="cover"><div class="in">
+  <div class="crest"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2l12 5v8c0 7.5-5.2 13-12 15C9.2 28 4 22.5 4 15V7z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 9l2.2 4.5 5 .7-3.6 3.5.9 5L16 20.4l-4.5 2.3.9-5-3.6-3.5 5-.7z" fill="currentColor"/></svg>Departamento de Polícia de Paralela</div>
+  <h1>PRD — DPP HUB</h1>
+  <p>O portal oficial da PM de Paralela RP: normas, unidades, editais, cursos, instrutores, certificados e condecorações num só lugar, sincronizado com o Discord nos dois sentidos.</p>
+  <div class="meta">Documento de requisitos de produto · rascunho · 10 nov. 2026</div>
+</div></header>
+<div class="wrap">
+  <nav class="toc" aria-label="Sumário"><h4>Sumário</h4><ol>
+<li><a href="#s1"><span class="n">1</span>Resumo executivo</a></li>
+<li><a href="#s2"><span class="n">2</span>Contexto e problema</a></li>
+<li><a href="#s3"><span class="n">3</span>Objetivos, não-objetivos e métricas</a></li>
+<li><a href="#s4"><span class="n">4</span>Usuários e permissões</a></li>
+<li><a href="#s5"><span class="n">5</span>Mapa Discord → HUB</a></li>
+<li><a href="#s6"><span class="n">6</span>Módulos do HUB</a></li>
+<li><a href="#s7"><span class="n">7</span>Integração com o Discord</a></li>
+<li><a href="#s8"><span class="n">8</span>Arquitetura e stack sugerida</a></li>
+<li><a href="#s9"><span class="n">9</span>Direção visual</a></li>
+<li><a href="#s10"><span class="n">10</span>Roadmap por fases</a></li>
+<li><a href="#s11"><span class="n">11</span>Perguntas em aberto</a></li>
+  </ol></nav>
+  <main>
+<section id="s1"><h2><span class="n">1</span>Resumo executivo</h2>
+<p>O DPP HUB é o portal oficial do Departamento de Polícia de Paralela: um só endereço onde qualquer PM encontra as normas, as unidades, os editais, os cursos, os instrutores, os certificados e as condecorações. Ele não substitui o Discord; ele o espelha com uma leitura melhor, e um bot mantém os dois iguais nos dois sentidos.</p>
+<p><strong>A promessa em uma frase:</strong> o Discord continua sendo onde a PM trabalha e conversa; o HUB passa a ser onde a PM consulta, comprova e se orienta.</p>
+<p class="lbl"><strong>O que o HUB reúne:</strong></p>
+<ul><li><strong>Portal das unidades</strong> — cartões com link para o site da CIT, da Vanguarda (VGD) e de qualquer unidade que venha a surgir, cadastrada sem mexer em código.</li><li><strong>Biblioteca normativa</strong> — Regras e Termos da Cidade, Código Penal e Regulamento Interno, legíveis, pesquisáveis por artigo e com histórico de versões.</li><li><strong>Recrutamento</strong> — editais de abertura de vagas por unidade, com prazo, requisitos e status.</li><li><strong>Formação</strong> — cursos ofertados (ex.: Modulação, Acompanhamento), instrutores licenciados por curso e o registro público de quem foi aprovado e possui certificado.</li><li><strong>Honrarias</strong> — condecorações, medalhas e certificados concedidos, com o quadro de quem recebeu cada uma.</li></ul>
+<p><strong>Como funciona com o Discord:</strong> cada aba do HUB corresponde a um ou mais canais que já existem (ex.: <code>#editais</code>, <code>#aprovados</code>, <code>#condecorações</code>). Publicar no HUB gera a mensagem no canal; um comando ou formulário no Discord grava no HUB. Login no site é feito com a conta do Discord, e o que cada pessoa pode editar vem dos cargos que ela já tem no servidor.</p>
+<p><strong>Para quem:</strong> todo o efetivo da PM de Paralela, o comando e os instrutores que mantêm o conteúdo, e candidatos que querem saber como entrar numa unidade.</p>
+</section>
+<section id="s2"><h2><span class="n">2</span>Contexto e problema</h2>
+<p>Hoje a PM de Paralela se organiza quase toda no Discord “Polícia Paralela”, em mais de 40 canais divididos em categorias (Importante, Regulamentos, Administrativo, Corregedoria, Ações, Instrutores, Recrutamento, Cursos, Editais e as áreas internas da CIT, DRE e CSA). Isso funciona para conversar, mas falha para consultar.</p>
+<p class="lbl"><strong>Onde dói:</strong></p>
+<ul><li><strong>Informação enterrada no histórico.</strong> Quem foi aprovado em Modulação em setembro? É preciso rolar <code>#aprovados</code> até achar. Não há busca por pessoa, curso ou data.</li><li><strong>Sem visão por pessoa.</strong> As condecorações de um PM, seus cursos e certificados estão espalhados em <code>#medalhas</code>, <code>#condecorações</code>, <code>#aprovados</code> e nos canais de unidade.</li><li><strong>Documentos em PDF.</strong> O Código Penal e as Regras têm mais de 50 capítulos; no Discord eles são anexos ou textos longos, sem índice nem link direto para um artigo.</li><li><strong>Editais duplicados.</strong> Cada unidade (DRE, DPU, CSA, VGD, CIT) tem seu canal de edital, e o canal geral <code>#editais</code> repete parte deles. Não há um lugar que diga “o que está aberto agora”.</li><li><strong>Instrutores sem registro formal.</strong> Não há uma lista oficial de quem está licenciado a ministrar cada curso.</li><li><strong>Unidades em sites soltos.</strong> CIT (<a href="https://cit00.vercel.app">cit00.vercel.app</a>) e VGD (<a href="https://vgd00-pi.vercel.app">vgd00-pi.vercel.app</a>) já têm sites próprios, mas nada os liga; quem entra na PM não sabe que existem.</li><li><strong>Visitantes e candidatos.</strong> Quem ainda não está na PM não tem como ver editais e requisitos sem entrar no Discord.</li></ul>
+<p><strong>Restrição importante:</strong> o Regulamento Interno é de uso restrito ao efetivo policial. O repositório do DPP é público e os PDFs ficam fora dele; o HUB precisa manter essa separação (conteúdo restrito só aparece para quem está logado com cargo de PM).</p>
+</section>
+<section id="s3"><h2><span class="n">3</span>Objetivos, não-objetivos e métricas</h2>
+<p class="lbl"><strong>Objetivos</strong></p>
+<ol><li>Um endereço único para tudo que é do DPP: normas, unidades, recrutamento, formação e honrarias.</li><li>Toda informação do HUB tem um canal correspondente no Discord, e os dois ficam iguais sem trabalho manual duplicado.</li><li>Qualquer PM acha em menos de 30 segundos: um artigo do Código Penal, um edital aberto, se alguém tem um curso, quem pode ministrá-lo.</li><li>Configurável por quem não programa: criar curso, unidade, medalha ou edital pelo painel, sem deploy.</li><li>Perfil por PM: uma página com cursos, certificados e condecorações da pessoa.</li></ol>
+<p class="lbl"><strong>Não-objetivos (fora do escopo)</strong></p>
+<ul><li>Substituir o Discord para conversa, avisos do dia a dia, call ou Corregedoria.</li><li>Absorver as ferramentas das unidades: a CIT e a VGD seguem com sites, bancos e contas próprios; o HUB só aponta para eles.</li><li>Bater ponto, escala de ações ou registro de ocorrências (pode virar fase futura).</li><li>Qualquer integração com o jogo (FiveM) em si.</li></ul>
+<p class="lbl"><strong>Métricas de sucesso (90 dias após o lançamento)</strong></p>
+<div class="tbl"><table><thead><tr><th>Métrica</th><th>Meta</th></tr></thead><tbody><tr><td data-h="Métrica">PMs ativos que fizeram login no HUB</td><td data-h="Meta">≥ 70% do efetivo</td></tr><tr><td data-h="Métrica">Editais, cursos e aprovações publicados pelo HUB ou pelo bot (não à mão no canal)</td><td data-h="Meta">≥ 90%</td></tr><tr><td data-h="Métrica">Divergências entre HUB e Discord reportadas</td><td data-h="Meta">0 por semana após o 1º mês</td></tr><tr><td data-h="Métrica">Tempo para publicar um novo edital</td><td data-h="Meta">&lt; 3 minutos</td></tr></tbody></table></div>
+</section>
+<section id="s4"><h2><span class="n">4</span>Usuários e permissões</h2>
+<p>O login é “Entrar com Discord” (OAuth2). O HUB lê os cargos da pessoa no servidor Polícia Paralela e deriva o perfil dela; ninguém ganha permissão no site sem ter o cargo no Discord. Tirar o cargo no Discord tira o acesso no HUB no próximo login ou em até 5 minutos (evento do bot).</p>
+<div class="tbl"><table><thead><tr><th>Perfil</th><th>Cargo no Discord (exemplo)</th><th>Vê</th><th>Edita</th></tr></thead><tbody><tr><td data-h="Perfil">Visitante</td><td data-h="Cargo no Discord (exemplo)">nenhum / não logado</td><td data-h="Vê">Unidades, editais abertos, cursos ofertados, Regras da Cidade, Código Penal</td><td data-h="Edita">nada</td></tr><tr><td data-h="Perfil">PM</td><td data-h="Cargo no Discord (exemplo)">qualquer patente da PM</td><td data-h="Vê">Tudo do visitante + Regulamento Interno, aprovados, instrutores, condecorações, perfis</td><td data-h="Edita">o próprio perfil (foto, unidade)</td></tr><tr><td data-h="Perfil">Instrutor</td><td data-h="Cargo no Discord (exemplo)">Instrutor + licença do curso</td><td data-h="Vê">Tudo do PM</td><td data-h="Edita">turmas e aprovações <strong>do curso em que é licenciado</strong></td></tr><tr><td data-h="Perfil">Recrutador de unidade</td><td data-h="Cargo no Discord (exemplo)">Recrutamento da unidade (ex.: Recrutador DRE)</td><td data-h="Vê">Tudo do PM</td><td data-h="Edita">editais e fila da própria unidade</td></tr><tr><td data-h="Perfil">Comando</td><td data-h="Cargo no Discord (exemplo)">Oficiais / Comando Superior</td><td data-h="Vê">Tudo</td><td data-h="Edita">condecorações, licenças de instrutor, documentos, cursos</td></tr><tr><td data-h="Perfil">Admin do HUB</td><td data-h="Cargo no Discord (exemplo)">cargo técnico dedicado</td><td data-h="Vê">Tudo + logs</td><td data-h="Edita">configuração: unidades, mapa canal↔aba, cargos↔perfis</td></tr></tbody></table></div>
+<p>O mapeamento “cargo do Discord → perfil” é configurável no painel do admin, para não depender dos nomes atuais dos cargos.</p>
+</section>
+<section id="s5"><h2><span class="n">5</span>Mapa Discord → HUB</h2>
+<p>Cerca de 25 canais viram conteúdo estruturado no HUB; os de conversa, Corregedoria, Ações e OFF RP continuam só no Discord. “⇄” = edita nos dois lados; “→ Discord” = o HUB publica e o canal só exibe.</p>
+<div class="tbl"><table><thead><tr><th>Canal(is) no Discord</th><th>Categoria</th><th>Módulo no HUB</th><th>Sincronização</th></tr></thead><tbody><tr><td data-h="Canal(is) no Discord"><code>#regras-da-cidade</code>, <code>#código-penal</code>, <code>#regulamento-interno</code></td><td data-h="Categoria">Importante</td><td data-h="Módulo no HUB">Biblioteca normativa</td><td data-h="Sincronização">→ Discord</td></tr><tr><td data-h="Canal(is) no Discord"><code>#protocolos</code>, <code>#viaturas</code>, <code>#fardamento</code>, <code>#armamento</code> (fóruns)</td><td data-h="Categoria">Regulamentos</td><td data-h="Módulo no HUB">Biblioteca · Manuais operacionais</td><td data-h="Sincronização">⇄ (cada post do fórum = um documento)</td></tr><tr><td data-h="Canal(is) no Discord"><code>#condecorações</code>, <code>#medalhas</code></td><td data-h="Categoria">Importante</td><td data-h="Módulo no HUB">Honrarias</td><td data-h="Sincronização">⇄</td></tr><tr><td data-h="Canal(is) no Discord"><code>#dre</code>, <code>#dpu</code>, <code>#csa</code>, <code>#vgd</code>, <code>#cit</code></td><td data-h="Categoria">Editais</td><td data-h="Módulo no HUB">Editais de unidade</td><td data-h="Sincronização">⇄</td></tr><tr><td data-h="Canal(is) no Discord"><code>#cursos-basicos</code> (fórum)</td><td data-h="Categoria">Cursos</td><td data-h="Módulo no HUB">Catálogo de cursos</td><td data-h="Sincronização">⇄ (cada post = um curso)</td></tr><tr><td data-h="Canal(is) no Discord"><code>#editais</code></td><td data-h="Categoria">Cursos</td><td data-h="Módulo no HUB">Turmas abertas de curso</td><td data-h="Sincronização">⇄</td></tr><tr><td data-h="Canal(is) no Discord"><code>#aprovados</code></td><td data-h="Categoria">Cursos</td><td data-h="Módulo no HUB">Certificados (público ao efetivo)</td><td data-h="Sincronização">⇄</td></tr><tr><td data-h="Canal(is) no Discord"><code>#reprovados</code></td><td data-h="Categoria">Cursos</td><td data-h="Módulo no HUB">Histórico de avaliação (só instrutores)</td><td data-h="Sincronização">⇄</td></tr><tr><td data-h="Canal(is) no Discord"><code>#fila-de-espera</code>, <code>#ficha-do-conscrito</code></td><td data-h="Categoria">Recrutamento</td><td data-h="Módulo no HUB">Ingresso na PM · inscrições</td><td data-h="Sincronização">⇄ (fase 2)</td></tr><tr><td data-h="Canal(is) no Discord"><code>#lista-de-aprovados</code>, <code>#lista-de-reprovados</code>, <code>#feedback-alunos</code></td><td data-h="Categoria">Recrutamento</td><td data-h="Módulo no HUB">Ingresso na PM · resultados</td><td data-h="Sincronização">⇄ (fase 2)</td></tr><tr><td data-h="Canal(is) no Discord"><code>#relatórios</code></td><td data-h="Categoria">Instrutores</td><td data-h="Módulo no HUB">Relatórios de aula</td><td data-h="Sincronização">⇄ (fase 2)</td></tr><tr><td data-h="Canal(is) no Discord"><code>#promoções</code></td><td data-h="Categoria">Administrativo</td><td data-h="Módulo no HUB">Linha do tempo no perfil do PM</td><td data-h="Sincronização">Discord → HUB (fase 3)</td></tr><tr><td data-h="Canal(is) no Discord"><code>#avisos</code></td><td data-h="Categoria">Importante</td><td data-h="Módulo no HUB">Mural da home (últimos 3 avisos)</td><td data-h="Sincronização">Discord → HUB</td></tr><tr><td data-h="Canal(is) no Discord"><code>#chat-instrutores</code>, <code>#avisos-instrutores</code></td><td data-h="Categoria">Instrutores</td><td data-h="Módulo no HUB">—</td><td data-h="Sincronização">Só Discord</td></tr><tr><td data-h="Canal(is) no Discord">Canais internos CIT, DRE e CSA</td><td data-h="Categoria">Unidades</td><td data-h="Módulo no HUB">Cartão da unidade aponta para o site dela</td><td data-h="Sincronização">Só Discord</td></tr><tr><td data-h="Canal(is) no Discord">Corregedoria, Ações, Administrativo (exceto promoções), OFF RP</td><td data-h="Categoria">—</td><td data-h="Módulo no HUB">—</td><td data-h="Sincronização">Só Discord</td></tr></tbody></table></div>
+<p>Os canais citados são os das prints de hoje. O mapa fica salvo no banco (aba ↔ ID do canal), então renomear ou mover um canal não quebra a integração.</p>
+</section>
+<section id="s6"><h2><span class="n">6</span>Módulos do HUB</h2>
+<p>São 8 abas. Cada uma tem uma visão pública (leitura) e um painel de edição para os perfis autorizados.</p>
+<h3 id="s6-1">6.1 Início</h3>
+<ul><li>Apresentação curta do DPP, mural com os 3 últimos <code>#avisos</code>, editais abertos e próximas turmas de curso.</li><li>Busca global (artigo, curso, pessoa, edital) no topo.</li></ul>
+<h3 id="s6-2">6.2 Unidades</h3>
+<ul><li>Um cartão por unidade: nome, brasão, descrição de 1–2 linhas, link do site, link do edital vigente, status (ativa / em formação).</li><li>Começa com CIT (<a href="https://cit00.vercel.app">cit00.vercel.app</a>) e VGD (<a href="https://vgd00-pi.vercel.app">vgd00-pi.vercel.app</a>); DRE, DPU e CSA entram como cartão mesmo sem site.</li><li>Admin cria uma unidade nova pelo painel: nome, sigla, cor, brasão, link, canal de edital no Discord.</li></ul>
+<h3 id="s6-3">6.3 Biblioteca normativa</h3>
+<ul><li>Regras e Termos da Cidade, Código Penal, Regulamento Interno e os manuais (Protocolos, Viaturas, Fardamento, Armamento).</li><li>Texto em HTML, não PDF: índice lateral por capítulo, link direto para cada artigo (ex.: <code>/regras#42.7</code>), busca no texto, botão “copiar artigo”. PDF original disponível para download.</li><li>Versões: cada publicação grava data e autor; uma tela mostra o que mudou desde a versão anterior.</li><li>Regulamento Interno e manuais exigem login de PM.</li><li>Publicar uma nova versão posta no canal correspondente: resumo das mudanças + link para o artigo no HUB.</li></ul>
+<h3 id="s6-4">6.4 Editais</h3>
+<ul><li>Edital = unidade, título, vagas, requisitos (patente mínima, cursos exigidos), período de inscrição, etapas, status (rascunho, aberto, encerrado, resultado).</li><li>Lista filtrável por unidade e status; “abertos agora” em destaque.</li><li>Fase 2: botão “Me inscrever” que checa os requisitos com base no perfil do PM e gera a inscrição.</li></ul>
+<h3 id="s6-5">6.5 Cursos</h3>
+<ul><li>Catálogo: nome (ex.: Modulação, Acompanhamento), descrição, carga, pré-requisitos, material (link para o site da unidade quando houver, como o material de Modulação na VGD), quantos aprovados.</li><li>Turmas: data, horário, instrutor responsável, vagas, status. Uma turma nova vira post em <code>#editais</code> (Cursos).</li></ul>
+<h3 id="s6-6">6.6 Instrutores</h3>
+<ul><li>Quadro por curso: quem está licenciado, desde quando, quem concedeu, status (ativo, suspenso, expirado).</li><li>Licença concedida no HUB dá o cargo de instrutor daquele curso no Discord, e vice-versa.</li></ul>
+<h3 id="s6-7">6.7 Aprovados e certificados</h3>
+<ul><li>Registro por curso: PM, turma, data, instrutor, nota (opcional), número do certificado.</li><li>Certificado gerado em PDF/PNG com código de verificação; a página <code>/certificado/&lt;código&gt;</code> confirma que é autêntico.</li><li>Lançar uma aprovação posta em <code>#aprovados</code> e pode dar um cargo de curso no Discord.</li></ul>
+<h3 id="s6-8">6.8 Condecorações</h3>
+<ul><li>Catálogo de honrarias (medalhas e certificados de mérito): imagem, nome, critério de concessão, ordem de precedência.</li><li>Quadro de agraciados: PM, honraria, data, motivo, quem concedeu.</li><li>Conceder posta em <code>#condecorações</code> com a imagem da medalha e menciona o PM.</li></ul>
+<h3 id="s6-9">6.9 Perfil do PM (transversal)</h3>
+<ul><li>Página por PM: nome no RP, patente, unidade, cursos, licenças de instrutor, condecorações. Montada a partir dos módulos acima, sem cadastro duplicado.</li><li>Identidade = ID do usuário no Discord; o nome do personagem vem do apelido no servidor.</li></ul>
+</section>
+<section id="s7"><h2><span class="n">7</span>Integração com o Discord</h2>
+<p>O banco do HUB é a fonte da verdade; cada mensagem do bot no Discord é uma “visão” de um registro, e o registro guarda o ID da mensagem. Assim, editar em qualquer lado atualiza a mesma mensagem, nunca cria uma duplicata.</p>
+<p class="lbl"><strong>HUB → Discord</strong></p>
+<ul><li>Criar, editar ou encerrar um registro (edital, aprovação, condecoração, documento) faz o bot postar, editar ou marcar como encerrada a mensagem no canal mapeado, em formato de embed padronizado com link para o HUB.</li><li>Licença de instrutor, aprovação em curso e lotação em unidade podem dar ou tirar cargos (configurável por item).</li></ul>
+<p class="lbl"><strong>Discord → HUB</strong></p>
+<ul><li><strong>Comandos e formulários do bot</strong> (slash commands + modais): <code>/edital novo</code>, <code>/curso turma</code>, <code>/aprovar @pm curso</code>, <code>/condecorar @pm medalha</code>, <code>/instrutor licenciar @pm curso</code>. O bot grava no HUB e posta a mensagem.</li><li><strong>Botões no embed:</strong> Editar, Encerrar, Ver no HUB — aparecem só para quem tem permissão.</li><li><strong>Fóruns:</strong> em <code>#protocolos</code>, <code>#viaturas</code>, <code>#fardamento</code>, <code>#armamento</code> e <code>#cursos-basicos</code>, criar ou editar um post atualiza o documento ou curso no HUB.</li><li><strong>Cargos:</strong> entrar, sair ou mudar de cargo no servidor atualiza perfil e permissões no HUB.</li></ul>
+<p class="lbl"><strong>Regras de consistência</strong></p>
+<ul><li>Nos canais mapeados, só o bot posta mensagens raiz; o efetivo comenta em threads. Isso evita texto solto que o HUB não consegue ler.</li><li>Cada registro tem versão; se dois lados editam ao mesmo tempo, vence a última gravação e a anterior fica no histórico.</li><li>Todo evento vai para um log de auditoria: o quê, quem, quando, origem (site ou Discord).</li><li>Falha de envio entra numa fila com nova tentativa; o painel admin mostra pendências e o comando <code>/hub ressincronizar #canal</code> refaz um canal inteiro.</li></ul>
+<p><strong>Importação inicial:</strong> um script lê o histórico de <code>#aprovados</code>, <code>#condecorações</code>, <code>#medalhas</code> e dos canais de edital e propõe registros; um admin revisa antes de gravar, porque esses canais têm texto livre.</p>
+</section>
+<section id="s8"><h2><span class="n">8</span>Arquitetura e stack sugerida</h2>
+<p>A proposta segue o padrão que o repositório já usa (site estático + Supabase + Vercel) e acrescenta uma peça nova: um bot sempre ligado, porque a Vercel não mantém a conexão permanente que o Discord exige para ouvir eventos.</p>
+<figure class="fig"><svg viewBox="0 0 760 496" role="img" aria-label="Arquitetura do DPP HUB"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker></defs><text x="24" y="34" class="ttl">O banco do HUB é a fonte da verdade; site e bot leem e gravam nele</text><g class="ln"><path d="M208 96H288" marker-end="url(#ar)"/><path d="M472 96H552" marker-end="url(#ar)"/><path d="M380.0 132V188" marker-start="url(#ar)" marker-end="url(#ar)"/><path d="M380.0 324V380" marker-start="url(#ar)" marker-end="url(#ar)"/><path d="M288 424H208" marker-start="url(#ar)" marker-end="url(#ar)"/></g><text x="248" y="88" class="q" text-anchor="middle">acessa</text><text x="512" y="88" class="q" text-anchor="middle">links</text><text x="390.0" y="164" class="q">lê e grava</text><text x="390.0" y="356" class="q">fila de saída + realtime</text><text x="248" y="416" class="q" text-anchor="middle">eventos</text><rect x="24" y="60" width="184" height="72" rx="8" class="bx"/><text x="36" y="84" class="nm">Efetivo e visitantes</text><text x="36" y="104" class="q">celular ou PC</text><text x="36" y="120" class="q">login com Discord</text><rect x="288" y="60" width="184" height="72" rx="8" class="bx"/><text x="300" y="84" class="nm">HUB web</text><text x="300" y="104" class="q">site estático na Vercel</text><text x="300" y="120" class="q">pasta hub/ do repositório</text><rect x="552" y="60" width="184" height="72" rx="8" class="bx"/><text x="564" y="84" class="nm">Sites das unidades</text><text x="564" y="104" class="q">CIT · cit00.vercel.app</text><text x="564" y="120" class="q">VGD · vgd00-pi.vercel.app</text><rect x="288" y="188" width="184" height="136" rx="8" class="bx-main"/><text x="300" y="212" class="nm">Supabase</text><text x="300" y="232" class="i">fonte da verdade</text><text x="300" y="248" class="i">Auth: login Discord</text><text x="300" y="264" class="i">Postgres + RLS por perfil</text><text x="300" y="280" class="i">Storage: PDFs e imagens</text><text x="300" y="296" class="i">Edge Functions: cargos</text><text x="300" y="312" class="i">log de auditoria</text><rect x="288" y="380" width="184" height="88" rx="8" class="bx"/><text x="300" y="404" class="nm">Bot DPP</text><text x="300" y="424" class="q">Node + discord.js</text><text x="300" y="440" class="q">sempre ligado (Railway)</text><text x="300" y="456" class="q">comandos, embeds, cargos</text><rect x="24" y="380" width="184" height="88" rx="8" class="bx"/><text x="36" y="404" class="nm">Servidor Discord</text><text x="36" y="424" class="q">Polícia Paralela</text><text x="36" y="440" class="q">canais mapeados</text><text x="36" y="456" class="q">cargos = permissões</text></svg><figcaption>Arquitetura do DPP HUB · 5 componentes</figcaption></figure>
+<p>O site e o bot nunca falam direto um com o outro: o site grava no banco e numa fila de saída; o bot lê a fila em tempo real, posta no Discord e devolve o ID da mensagem. No sentido inverso, o bot grava no banco o que veio de comandos, fóruns e cargos.</p>
+<ul><li><strong>HUB web:</strong> nova pasta <code>hub/</code> no repositório, um projeto Vercel próprio (Root Directory <code>hub</code>), sem build, como CIT e VGD.</li><li><strong>Supabase:</strong> projeto próprio do HUB (não compartilha banco com as unidades). Login pelo provedor Discord; permissões por RLS a partir do perfil derivado dos cargos.</li><li><strong>Bot:</strong> Node.js + discord.js num host sempre ligado (Railway, Fly.io ou VPS, ~US$ 5/mês). Usa a chave de serviço do Supabase, que nunca vai para o navegador.</li><li><strong>Normas:</strong> texto mantido em Markdown no banco, com o PDF original no Storage; o Regulamento Interno fica em bucket privado.</li></ul>
+</section>
+<section id="s9"><h2><span class="n">9</span>Direção visual</h2>
+<p>Proposta: <strong>“institucional de gabinete”</strong> — o HUB deve parecer o portal oficial de um departamento, não um terminal. A linha cyberpunk continua sendo a identidade das unidades (CIT, VGD); o HUB é a casa neutra que as apresenta.</p>
+<ul><li><strong>Paleta:</strong> azul-marinho profundo + off-white, com dourado reservado a honrarias e destaques; cada unidade entra com a sua cor só no próprio cartão. Um toque do roxo-azul da marca Paralela RP como acento de links.</li><li><strong>Tipografia:</strong> serifada para títulos e para o texto das normas (leitura de documento oficial); sem serifa para a interface.</li><li><strong>Elementos:</strong> brasões, insígnias e medalhas como protagonistas visuais; cartões limpos, bordas finas, sem neon, glitch ou scanlines.</li><li><strong>Modo claro e escuro</strong>, com claro como padrão para leitura longa.</li><li><strong>Celular primeiro:</strong> boa parte do efetivo consulta pelo telefone durante o RP; índice das normas vira gaveta, tabelas viram cartões.</li><li>Embeds do bot no Discord seguem a mesma paleta (barra lateral na cor do módulo) para o HUB e o canal parecerem a mesma coisa.</li></ul>
+</section>
+<section id="s10"><h2><span class="n">10</span>Roadmap por fases</h2>
+<p>A Fase 1 entrega o que foi pedido (todas as abas, integradas ao Discord); as fases 2 e 3 transformam o HUB de vitrine em ferramenta de processo. Sem datas ainda: a ordem e os portões é que importam.</p>
+<figure class="fig"><svg viewBox="0 0 760 306" role="img" aria-label="Roadmap do DPP HUB"><text x="24" y="34" class="ttl">O MVP integrado chega na Fase 1; processos e perfil vêm depois</text><rect x="24" y="60" width="166" height="156" rx="8" class="bx"/><text x="36" y="84" class="nm">Fase 0 · Fundação</text><text x="36" y="108" class="q">Login com Discord</text><text x="36" y="126" class="q">Perfis por cargo</text><text x="36" y="144" class="q">Unidades</text><text x="36" y="162" class="q">Biblioteca (leitura)</text><text x="36" y="180" class="q">Bot publica normas</text><rect x="206" y="60" width="166" height="156" rx="8" class="bx-main"/><text x="218" y="84" class="nm">Fase 1 · Núcleo (MVP)</text><text x="218" y="108" class="i">Editais</text><text x="218" y="126" class="i">Cursos e turmas</text><text x="218" y="144" class="i">Instrutores</text><text x="218" y="162" class="i">Certificados</text><text x="218" y="180" class="i">Condecorações</text><text x="218" y="198" class="i">Importar histórico</text><rect x="388" y="60" width="166" height="156" rx="8" class="bx"/><text x="400" y="84" class="nm">Fase 2 · Processos</text><text x="400" y="108" class="q">Inscrição em edital</text><text x="400" y="126" class="q">Ingresso na PM</text><text x="400" y="144" class="q">Relatórios de aula</text><text x="400" y="162" class="q">Avaliações de curso</text><rect x="570" y="60" width="166" height="156" rx="8" class="bx"/><text x="582" y="84" class="nm">Fase 3 · Perfil</text><text x="582" y="108" class="q">Linha do tempo do PM</text><text x="582" y="126" class="q">Promoções</text><text x="582" y="144" class="q">Validade de licenças</text><text x="582" y="162" class="q">Painel de números</text><path d="M198 226l10 10l-10 10l-10 -10z" class="gate"/><text x="198" y="266" class="q" text-anchor="middle">Comando aprova</text><text x="198" y="282" class="q" text-anchor="middle">cargos e layout</text><path d="M380 226l10 10l-10 10l-10 -10z" class="gate"/><text x="380" y="266" class="q" text-anchor="middle">2 semanas sem</text><text x="380" y="282" class="q" text-anchor="middle">divergência</text></svg><figcaption>Roadmap · 4 fases, 2 portões</figcaption></figure>
+<p>A Fase 0 já é útil sozinha: normas legíveis e o portal das unidades. O segundo portão exige duas semanas sem divergência entre HUB e Discord antes de abrir inscrições pelo site.</p>
+</section>
+<section id="s11"><h2><span class="n">11</span>Perguntas em aberto</h2>
+<ul class="check"><li><span class="bx" aria-hidden="true"></span><span><strong>Recrutamento vs. Cursos:</strong> <code>#fila-de-espera</code>, <code>#ficha-do-conscrito</code> e as listas de aprovados/reprovados são do ingresso na PM (academia) e <code>#aprovados</code>/<code>#reprovados</code> de Cursos são dos cursos de especialização? Confirmar.</span></li><li><span class="bx" aria-hidden="true"></span><span><strong><code>#editais</code> em Cursos:</strong> divulga turmas de curso ou repete os editais de unidade?</span></li><li><span class="bx" aria-hidden="true"></span><span><strong>Medalhas vs. Condecorações:</strong> qual a diferença entre os dois canais? Um é o catálogo e o outro o registro de quem recebeu?</span></li><li><span class="bx" aria-hidden="true"></span><span><strong><code>#registro</code></strong> (DP Paralela): é onde o PM se registra/seta? Se sim, pode virar o cadastro do perfil no HUB.</span></li><li><span class="bx" aria-hidden="true"></span><span><strong>Unidades sem site</strong> (DRE, DPU, CSA): só cartão, ou o HUB deve oferecer uma página simples para elas?</span></li><li><span class="bx" aria-hidden="true"></span><span><strong>Reprovados:</strong> a lista deve ser visível ao efetivo ou só aos instrutores?</span></li><li><span class="bx" aria-hidden="true"></span><span><strong>Validade de licenças:</strong> licença de instrutor e certificado têm prazo de validade ou reciclagem?</span></li><li><span class="bx" aria-hidden="true"></span><span><strong>Quem é o admin do HUB</strong> e quais cargos do Discord correspondem a Comando e a Instrutor hoje?</span></li><li><span class="bx" aria-hidden="true"></span><span><strong>Hospedagem do bot:</strong> existe um bot da PM em uso hoje (ex.: para setagem) que devêmos estender, ou será um bot novo?</span></li><li><span class="bx" aria-hidden="true"></span><span><strong>Endereço:</strong> subdomínio na Vercel (ex.: <code>dpp-hub.vercel.app</code>) ou domínio próprio?</span></li></ul>
+</section>
+  </main>
+</div>
+<footer>DPP HUB · PRD · Paralela RP</footer>
+<button class="theme" type="button" id="themeBtn">Tema</button>
+<script>
+(function(){
+  var r=document.documentElement,b=document.getElementById('themeBtn');
+  try{var s=localStorage.getItem('prd-theme');if(s)r.setAttribute('data-theme',s);}catch(e){}
+  function cur(){var a=r.getAttribute('data-theme');if(a)return a;return matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
+  function lbl(){b.textContent=cur()==='dark'?'☀ Claro':'☾ Escuro';}
+  b.onclick=function(){var n=cur()==='dark'?'light':'dark';r.setAttribute('data-theme',n);try{localStorage.setItem('prd-theme',n);}catch(e){}lbl();};
+  lbl();
+})();
+</script>
+</body>
+</html>
