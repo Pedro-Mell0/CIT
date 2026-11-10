@@ -1,6 +1,7 @@
 # CIT · Paralela — comunicação anônima para RolePlay
 
-Site estático (sem build). Backend: Supabase. Hospedagem: Vercel.
+Site estático (sem build). Backend: Supabase. Hospedagem: Vercel, projeto
+`cit00` — **https://cit00.vercel.app/**.
 
 > Este site vive em `cit/`, dentro do repositório do DPP (ver o
 > [README da raiz](../README.md)). A irmã dele, a **VGD · Vanguarda**, fica em

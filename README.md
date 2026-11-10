@@ -38,10 +38,13 @@ cidade e da polícia:
 Dois projetos na Vercel apontando para este mesmo repositório, cada um com o
 seu *Root Directory*:
 
-| Projeto Vercel | Root Directory |
-|----------------|----------------|
-| `cit00`        | `cit`          |
-| `vgd00`        | `vgd`          |
+| Projeto Vercel | Root Directory | Endereço                       |
+|----------------|----------------|--------------------------------|
+| `cit00`        | `cit`          | https://cit00.vercel.app/      |
+| `vgd00`        | `vgd`          | https://vgd00-pi.vercel.app/   |
+
+> Até novembro de 2026 a VGD era servida em `cit00.vercel.app/vgd/`, de
+> dentro do projeto do CIT. Esse endereço não existe mais.
 
 A raiz do repositório não é um site: nenhum projeto deve apontar para ela.
 

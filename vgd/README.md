@@ -1,6 +1,7 @@
 # VGD · Vanguarda — prova e informes da unidade
 
-Site estático (sem build). Backend: Supabase. Hospedagem: Vercel.
+Site estático (sem build). Backend: Supabase. Hospedagem: Vercel, projeto
+`vgd00` — **https://vgd00-pi.vercel.app/**.
 
 Irmão do CIT, que vive em [`../cit/`](../cit/) neste mesmo repositório do DPP — mesmo jeito de fazer as
 coisas, **banco separado**. Nenhuma conta, nenhuma tabela e nenhum informe é
