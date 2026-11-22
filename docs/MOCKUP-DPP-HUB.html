@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DPP HUB · Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* =========================================================
+   DPP HUB · mockup navegável (dados fictícios)
+   Paleta A1 · lateral flutuante em vidro · gradiente na página toda
+   ========================================================= */
+:root{
+  --bg:#f4f2ed;--paper:#fffefb;--ink:#1b1f3c;--ink2:#5d6079;--rule:#e0dbd0;
+  --head:#20284f;--accent:#20284f;--onaccent:#fff;--gold:#a8843a;--link:#3a44a3;
+  --ok:#2f7a4f;--warn:#9a6a1c;--bad:#9c3f3f;
+  --sky1:#1c2350;--sky2:#3b3474;--sky3:#4a3f8f;--sky4:#57479e;
+  --on-sky:#f3f1ec;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12152b;--paper:#1a1c37;--ink:#e7e4dc;--ink2:#a4a7be;--rule:#2c2f50;
+  --head:#0e1124;--accent:#42508e;--onaccent:#fff;--gold:#cfae62;--link:#a5a9f2;
+  --ok:#7cc49a;--warn:#dcb06a;--bad:#e29590;
+  --sky1:#141a3d;--sky2:#2a2560;--sky3:#352d72;--sky4:#3a2f7a}}
+:root[data-theme="dark"]{
+  --bg:#12152b;--paper:#1a1c37;--ink:#e7e4dc;--ink2:#a4a7be;--rule:#2c2f50;
+  --head:#0e1124;--accent:#42508e;--onaccent:#fff;--gold:#cfae62;--link:#a5a9f2;
+  --ok:#7cc49a;--warn:#dcb06a;--bad:#e29590;
+  --sky1:#141a3d;--sky2:#2a2560;--sky3:#352d72;--sky4:#3a2f7a}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;min-height:100vh;color:var(--ink);font:14px/1.5 Inter,system-ui,sans-serif;background:var(--sky1)}
+/* gradiente da página inteira numa camada fixa (mais estável que background-attachment:fixed) */
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(700px 340px at 92% 0%,color-mix(in srgb,var(--gold) 24%,transparent),transparent 70%),
+    radial-gradient(800px 560px at 0% 50%,var(--sky3),transparent 70%),
+    radial-gradient(760px 520px at 100% 95%,var(--sky4),transparent 70%),
+    linear-gradient(160deg,var(--sky1),var(--sky2) 60%,var(--sky1))}
+a{color:var(--link);text-decoration:none}
+button{font:inherit;cursor:pointer}
+.ico{width:17px;height:17px;flex:none;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- vidro ---------- */
+.glass-dark{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.tile{color:var(--ink);background:color-mix(in srgb,var(--paper) 84%,transparent);border:1px solid color-mix(in srgb,var(--paper) 40%,transparent);border-radius:14px;padding:18px;
+  backdrop-filter:blur(18px) saturate(1.15);-webkit-backdrop-filter:blur(18px) saturate(1.15);box-shadow:0 16px 36px -22px rgba(10,10,40,.6);min-width:0}
+.tile.hon{background:color-mix(in srgb,color-mix(in srgb,var(--gold) 12%,var(--paper)) 84%,transparent);border-color:color-mix(in srgb,var(--gold) 40%,transparent)}
+
+/* ---------- estrutura ---------- */
+.app{display:grid;grid-template-columns:244px minmax(0,1fr);gap:18px;padding:16px;max-width:1480px;margin:0 auto}
+.side{position:sticky;top:16px;height:calc(100vh - 32px);display:flex;flex-direction:column;gap:20px;padding:16px 10px;border-radius:16px;overflow:auto;
+  background:color-mix(in srgb,var(--paper) 82%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid color-mix(in srgb,var(--paper) 55%,var(--rule));box-shadow:0 18px 40px -24px rgba(20,20,60,.6)}
+.brand{display:flex;align-items:center;gap:10px;font:700 17px/1 "Source Serif 4",Georgia,serif;white-space:nowrap;padding:0 6px;color:var(--ink)}
+.brand small{display:block;font:500 9px/1.3 Inter;letter-spacing:.12em;text-transform:uppercase;color:var(--ink2);margin-top:3px}
+.brand svg{width:30px;height:30px;flex:none}
+.grp{font:600 10px/1 Inter;letter-spacing:.14em;text-transform:uppercase;color:var(--ink2);padding:0 10px;margin:2px 0 6px}
+.side nav{display:flex;flex-direction:column;gap:2px}
+.side nav a{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:8px;font-size:13.5px;color:var(--ink2)}
+.side nav a:hover{background:color-mix(in srgb,var(--ink) 6%,transparent);color:var(--ink)}
+.side nav a.on{color:var(--onaccent);background:var(--accent);font-weight:500}
+.side nav a .n{margin-left:auto;font:600 10.5px/1 Inter;background:color-mix(in srgb,var(--gold) 18%,transparent);color:var(--gold);padding:3px 6px;border-radius:999px}
+.side nav a.on .n{background:var(--gold);color:var(--head)}
+.side nav a .lk{margin-left:auto;width:13px;height:13px;opacity:.6}
+.me{margin-top:auto;display:flex;align-items:center;gap:10px;font-size:12.5px;padding:12px 8px 0;border-top:1px solid var(--rule);color:var(--ink)}
+.me small{display:block;color:var(--ink2);font-size:11px}
+.av{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font:700 12px Inter;flex:none;background:var(--accent);color:var(--onaccent)}
+.discord{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:10px;border-radius:9px;border:0;background:#5865F2;color:#fff;font-weight:600;font-size:13px}
+.discord svg{width:18px;height:18px}
+
+main{min-width:0;color:var(--on-sky);padding-bottom:40px}
+.topbar{display:flex;align-items:center;gap:10px;padding:4px 2px 0}
+.crumb{font-size:12.5px;opacity:.75;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crumb b{font-weight:600;opacity:1}
+.gsearch{display:flex;align-items:center;gap:8px;padding:9px 12px;font-size:13px;color:rgba(255,255,255,.82);border-radius:12px;width:340px;white-space:nowrap;overflow:hidden;border:1px solid rgba(255,255,255,.22)}
+.gsearch span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.gsearch kbd{margin-left:auto;font:11px Inter;border:1px solid rgba(255,255,255,.25);border-radius:5px;padding:1px 6px;opacity:.8}
+.gbtn{width:38px;height:38px;display:grid;place-items:center;flex:none;border-radius:12px;color:var(--on-sky);position:relative}
+.gbtn .dot{position:absolute;top:8px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--gold)}
+.menu-btn{display:none}
+.ph{margin:26px 2px 22px;max-width:760px}
+.ph h1{font:700 32px/1.12 "Source Serif 4",Georgia,serif;margin:0 0 8px;color:#fff}
+.ph p{margin:0;opacity:.82;font-size:14.5px}
+.ph .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+
+/* ---------- peças ---------- */
+.lbl{font:600 10.5px/1 Inter;letter-spacing:.12em;text-transform:uppercase;color:var(--ink2);margin:0 0 12px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lbl a{letter-spacing:0;text-transform:none;font-weight:500;font-size:12px}
+.list{list-style:none;margin:0;padding:0}
+.list li{padding:10px 0;border-top:1px solid var(--rule)}
+.list li:first-child{border-top:0;padding-top:0}
+.list li:last-child{padding-bottom:0}
+.list .t{font-weight:600;line-height:1.35;color:var(--ink)}
+.list .m{font-size:12px;color:var(--ink2);margin-top:3px}
+.list a.t:hover{color:var(--link)}
+.tag{display:inline-block;font:700 9.5px/1 Inter;letter-spacing:.08em;padding:3px 6px;border-radius:4px;color:var(--u);background:color-mix(in srgb,var(--u) 15%,transparent);margin-right:6px;vertical-align:1px}
+.pill{display:inline-block;font:600 10.5px/1 Inter;padding:4px 8px;border-radius:999px;color:var(--c);background:color-mix(in srgb,var(--c) 13%,transparent);white-space:nowrap}
+.ok{--c:var(--ok)}.warn{--c:var(--warn)}.bad{--c:var(--bad)}.neu{--c:var(--ink2)}
+.ch{font:11px ui-monospace,Consolas,monospace;color:var(--ink2);white-space:nowrap}
+.num{font:700 30px/1 "Source Serif 4",Georgia,serif;color:var(--ink)}
+.num+small{display:block;color:var(--ink2);font-size:12px;margin-top:6px}
+.btn{display:inline-flex;align-items:center;gap:7px;font:600 12.5px/1 Inter;padding:9px 13px;border-radius:8px;background:var(--accent);color:var(--onaccent);border:1px solid transparent;white-space:nowrap}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--rule)}
+.btn.sky{background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.25);backdrop-filter:blur(10px)}
+.btn.gold{background:var(--gold);color:#1b1f3c}
+.btn .ico{width:15px;height:15px}
+.btn[disabled]{opacity:.55;cursor:not-allowed}
+.soon{font:600 9.5px/1 Inter;letter-spacing:.06em;text-transform:uppercase;padding:3px 5px;border-radius:4px;border:1px solid currentColor;opacity:.7;margin-left:4px}
+.muted{color:var(--ink2)}
+.serif{font-family:"Source Serif 4",Georgia,serif}
+.honor{display:flex;gap:12px;align-items:center}
+.honor svg{width:30px;height:44px;flex:none}
+.honor b{display:block;font:700 15px/1.2 "Source Serif 4",Georgia,serif;color:var(--ink)}
+.honor span{font-size:12px;color:var(--ink2)}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:12px}
+.stats .tile{padding:15px 17px;background:color-mix(in srgb,var(--paper) 74%,transparent)}
+.g{display:grid;gap:12px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+.chip{padding:7px 12px;border-radius:999px;font:500 12.5px/1 Inter;color:#fff;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(10px)}
+.chip.on{background:var(--paper);color:var(--ink);border-color:var(--paper)}
+.chip i{font-style:normal;opacity:.6;margin-left:4px}
+.sync{display:inline-flex;align-items:center;gap:5px;font:11px ui-monospace,Consolas,monospace;color:var(--ink2);border:1px dashed var(--rule);border-radius:6px;padding:3px 7px}
+.sync svg{width:12px;height:12px}
+
+/* tabelas */
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font:600 10.5px/1 Inter;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);padding:0 10px 10px 0;white-space:nowrap}
+.tbl td{padding:10px 10px 10px 0;border-top:1px solid var(--rule);vertical-align:middle}
+.tbl td:last-child,.tbl th:last-child{padding-right:0}
+.who{display:flex;align-items:center;gap:9px;color:var(--ink);font-weight:500}
+.who .av{width:28px;height:28px;font-size:10px}
+code.c{font:12px ui-monospace,Consolas,monospace;background:color-mix(in srgb,var(--ink) 7%,transparent);padding:2px 6px;border-radius:4px;color:var(--ink)}
+
+/* início */
+.home{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-areas:"avis avis edit" "turm hon edit" "unid unid unid"}
+.units-mini{display:flex;flex-wrap:wrap;gap:8px}
+.unit-mini{flex:1 1 110px;border:1px solid var(--rule);border-left:3px solid var(--u);border-radius:8px;padding:9px 11px;background:color-mix(in srgb,var(--bg) 55%,transparent);color:var(--ink)}
+.unit-mini b{display:block;font-size:13px}.unit-mini span{font-size:11.5px;color:var(--ink2)}
+
+/* unidades */
+.ucard{border-top:3px solid var(--u);display:flex;flex-direction:column;gap:12px}
+.ucard .hd{display:flex;gap:12px;align-items:center}
+.seal{width:48px;height:48px;border-radius:12px;display:grid;place-items:center;font:700 14px "Source Serif 4",Georgia,serif;color:var(--u);background:color-mix(in srgb,var(--u) 14%,transparent);border:1px solid color-mix(in srgb,var(--u) 35%,transparent);flex:none}
+.ucard h3{font:700 19px/1.2 "Source Serif 4",Georgia,serif;margin:0}
+.ucard p{margin:0;color:var(--ink2)}
+.ucard .ft{margin-top:auto;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12.5px}
+.kv dt{color:var(--ink2)}.kv dd{margin:0;color:var(--ink)}
+.add{display:grid;place-items:center;text-align:center;border:1.5px dashed rgba(255,255,255,.35);background:rgba(255,255,255,.05);color:#fff;border-radius:14px;padding:18px;min-height:200px}
+
+/* biblioteca */
+.lib{display:grid;grid-template-columns:250px minmax(0,1fr);gap:12px;align-items:start}
+.docs{position:sticky;top:16px}
+.docs a{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;color:var(--ink)}
+.docs a:hover{background:color-mix(in srgb,var(--ink) 5%,transparent)}
+.docs a.on{background:color-mix(in srgb,var(--accent) 12%,transparent);font-weight:600}
+.docs a small{display:block;font-size:11px;color:var(--ink2);font-weight:400}
+.docs a .lk{margin-left:auto;width:13px;height:13px;color:var(--ink2)}
+.docs .sep{height:1px;background:var(--rule);margin:8px 4px}
+.reader{padding:0;overflow:hidden}
+.reader .rh{padding:22px 26px 16px;border-bottom:1px solid var(--rule)}
+.reader .rh h2{font:700 28px/1.15 "Source Serif 4",Georgia,serif;margin:6px 0 8px}
+.reader .rh .meta{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:12.5px;color:var(--ink2)}
+.reader .rb{display:grid;grid-template-columns:190px minmax(0,1fr)}
+.toc{padding:18px 16px;border-right:1px solid var(--rule);font-size:12.5px;position:sticky;top:0;align-self:start}
+.toc a{display:block;padding:5px 0;color:var(--ink2)}
+.toc a:hover{color:var(--ink)}
+.toc input{width:100%;padding:7px 9px;border-radius:7px;border:1px solid var(--rule);background:color-mix(in srgb,var(--bg) 60%,transparent);color:var(--ink);font:12.5px Inter;margin-bottom:10px}
+.text{padding:8px 30px 30px;max-width:720px}
+.text h3{font:700 13px/1.2 Inter;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin:26px 0 4px}
+.text h4{font:700 20px/1.25 "Source Serif 4",Georgia,serif;margin:0 0 6px}
+.art{padding:16px 0;border-bottom:1px solid var(--rule);scroll-margin-top:20px;position:relative}
+.art.hl{background:color-mix(in srgb,var(--gold) 10%,transparent);margin:0 -14px;padding:16px 14px;border-radius:8px}
+.art .no{font:600 11px/1 Inter;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2)}
+.art h5{font:700 17px/1.3 "Source Serif 4",Georgia,serif;margin:5px 0 6px}
+.art p{font:16px/1.65 "Source Serif 4",Georgia,serif;margin:0 0 8px}
+.art .pena{font-size:12.5px;color:var(--ink)}
+.art .pena b{color:var(--ink2);font-weight:500}
+.art .tools{position:absolute;right:0;top:16px;display:flex;gap:6px}
+.art.hl .tools{right:14px}
+.art .tools button{border:1px solid var(--rule);background:transparent;color:var(--ink2);border-radius:6px;padding:4px 8px;font-size:11.5px}
+.art .tools button:hover{color:var(--ink)}
+.new{font:600 9.5px/1 Inter;letter-spacing:.06em;text-transform:uppercase;color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:2px 5px;margin-left:6px;vertical-align:2px}
+
+/* editais */
+.ecard{border-left:3px solid var(--u);display:flex;flex-direction:column;gap:10px}
+.ecard h3{font:700 18px/1.25 "Source Serif 4",Georgia,serif;margin:0;color:var(--ink)}
+.ecard ul{margin:0;padding-left:18px;color:var(--ink);font-size:13px}
+.ecard li{margin:2px 0}
+.ecard li::marker{color:var(--gold)}
+.steps{display:flex;gap:4px;margin-top:2px}
+.steps div{flex:1;font-size:10.5px;color:var(--ink2)}
+.steps div::before{content:"";display:block;height:4px;border-radius:2px;background:var(--rule);margin-bottom:5px}
+.steps div.done::before{background:var(--accent)}
+.steps div.cur{color:var(--ink);font-weight:600}
+.steps div.cur::before{background:var(--gold)}
+.ecard .ft{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:auto;padding-top:4px}
+
+/* cursos */
+.ccard{display:flex;flex-direction:column;gap:10px}
+.ccard h3{font:700 19px/1.2 "Source Serif 4",Georgia,serif;margin:0;color:var(--ink)}
+.ccard p{margin:0;color:var(--ink2)}
+.facts{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--ink)}
+.facts span b{color:var(--ink2);font-weight:500}
+.ccard .ft{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:4px}
+
+/* certificados */
+.verify{display:flex;gap:8px;flex-wrap:wrap}
+.verify input,.field{flex:1;min-width:180px;padding:10px 12px;border-radius:9px;border:1px solid var(--rule);background:color-mix(in srgb,var(--bg) 60%,transparent);color:var(--ink);font:13.5px Inter}
+.vres{margin-top:12px;padding:12px 14px;border-radius:10px;font-size:13px;display:none}
+.vres.show{display:block}
+.vres.good{background:color-mix(in srgb,var(--ok) 12%,transparent);color:var(--ink);border:1px solid color-mix(in srgb,var(--ok) 35%,transparent)}
+.vres.nope{background:color-mix(in srgb,var(--bad) 10%,transparent);color:var(--ink);border:1px solid color-mix(in srgb,var(--bad) 30%,transparent)}
+.cert{border:1px solid color-mix(in srgb,var(--gold) 45%,var(--rule));border-radius:12px;padding:22px;text-align:center;background:color-mix(in srgb,var(--gold) 6%,transparent);position:relative}
+.cert::before{content:"";position:absolute;inset:6px;border:1px solid color-mix(in srgb,var(--gold) 30%,transparent);border-radius:8px;pointer-events:none}
+.cert .k{font:600 10px/1 Inter;letter-spacing:.2em;text-transform:uppercase;color:var(--gold)}
+.cert h3{font:700 22px/1.2 "Source Serif 4",Georgia,serif;margin:10px 0 4px}
+.cert p{margin:0;color:var(--ink2);font-size:13px}
+.cert .nm{font:italic 600 20px "Source Serif 4",Georgia,serif;color:var(--ink);margin:10px 0}
+
+/* honrarias */
+.mgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.mcard{display:flex;gap:14px;align-items:flex-start}
+.mcard svg{width:46px;height:66px;flex:none}
+.mcard h3{font:700 17px/1.2 "Source Serif 4",Georgia,serif;margin:0 0 4px;color:var(--ink)}
+.mcard p{margin:0 0 6px;font-size:12.5px;color:var(--ink2)}
+.mcard .cnt{font-size:12px;color:var(--ink)}
+.ord{font:600 10px/1 Inter;color:var(--gold);letter-spacing:.1em;text-transform:uppercase}
+
+/* perfil */
+.prof{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+.prof .av{width:76px;height:76px;font-size:24px;border-radius:20px}
+.prof h2{font:700 28px/1.1 "Source Serif 4",Georgia,serif;margin:0 0 6px;color:var(--ink)}
+.prof .sub{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;color:var(--ink2);font-size:13px}
+.prof .ft{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.medals-row{display:flex;flex-wrap:wrap;gap:16px}
+.medals-row figure{margin:0;width:88px;text-align:center;font-size:11.5px;color:var(--ink2)}
+.medals-row svg{width:40px;height:58px;display:block;margin:0 auto 6px}
+.tl{list-style:none;margin:0;padding:0 0 0 16px;border-left:2px solid var(--rule)}
+.tl li{position:relative;padding:0 0 14px 6px}
+.tl li::before{content:"";position:absolute;left:-23px;top:5px;width:10px;height:10px;border-radius:50%;background:var(--paper);border:2px solid var(--gold)}
+.tl b{display:block;color:var(--ink);font-weight:600}
+.tl span{font-size:12px;color:var(--ink2)}
+
+/* bloqueado */
+.locked{max-width:520px;margin:40px auto;text-align:center;padding:34px}
+.locked .lkbig{width:54px;height:54px;border-radius:16px;display:grid;place-items:center;margin:0 auto 14px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent)}
+:root[data-theme="dark"] .locked .lkbig{color:var(--gold)}
+.locked h2{font:700 24px/1.2 "Source Serif 4",Georgia,serif;margin:0 0 8px}
+.locked p{color:var(--ink2);margin:0 0 18px}
+
+/* busca */
+.overlay{position:fixed;inset:0;background:rgba(8,10,25,.45);backdrop-filter:blur(4px);display:none;align-items:flex-start;justify-content:center;padding:12vh 16px 16px;z-index:40}
+.overlay.open{display:flex}
+.sbox{width:100%;max-width:620px;padding:0;overflow:hidden}
+.sbox .in{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--rule);color:var(--ink2)}
+.sbox input{flex:1;border:0;background:transparent;font:16px Inter;color:var(--ink);outline:none;min-width:0}
+.sbox kbd{font:11px Inter;border:1px solid var(--rule);border-radius:5px;padding:1px 6px}
+.sres{max-height:52vh;overflow:auto;padding:6px}
+.sres a{display:flex;gap:12px;align-items:center;padding:9px 10px;border-radius:8px;color:var(--ink)}
+.sres a:hover,.sres a.sel{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.sres .k{font:600 9.5px/1 Inter;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);width:74px;flex:none}
+.sres small{display:block;color:var(--ink2);font-size:11.5px}
+.sres .empty{padding:18px;color:var(--ink2);text-align:center}
+
+/* mockup tools */
+.mock{position:fixed;right:16px;bottom:16px;z-index:30;display:flex;align-items:center;gap:6px;padding:6px;border-radius:999px;font-size:12px;color:var(--ink);
+  background:color-mix(in srgb,var(--paper) 88%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--rule);box-shadow:0 10px 30px -14px rgba(10,10,40,.6)}
+.mock .lab{padding:0 6px 0 8px;color:var(--ink2);white-space:nowrap}
+.mock button{border:0;background:transparent;color:var(--ink2);padding:6px 10px;border-radius:999px;font-size:12px}
+.mock button.on{background:var(--accent);color:var(--onaccent)}
+.mock .sep{width:1px;height:18px;background:var(--rule)}
+.toast{position:fixed;left:50%;bottom:76px;transform:translateX(-50%) translateY(20px);opacity:0;transition:.25s;z-index:50;max-width:min(560px,calc(100% - 32px));padding:12px 16px;border-radius:12px;font-size:13px;color:var(--ink);
+  background:color-mix(in srgb,var(--paper) 94%,transparent);border:1px solid var(--rule);box-shadow:0 16px 40px -16px rgba(0,0,0,.5);pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%)}
+.toast b{color:var(--gold)}
+
+/* celular */
+.tabbar{display:none}
+.scrim{display:none}
+.need-pm,.need-cmd,.only-vis{}
+body[data-role="vis"] .need-pm{display:none!important}
+body:not([data-role="cmd"]) .need-cmd{display:none!important}
+body:not([data-role="vis"]) .only-vis{display:none!important}
+
+@media (max-width:1100px){
+  .home{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-areas:"avis avis" "edit turm" "hon hon" "unid unid"}
+  .g3,.mgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .reader .rb{grid-template-columns:minmax(0,1fr)}
+  .toc{display:none}
+}
+@media (max-width:860px){
+  .app{grid-template-columns:minmax(0,1fr);padding:12px 12px 96px}
+  .side{position:fixed;left:10px;top:10px;bottom:10px;height:auto;width:260px;z-index:35;transform:translateX(-115%);transition:transform .25s}
+  body.drawer .side{transform:none}
+  body.drawer .scrim{display:block;position:fixed;inset:0;z-index:34;background:rgba(8,10,25,.4)}
+  .menu-btn{display:grid}
+  .gsearch{width:auto;flex:1}
+  .gsearch kbd,.crumb{display:none}
+  .ph{margin:18px 2px 16px}
+  .ph h1{font-size:26px}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .g2,.g3,.mgrid,.home,.lib{grid-template-columns:minmax(0,1fr)}
+  .home{grid-template-areas:"avis" "edit" "turm" "hon" "unid"}
+  .docs{position:static}
+  .text{padding:4px 18px 22px}
+  .reader .rh{padding:18px}
+  .art .tools{position:static;margin-top:6px}
+  .tbl thead{display:none}
+  .tbl,.tbl tbody,.tbl tr,.tbl td{display:block;width:100%}
+  .tbl tr{border-top:1px solid var(--rule);padding:8px 0}
+  .tbl tr:first-child{border-top:0}
+  .tbl td{border:0;padding:3px 0;display:flex;justify-content:space-between;gap:12px;text-align:right}
+  .tbl td::before{content:attr(data-h);font:600 10px/1.6 Inter;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);text-align:left}
+  .tabbar{display:grid;position:fixed;left:10px;right:10px;bottom:10px;z-index:30;grid-template-columns:repeat(5,1fr);padding:8px 4px;border-radius:18px;
+    background:color-mix(in srgb,var(--paper) 85%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--rule);box-shadow:0 10px 30px -14px rgba(20,20,60,.5)}
+  .tabbar a{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10.5px;color:var(--ink2);background:none;border:0}
+  .tabbar a.on{color:var(--accent);font-weight:600}
+  .mock{bottom:84px;right:10px}
+  .mock .lab{display:none}
+  .toast{bottom:150px}
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .tabbar a.on{color:var(--gold)}}
+:root[data-theme="dark"] .tabbar a.on{color:var(--gold)}
+</style>
+</head>
+<body data-role="pm">
+
+<div class="app">
+  <aside class="side" id="side"></aside>
+  <main>
+    <div class="topbar">
+      <button class="gbtn glass-dark menu-btn" id="menuBtn" aria-label="Menu"><svg class="ico" viewBox="0 0 16 16"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg></button>
+      <div class="crumb" id="crumb"></div>
+      <button class="gsearch glass-dark" id="searchBtn"><svg class="ico" viewBox="0 0 16 16"><path d="M7 12A5 5 0 1 0 7 2a5 5 0 0 0 0 10zM11 11l3.5 3.5"/></svg><span>Buscar artigo, curso, edital ou pessoa…</span><kbd>Ctrl K</kbd></button>
+      <button class="gbtn glass-dark need-pm" aria-label="Notificações" data-act="Notificações: 2 novas (aprovação em Modulação; edital da DRE aberto)."><svg class="ico" viewBox="0 0 16 16"><path d="M4 11V7a4 4 0 0 1 8 0v4l1 1.5H3zM6.5 14h3"/></svg><span class="dot"></span></button>
+    </div>
+    <div id="view"></div>
+  </main>
+</div>
+<div class="scrim" id="scrim"></div>
+
+<nav class="tabbar" id="tabbar"></nav>
+
+<div class="overlay" id="overlay">
+  <div class="tile sbox">
+    <div class="in"><svg class="ico" viewBox="0 0 16 16"><path d="M7 12A5 5 0 1 0 7 2a5 5 0 0 0 0 10zM11 11l3.5 3.5"/></svg><input id="q" placeholder="Artigo, curso, edital, pessoa, medalha…" autocomplete="off"><kbd>Esc</kbd></div>
+    <div class="sres" id="sres"></div>
+  </div>
+</div>
+
+<div class="mock" id="mock">
+  <span class="lab">Mockup · ver como</span>
+  <button data-role="vis">Visitante</button><button data-role="pm" class="on">PM</button><button data-role="cmd">Comando</button>
+  <span class="sep"></span>
+  <button id="themeBtn" aria-label="Tema">☾</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= dados fictícios ================= */
+const UNITS={
+  CIT:{c:'#6656b8',name:'CIT',full:'Unidade investigativa',desc:'Investigações, dossiês de operação, cadastro de entidades e a Teia de Vínculos entre investigações.',site:'cit00.vercel.app',status:'ativa',cmd:'Cap. Otávio Sarmento',ef:14,canal:'#edital-cit'},
+  VGD:{c:'#b8742e',name:'VGD',full:'Vanguarda',desc:'Acompanhamentos com viaturas especializadas, informes da unidade e o Curso de Modulação.',site:'vgd00-pi.vercel.app',status:'ativa',cmd:'1º Ten. Helena Duarte',ef:22,canal:'#edital-vgd'},
+  DRE:{c:'#3f7d55',name:'DRE',full:'Unidade especializada',desc:'Descrição a definir pelo comando da unidade.',site:'',status:'em formação',cmd:'a definir',ef:6,canal:'#edital-dre'},
+  DPU:{c:'#3a6ea5',name:'DPU',full:'Unidade especializada',desc:'Descrição a definir pelo comando da unidade.',site:'',status:'em formação',cmd:'a definir',ef:9,canal:'#edital-dpu'},
+  CSA:{c:'#a04848',name:'CSA',full:'Unidade especializada',desc:'Descrição a definir pelo comando da unidade.',site:'',status:'em formação',cmd:'2º Sgt. Paula Rezende',ef:5,canal:'#edital-csa'}
+};
+const PEOPLE={
+  hd:{n:'Helena Duarte',p:'1º Ten.',u:'VGD',dc:'@h.duarte',since:'mar 2026'},
+  av:{n:'Augusto Verano',p:'Cel.',u:'Comando',dc:'@verano',since:'jan 2026'},
+  bt:{n:'Bruno Teixeira',p:'Maj.',u:'Comando',dc:'@b.teixeira',since:'jan 2026'},
+  rb:{n:'Rafael Brandão',p:'3º Sgt.',u:'VGD',dc:'@brandao',since:'abr 2026'},
+  nc:{n:'Nina Castilho',p:'Sd.',u:'DRE',dc:'@ninac',since:'set 2026'},
+  lm:{n:'Lívia Moraes',p:'Cb.',u:'CIT',dc:'@liv.moraes',since:'mai 2026'},
+  os:{n:'Otávio Sarmento',p:'Cap.',u:'CIT',dc:'@sarmento',since:'fev 2026'},
+  da:{n:'Diego Arantes',p:'Cb.',u:'DPU',dc:'@arantes',since:'jun 2026'},
+  pr:{n:'Paula Rezende',p:'2º Sgt.',u:'CSA',dc:'@p.rezende',since:'mar 2026'},
+  cv:{n:'Caio Ventura',p:'Sd.',u:'VGD',dc:'@caiov',since:'out 2026'}
+};
+const COURSES={
+  mod:{n:'Modulação',d:'Técnicas de acompanhamento e comunicação via rádio entre viaturas especializadas.',h:'6 h',pre:'Soldado ou acima',mat:'vgd00-pi.vercel.app',code:'MOD'},
+  acp:{n:'Acompanhamento Tático',d:'Perseguição, cerco e encerramento seguro de fugas em vias urbanas.',h:'4 h',pre:'Curso de Modulação',code:'ACP'},
+  abv:{n:'Abordagem Veicular',d:'Procedimento padrão de abordagem a veículos, do sinal de parada à revista.',h:'3 h',pre:'Soldado ou acima',code:'ABV'},
+  neg:{n:'Negociação de Crises',d:'Contato com tomadores de reféns, tempo, concessões e Código 5.',h:'5 h',pre:'Cabo ou acima',code:'NEG'},
+  tir:{n:'Tiro Defensivo',d:'Uso progressivo da força, controle de disparo e segurança da equipe.',h:'4 h',pre:'Soldado ou acima',code:'TIR'},
+  aph:{n:'Atendimento Pré-Hospitalar',d:'Primeiro atendimento a feridos até a chegada do socorro médico.',h:'3 h',pre:'Soldado ou acima',code:'APH'}
+};
+const INSTR=[['hd','abv','20 abr 2026','av','ativo'],['hd','mod','10 ago 2026','bt','ativo'],['rb','mod','15 jun 2026','hd','ativo'],['rb','acp','18 set 2026','av','ativo'],
+  ['os','neg','20 abr 2026','av','ativo'],['pr','aph','01 set 2026','bt','ativo'],['lm','tir','12 jul 2026','os','suspenso'],['da','acp','05 mar 2026','bt','expirado']];
+const CERTS=[['DPP-MOD-0412','cv','mod','14 nov 2026','rb','9,0'],['DPP-MOD-0411','nc','mod','14 nov 2026','rb','8,5'],['DPP-ABV-0233','cv','abv','09 nov 2026','hd','8,0'],
+  ['DPP-NEG-0098','lm','neg','02 nov 2026','os','9,5'],['DPP-APH-0151','da','aph','28 out 2026','pr','7,5'],['DPP-TIR-0187','nc','tir','20 out 2026','lm','8,0'],
+  ['DPP-NEG-0080','hd','neg','15 set 2026','os','8,5'],['DPP-ACP-0064','rb','acp','02 set 2026','da','9,0'],['DPP-MOD-0377','hd','mod','12 jun 2026','bt','10'],['DPP-ABV-0101','hd','abv','20 abr 2026','av','9,5']];
+const MEDALS={
+  cco:{n:'Cruz do Comando',crit:'Serviços excepcionais ao Departamento. Concedida apenas pelo Comando-Geral.',rib:['#20284f','#b8963e','#20284f','#b8963e','#20284f'],m:'g'},
+  bra:{n:'Medalha de Bravura',crit:'Ato de coragem em ocorrência de alto risco, com risco à própria vida.',rib:['#7a2b2b','#b8963e','#7a2b2b'],m:'g'},
+  mop:{n:'Mérito Operacional',crit:'Participação decisiva em operação de destaque.',rib:['#24406e','#e8e4da','#24406e'],m:'g'},
+  min:{n:'Mérito Instrutor',crit:'20 turmas ministradas com avaliação positiva dos alunos.',rib:['#4f4290','#e8e4da','#4f4290'],m:'s'},
+  tsv:{n:'Tempo de Serviço',crit:'90 dias de serviço ativo sem punição disciplinar.',rib:['#2f6b48','#e8e4da','#2f6b48'],m:'s'},
+  hm:{n:'Honra ao Mérito',crit:'Reconhecimento por conduta exemplar em serviço.',rib:['#8a3434','#e8e4da','#24406e'],m:'b'}
+};
+const AWARDS=[['nc','bra','12 nov 2026','Resgate de refém na Operação Farol','av'],['cv','hm','05 nov 2026','Conduta exemplar em abordagem no Centro','hd'],
+  ['hd','mop','02 nov 2026','Coordenação da Operação Maré Alta (1ª fase)','av'],['rb','min','25 out 2026','20 turmas de Modulação','bt'],
+  ['os','cco','10 out 2026','Estruturação da CIT','av'],['lm','mop','18 set 2026','Desarticulação da rede Corvo','os'],['hd','tsv','01 set 2026','90 dias de serviço ativo','bt']];
+const STEPS=['Inscrições','Prova','Entrevista','Resultado'];
+const EDITAIS=[
+  {u:'VGD',num:'04/2026',t:'Vanguarda: acompanhamentos táticos',v:6,req:['Cabo ou acima','Curso de Modulação','30 dias sem punição'],per:'10 nov a 24 nov',step:0,st:'encerrando'},
+  {u:'DRE',num:'05/2026',t:'DRE: ingresso de agentes',v:4,req:['Soldado ou acima','Curso de Abordagem Veicular'],per:'15 nov a 30 nov',step:0,st:'aberto'},
+  {u:'DPU',num:'02/2026',t:'DPU: patrulhamento urbano',v:8,req:['Soldado ou acima'],per:'18 nov a 05 dez',step:0,st:'aberto'},
+  {u:'CIT',num:'03/2026',t:'CIT: investigação',v:3,req:['3º Sgt. ou acima','Curso de Negociação de Crises','Entrevista com o comando da CIT'],per:'01 nov a 15 nov',step:3,st:'resultado'},
+  {u:'CSA',num:'01/2026',t:'CSA: formação inicial',v:5,req:['Soldado ou acima','Curso de APH'],per:'01 out a 20 out',step:3,st:'encerrado'}
+];
+const ST_LABEL={aberto:['Aberto','ok'],encerrando:['Encerra em 2 dias','warn'],resultado:['Resultado publicado','neu'],encerrado:['Encerrado','bad']};
+const TURMAS=[['mod','Sex 21 nov · 20h','rb','8/12','aberta'],['abv','Dom 23 nov · 19h','hd','5/10','aberta'],['aph','Ter 25 nov · 21h','pr','10/10','lotada'],['neg','Sáb 29 nov · 18h','os','3/8','aberta']];
+const AVISOS=[['Operação Maré Alta: reforço no Porto neste sábado, às 21h','Cel. A. Verano','há 2 h'],['Novo uniforme de patrulha entra em vigor em 1º de dezembro','Maj. B. Teixeira','ontem'],['Código Penal 3.2 publicado, com mudanças nos arts. 11 e 21','Comando','17 nov']];
+
+const DOCS={
+  cp:{n:'Código Penal',pub:true,v:'3.2',date:'17 nov 2026',by:'Maj. B. Teixeira',canal:'#código-penal',parts:[
+    ['Título I · Crimes contra a pessoa',[
+      ['1','Homicídio doloso','Matar alguém de forma intencional.','60 meses','$ 30.000'],
+      ['2','Homicídio culposo','Matar alguém sem intenção, por imprudência, negligência ou imperícia.','25 meses','$ 10.000'],
+      ['3','Lesão corporal','Ofender a integridade física ou a saúde de outra pessoa.','15 meses','$ 5.000'],
+      ['4','Sequestro e cárcere privado','Privar alguém de liberdade, mantendo-o sob seu poder contra a vontade.','35 meses','$ 20.000']]],
+    ['Título II · Crimes contra o patrimônio',[
+      ['10','Furto','Subtrair coisa alheia móvel sem violência ou grave ameaça.','10 meses','$ 3.000'],
+      ['11','Roubo','Subtrair coisa alheia mediante grave ameaça ou violência à pessoa.','25 meses','$ 12.000',1],
+      ['12','Roubo a estabelecimento','Roubo praticado contra loja, posto ou banco, com ou sem reféns.','35 meses','$ 25.000'],
+      ['13','Receptação','Adquirir, guardar ou vender coisa que sabe ser produto de crime.','12 meses','$ 6.000']]],
+    ['Título III · Crimes de trânsito',[
+      ['20','Direção perigosa','Conduzir veículo colocando em risco a segurança de terceiros.','6 meses','$ 2.000'],
+      ['21','Fuga de abordagem','Desobedecer à ordem de parada dada por autoridade policial.','15 meses','$ 8.000',1],
+      ['22','Dirigir sem habilitação','Conduzir veículo automotor sem a devida habilitação.','—','$ 1.500']]]]},
+  rg:{n:'Regras e Termos da Cidade',pub:true,v:'5.0',date:'02 out 2026',by:'Administração Paralela RP',canal:'#regras-da-cidade',parts:[
+    ['Capítulo 1 · Conduta geral',[
+      ['1','RDM','É proibido matar sem motivo de roleplay que o justifique.'],
+      ['2','VDM','É proibido usar veículo como arma sem contexto de roleplay.'],
+      ['3','Metagaming','É proibido usar no jogo informação obtida fora dele.'],
+      ['4','Powergaming','É proibido forçar ações irreais ou sem chance de reação ao outro jogador.']]],
+    ['Capítulo 2 · Ações',[
+      ['10','Assalto a loja','De 2 a 4 participantes, até 2 reféns, apenas armamento leve.'],
+      ['11','Fuga limpa','A fuga só é válida se os envolvidos saírem do perímetro sem contato visual da polícia.'],
+      ['12','Código 5','Situação com refém em risco: negociação obrigatória antes de qualquer entrada tática.']]]]},
+  ri:{n:'Regulamento Interno',pub:false,v:'2.1',date:'20 set 2026',by:'Cel. A. Verano',canal:'#regulamento-interno',parts:[
+    ['Capítulo 1 · Hierarquia',[
+      ['1','Cadeia de comando','Toda ordem segue a cadeia de comando; ninguém dá ordem a superior hierárquico.'],
+      ['2','Continência','A continência é devida a todo superior, dentro e fora de serviço.'],
+      ['3','Tratamento','Superiores são tratados pela patente seguida do nome de guerra.']]],
+    ['Capítulo 2 · Conduta em serviço',[
+      ['10','Uso do rádio','Comunicação no rádio é curta, objetiva e segue o código Q.'],
+      ['11','Abordagem','Toda abordagem segue o procedimento do curso de Abordagem Veicular.'],
+      ['12','Uso da força','A força é progressiva e proporcional à ameaça.']]]]},
+  pt:{n:'Protocolos',pub:false,v:'1.4',date:'11 nov 2026',by:'Maj. B. Teixeira',canal:'#protocolos',parts:[['Protocolos operacionais',[['1','Código 3','Deslocamento com sirene e giroflex, prioridade máxima.'],['2','Código 5','Refém em risco; acionar negociador antes de entrada tática.']]]]},
+  vt:{n:'Viaturas',pub:false,v:'1.1',date:'30 out 2026',by:'1º Ten. H. Duarte',canal:'#viaturas',parts:[['Uso de viaturas',[['1','Viaturas de patrulha','Uso livre por qualquer PM em serviço.'],['2','Viaturas especializadas','Uso restrito a PMs com o curso correspondente.']]]]},
+  fd:{n:'Fardamento',pub:false,v:'2.0',date:'18 nov 2026',by:'Maj. B. Teixeira',canal:'#fardamento',parts:[['Uniformes',[['1','Uniforme de patrulha','Novo modelo obrigatório a partir de 1º de dezembro.'],['2','Uniforme de gala','Usado em cerimônias e entrega de condecorações.']]]]},
+  ar:{n:'Armamento',pub:false,v:'1.3',date:'05 out 2026',by:'Cap. O. Sarmento',canal:'#armamento',parts:[['Armamento',[['1','Armamento padrão','Pistola e taser para todo PM em serviço.'],['2','Armamento longo','Somente com Tiro Defensivo e autorização do oficial de dia.']]]]}
+};
+
+/* ================= utilidades ================= */
+const $=s=>document.querySelector(s);
+const P={home:'M2.5 7.5 8 3l5.5 4.5V13a.5.5 0 0 1-.5.5H10V10H6v3.5H3a.5.5 0 0 1-.5-.5z',unid:'M3 13.5v-10h6v10M9 6.5h4v7M2 13.5h12M5 6h2M5 8.5h2M5 11h2',
+ book:'M2.5 3.5h4A1.5 1.5 0 0 1 8 5v8.5A1.5 1.5 0 0 0 6.5 12h-4zM13.5 3.5h-4A1.5 1.5 0 0 0 8 5v8.5A1.5 1.5 0 0 1 9.5 12h4z',doc:'M4 1.5h5.5l3 3v10H4zM9.5 1.5v3h3M6 8h4.5M6 10.5h4.5',
+ cap:'M1.5 6 8 3l6.5 3L8 9zM4 7.2V11c1 1 2.5 1.5 4 1.5s3-.5 4-1.5V7.2',user:'M8 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM3 14c.5-2.7 2.5-4 5-4s4.5 1.3 5 4',
+ cert:'M2 3h12v8H2zM5 6h6M5 8h3M10.5 11v3.5l1.2-.8 1.3.8V11',medal:'M5.5 1.5 8 6l2.5-4.5M8 15a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z',
+ lock:'M4 7.5h8v6H4zM5.5 7.5V5a2.5 2.5 0 0 1 5 0v2.5',more:'M3 8h.01M8 8h.01M13 8h.01',plus:'M8 3v10M3 8h10',ext:'M9 2.5h4.5V7M13.5 2.5 7 9M11.5 9.5v4h-9v-9h4',
+ sync:'M2.5 6a5.5 5.5 0 0 1 10-2l1 1.5M13.5 10a5.5 5.5 0 0 1-10 2l-1-1.5M13.5 2.5v3h-3M2.5 13.5v-3h3',link:'M6.5 9.5l3-3M7 4.5l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1M9 11.5l-1 1A2.5 2.5 0 0 1 4.5 9l1-1',
+ copy:'M5.5 5.5h7v8h-7zM3.5 10.5v-8h7',dl:'M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10',check:'M3 8.5 6.5 12 13 4.5'};
+const ic=(k,cls)=>`<svg class="ico ${cls||''}" viewBox="0 0 16 16"><path d="${P[k]}"/></svg>`;
+function star(cx,cy,R,r){let p=[];for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,k=i%2?r:R;p.push((cx+k*Math.cos(a)).toFixed(1)+','+(cy+k*Math.sin(a)).toFixed(1));}return p.join(' ');}
+const crest=c=>`<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2 4 6v9c0 7.5 5.2 12.6 12 15 6.8-2.4 12-7.5 12-15V6z" style="fill:none;stroke:${c};stroke-width:1.8"/><polygon points="${star(16,16,6.3,2.7)}" style="fill:${c}"/></svg>`;
+const METAL={g:['#c9a65a','#6e5320'],s:['#c3c7cd','#59606b'],b:['#b58a5e','#6b4426']};
+function medal(id){const m=MEDALS[id],[mt,e]=METAL[m.m],w=32/m.rib.length;
+  return `<svg viewBox="0 0 60 86" aria-hidden="true">${m.rib.map((c,i)=>`<rect x="${(14+i*w).toFixed(2)}" y="0" width="${(w+.3).toFixed(2)}" height="34" fill="${c}"/>`).join('')}<rect x="14" y="32" width="32" height="2" fill="rgba(0,0,0,.25)"/><circle cx="30" cy="62" r="21" fill="${mt}" stroke="${e}" stroke-width="1.8"/><circle cx="30" cy="62" r="15.5" fill="none" stroke="${e}" opacity=".55"/><polygon points="${star(30,62,9.5,4)}" fill="${e}"/></svg>`;}
+const uc=u=>UNITS[u]?UNITS[u].c:'#8a8fa8';
+const tag=u=>`<span class="tag" style="--u:${uc(u)}">${u}</span>`;
+const ini=id=>PEOPLE[id].n.split(' ').map(s=>s[0]).slice(0,2).join('');
+const pname=id=>`${PEOPLE[id].p} ${PEOPLE[id].n}`;
+const avatar=id=>`<span class="av" style="background:color-mix(in srgb,${uc(PEOPLE[id].u)} 22%,var(--paper));color:var(--ink)">${ini(id)}</span>`;
+const who=id=>`<a class="who" href="#perfil/${id}">${avatar(id)}<span>${pname(id)}</span></a>`;
+const pill=st=>{const [l,c]=ST_LABEL[st];return `<span class="pill ${c}">${l}</span>`;};
+const ISTAT={ativo:['Ativo','ok'],suspenso:['Suspenso','warn'],expirado:['Expirado','bad'],aberta:['Inscrições abertas','ok'],lotada:['Lotada','warn']};
+const ip=s=>`<span class="pill ${ISTAT[s][1]}">${ISTAT[s][0]}</span>`;
+const sync=c=>`<span class="sync" title="Sincronizado com o Discord">${ic('sync')}${c}</span>`;
+const isOpen=e=>e.st==='aberto'||e.st==='encerrando';
+const role=()=>document.body.dataset.role;
+const ME={pm:'hd',cmd:'av'};
+const td=(h,v)=>`<td data-h="${h}">${v}</td>`;
+
+function toast(msg){const t=$('#toast');t.innerHTML=msg;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),3600);}
+document.addEventListener('click',e=>{const a=e.target.closest('[data-act]');if(a){e.preventDefault();toast(a.dataset.act);}});
+const act=(label,msg,cls)=>`<button class="btn ${cls||''}" data-act="${msg.replace(/"/g,'&quot;')}">${label}</button>`;
+const cmdAct=(label,msg)=>`<span class="need-cmd">${act(ic('plus')+label,'<b>No HUB real:</b> '+msg,'gold')}</span>`;
+
+/* ================= navegação ================= */
+const NAV1=[['inicio','home','Início'],['unidades','unid','Unidades'],['biblioteca','book','Biblioteca'],['editais','doc','Editais'],['cursos','cap','Cursos']];
+const NAV2=[['instrutores','user','Instrutores'],['certificados','cert','Certificados'],['honrarias','medal','Honrarias']];
+const PM_ONLY=new Set(['instrutores','certificados','honrarias','perfil']);
+const TITLES={inicio:'Início',unidades:'Unidades',biblioteca:'Biblioteca normativa',editais:'Editais',cursos:'Cursos',instrutores:'Instrutores',certificados:'Certificados',honrarias:'Honrarias',perfil:'Perfil'};
+
+function renderSide(cur){
+  const open=EDITAIS.filter(isOpen).length, r=role();
+  const item=([k,i,l])=>`<a href="#${k}" class="${cur===k?'on':''}">${ic(i)}${l}${k==='editais'?`<span class="n">${open}</span>`:''}${r==='vis'&&PM_ONLY.has(k)?ic('lock','lk'):''}</a>`;
+  const me=r==='vis'
+    ?`<div class="me" style="display:block"><p style="margin:0 0 10px;color:var(--ink2);font-size:12px">Entre para ver o conteúdo do efetivo.</p>${discordBtn}</div>`
+    :`<a class="me" href="#perfil/${ME[r]}">${avatar(ME[r])}<div>${pname(ME[r])}<small>${r==='cmd'?'Comando-Geral':'VGD · Instrutora'}</small></div></a>`;
+  $('#side').innerHTML=`<a class="brand" href="#inicio">${crest('var(--accent)')}<div>DPP HUB<small>Polícia de Paralela</small></div></a>
+    <div><div class="grp">Portal</div><nav>${NAV1.map(item).join('')}</nav></div>
+    <div><div class="grp">Efetivo</div><nav>${NAV2.map(item).join('')}${r!=='vis'?item(['perfil','user','Meu perfil']).replace('#perfil','#perfil/'+ME[r]):''}</nav></div>
+    ${r==='cmd'?`<div><div class="grp">Administração</div><nav><a href="#" data-act="<b>No HUB real:</b> painel de administração (mapa canal ↔ aba, cargos ↔ perfis, fila do bot e log de auditoria).">${ic('sync')}Painel do bot</a></nav></div>`:''}
+    ${me}`;
+  $('#tabbar').innerHTML=[['inicio','home','Início'],['editais','doc','Editais'],['biblioteca','book','Normas'],['cursos','cap','Cursos']].map(([k,i,l])=>`<a href="#${k}" class="${cur===k?'on':''}">${ic(i)}${l}</a>`).join('')+`<a href="#" id="moreBtn" class="${['unidades','instrutores','certificados','honrarias','perfil'].includes(cur)?'on':''}">${ic('more')}Mais</a>`;
+}
+const discordBtn=`<button class="discord" id="loginBtn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.6 5.3A16.5 16.5 0 0 0 15.5 4l-.5 1a15 15 0 0 0-6 0L8.5 4a16.5 16.5 0 0 0-4.1 1.3C1.8 9.2 1.1 13 1.4 16.8A16.6 16.6 0 0 0 6.5 19.4l1-1.6a10.6 10.6 0 0 1-1.6-.8l.4-.3a11.8 11.8 0 0 0 11.4 0l.4.3-1.6.8 1 1.6a16.5 16.5 0 0 0 5-2.6c.4-4.4-.7-8.2-2.9-11.5zM8.7 14.5c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2zm6.6 0c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2z"/></svg>Entrar com Discord</button>`;
+document.addEventListener('click',e=>{
+  if(e.target.closest('#loginBtn')){setRole('pm');toast('Login com Discord simulado: cargos lidos do servidor, perfil <b>PM</b> aplicado.');}
+  if(e.target.closest('#moreBtn')){e.preventDefault();document.body.classList.add('drawer');}
+});
+
+const header=(t,p,acts)=>`<div class="ph"><h1>${t}</h1>${p?`<p>${p}</p>`:''}${acts?`<div class="acts">${acts}</div>`:''}</div>`;
+
+/* ================= telas ================= */
+const V={};
+
+V.inicio=()=>{
+  const r=role(), open=EDITAIS.filter(isOpen);
+  const greet=r==='vis'?'Departamento de Polícia de Paralela':r==='cmd'?'Boa noite, Coronel Verano.':'Boa noite, Tenente Duarte.';
+  const sub=r==='vis'?'Normas, unidades, editais, cursos e honrarias da PM num só lugar, sincronizado com o Discord.':`Há ${open.length} editais abertos e uma turma de Modulação amanhã às 20h.`;
+  const stats=[[`${Object.values(UNITS).reduce((a,u)=>a+u.ef,0)+92}`,'PMs no efetivo'],[open.length,'editais abertos'],['212','certificados emitidos'],['37','honrarias concedidas']];
+  return header(greet,sub,r==='vis'?`<a class="btn sky" href="#editais">Ver editais abertos</a><a class="btn sky" href="#biblioteca">Ler o Código Penal</a>`:cmdAct('Publicar aviso','o aviso vai para o mural e o bot posta em <b>#avisos</b>.'))
+  +`<div class="stats">${stats.map(([n,l])=>`<div class="tile"><div class="num">${n}</div><small>${l}</small></div>`).join('')}</div>
+  <div class="g home">
+    <div class="tile" style="grid-area:avis"><p class="lbl">Mural de avisos ${sync('#avisos')}</p><ul class="list">${AVISOS.map(([t,a,d])=>`<li><div class="t">${t}</div><div class="m">${a} · ${d}</div></li>`).join('')}</ul></div>
+    <div class="tile" style="grid-area:edit"><p class="lbl">Editais abertos <a href="#editais">Ver todos</a></p><ul class="list">${open.map(e=>`<li><a class="t" href="#editais">${tag(e.u)}Edital ${e.num}</a><div class="m">${e.t.split(': ')[1]}</div><div class="m" style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:5px">${e.v} vagas · até ${e.per.split(' a ')[1]}${pill(e.st)}</div></li>`).join('')}</ul></div>
+    <div class="tile" style="grid-area:turm"><p class="lbl">Próximas turmas <a href="#cursos">Cursos</a></p><ul class="list">${TURMAS.slice(0,2).map(([c,d,i,v])=>`<li><div class="t">${COURSES[c].n}</div><div class="m">${d} · ${pname(i)} · ${v} vagas</div></li>`).join('')}</ul></div>
+    <div class="tile hon" style="grid-area:hon"><p class="lbl">Honraria recente <a class="need-pm" href="#honrarias">Quadro</a></p><div class="honor">${medal('bra')}<div><b>Medalha de Bravura</b><span>Sd. Nina Castilho · 12 nov</span></div></div><p class="muted" style="margin:12px 0 0;font-size:12.5px">${AWARDS[0][3]}.</p></div>
+    <div class="tile" style="grid-area:unid"><p class="lbl">Unidades <a href="#unidades">Ver todas</a></p><div class="units-mini">${Object.entries(UNITS).map(([k,u])=>`<a class="unit-mini" href="#unidades" style="--u:${u.c}"><b>${k}</b><span>${u.status==='ativa'?u.full:'em formação'}</span></a>`).join('')}</div></div>
+  </div>`;
+};
+
+V.unidades=()=>header('Unidades','Cada unidade tem seu próprio site, banco e comando. O HUB apresenta todas e aponta para elas.',cmdAct('Nova unidade','o admin cadastra nome, sigla, cor, brasão, link e o canal de edital no Discord, sem mexer em código.'))
+ +`<div class="g g3">${Object.entries(UNITS).map(([k,u])=>{const ed=EDITAIS.find(e=>e.u===k&&isOpen(e));return `<div class="tile ucard" style="--u:${u.c}">
+   <div class="hd"><div class="seal">${k}</div><div><h3>${u.full}</h3><span class="pill ${u.status==='ativa'?'ok':'neu'}">${u.status==='ativa'?'Ativa':'Em formação'}</span></div></div>
+   <p>${u.desc}</p>
+   <dl class="kv"><dt>Comando</dt><dd>${u.cmd}</dd><dt>Efetivo</dt><dd>${u.ef} PMs</dd><dt>Edital</dt><dd>${ed?`<a href="#editais">${ed.num} · aberto</a>`:'nenhum aberto'}</dd></dl>
+   <div class="ft">${u.site?`<a class="btn" href="https://${u.site}" target="_blank" rel="noopener">${ic('ext')}Abrir site</a>`:`<button class="btn ghost" disabled>Sem site próprio</button>`}${sync(u.canal)}</div></div>`;}).join('')}
+   <div class="add need-cmd"><div>${ic('plus')}<div style="margin-top:6px;font-weight:600">Cadastrar unidade</div><div style="opacity:.7;font-size:12.5px">Aparece aqui sem deploy</div></div></div></div>`;
+
+V.biblioteca=(doc,art)=>{
+  doc=DOCS[doc]?doc:'cp'; const d=DOCS[doc], r=role(), locked=!d.pub&&r==='vis';
+  const link=(k)=>{const x=DOCS[k];return `<a href="#biblioteca/${k}" class="${k===doc?'on':''}"><div>${x.n}<small>v${x.v} · ${x.date}</small></div>${!x.pub?ic('lock','lk'):''}</a>`;};
+  const list=`<div class="tile docs"><p class="lbl">Normas</p>${['cp','rg','ri'].map(link).join('')}<div class="sep"></div><p class="lbl" style="margin-top:12px">Manuais operacionais</p>${['pt','vt','fd','ar'].map(link).join('')}</div>`;
+  let body;
+  if(locked){body=`<div class="tile locked"><div class="lkbig">${ic('lock')}</div><h2>${d.n} é de uso restrito</h2><p>O ${d.n} e os manuais operacionais só aparecem para quem entra com uma conta do Discord que tenha cargo de PM no servidor Polícia Paralela.</p>${discordBtn}</div>`;}
+  else{
+    body=`<div class="tile reader"><div class="rh"><span class="lbl" style="margin:0">${d.pub?'Público':'Restrito ao efetivo'}</span><h2>${d.n}</h2>
+      <div class="meta"><span>Versão ${d.v} · publicada em ${d.date} por ${d.by}</span>${doc==='cp'?`<a href="#" data-act="<b>No HUB real:</b> tela de diferenças entre a v3.1 e a v3.2 (arts. 11 e 21 alterados).">Ver o que mudou</a>`:''}<a href="#" data-act="<b>No HUB real:</b> baixa o PDF original do Storage.">${ic('dl')} PDF original</a>${sync(d.canal)}</div>
+      <div style="margin-top:12px">${cmdAct('Publicar nova versão','grava a versão com data e autor, e o bot posta o resumo das mudanças em <b>'+d.canal+'</b>.')}</div></div>
+      <div class="rb"><nav class="toc"><input placeholder="Buscar no texto…" id="docq">${d.parts.map(([t,arts])=>`<a href="#biblioteca/${doc}/art-${arts[0][0]}" style="font-weight:600;color:var(--ink)">${t.split(' · ')[0]}</a>${arts.map(a=>`<a href="#biblioteca/${doc}/art-${a[0]}">Art. ${a[0]} · ${a[1]}</a>`).join('')}`).join('')}</nav>
+      <div class="text" id="doctext">${d.parts.map(([t,arts])=>`<h3>${t.split(' · ')[0]}</h3><h4>${t.split(' · ')[1]}</h4>${arts.map(([n,ti,tx,pe,mu,nw])=>`<div class="art${art==='art-'+n?' hl':''}" id="art-${n}" data-s="${(ti+' '+tx).toLowerCase()}"><div class="no">Art. ${n}${nw?'<span class="new">alterado na v3.2</span>':''}</div><h5>${ti}</h5><p>${tx}</p>${pe?`<div class="pena"><b>Pena:</b> ${pe} · <b>Multa:</b> ${mu}</div>`:''}<div class="tools"><button data-act="Link copiado: <b>dpp-hub.vercel.app/#biblioteca/${doc}/art-${n}</b>">${'Copiar link'}</button><button data-act="Artigo copiado: <b>Art. ${n} · ${ti}</b>">Copiar artigo</button></div></div>`).join('')}`).join('')}</div></div></div>`;
+  }
+  return header('Biblioteca normativa','O texto das normas em HTML, com índice, busca e link direto para cada artigo. O PDF original continua disponível.')+`<div class="lib">${list}${body}</div>`;
+};
+
+let edFilter={u:'Todas',s:'Abertos'};
+V.editais=()=>{
+  const r=role();
+  const list=EDITAIS.filter(e=>(edFilter.u==='Todas'||e.u===edFilter.u)&&(edFilter.s==='Todos'||(edFilter.s==='Abertos'?isOpen(e):!isOpen(e))));
+  const chipsU=['Todas',...Object.keys(UNITS)].map(u=>`<button class="chip ${edFilter.u===u?'on':''}" data-fu="${u}">${u}</button>`).join('');
+  const chipsS=['Abertos','Encerrados','Todos'].map(s=>`<button class="chip ${edFilter.s===s?'on':''}" data-fs="${s}">${s}<i>${s==='Todos'?EDITAIS.length:EDITAIS.filter(e=>s==='Abertos'?isOpen(e):!isOpen(e)).length}</i></button>`).join('');
+  return header('Editais','Vagas abertas em cada unidade, com requisitos, prazo e etapas. Visitantes também veem os editais abertos.',cmdAct('Novo edital','o edital entra como rascunho; ao abrir, o bot posta no canal da unidade e em <b>#editais</b>.'))
+  +`<div class="chips">${chipsS}</div><div class="chips">${chipsU}</div>
+  <div class="g g2">${list.map(e=>`<div class="tile ecard" style="--u:${uc(e.u)}">
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">${tag(e.u)}<span class="muted" style="font-size:12px;margin-right:auto">Edital ${e.num}</span>${pill(e.st)}</div>
+    <h3>${e.t}</h3>
+    <div class="facts"><span><b>Vagas</b> ${e.v}</span><span><b>Inscrições</b> ${e.per}</span></div>
+    <div><p class="lbl" style="margin:4px 0 6px">Requisitos</p><ul>${e.req.map(x=>`<li>${x}</li>`).join('')}</ul></div>
+    <div class="steps">${STEPS.map((s,i)=>`<div class="${i<e.step?'done':i===e.step?'cur':''}">${s}</div>`).join('')}</div>
+    <div class="ft">${isOpen(e)?(r==='vis'?`<button class="btn" disabled>Entre para se inscrever</button>`:act('Me inscrever<span class="soon">fase 2</span>','<b>Fase 2:</b> o HUB confere os requisitos no seu perfil (patente e cursos) e gera a inscrição.')):act('Ver resultado','<b>No HUB real:</b> lista de aprovados do edital '+e.num+'.','ghost')}${act('Edital completo','<b>No HUB real:</b> página do edital '+e.num+' com o texto integral.','ghost')}<span style="margin-left:auto">${sync(UNITS[e.u].canal)}</span></div>
+  </div>`).join('')||`<div class="tile muted">Nenhum edital com esses filtros.</div>`}</div>`;
+};
+document.addEventListener('click',e=>{const u=e.target.closest('[data-fu]'),s=e.target.closest('[data-fs]');if(u){edFilter.u=u.dataset.fu;route();}if(s){edFilter.s=s.dataset.fs;route();}});
+
+V.cursos=()=>header('Cursos','Catálogo de cursos da PM, próximas turmas e quem está licenciado para ministrar cada um.',cmdAct('Nova turma','a turma vira post em <b>#editais</b> (Cursos) e as inscrições abrem.'))
+ +`<div class="tile" style="margin-bottom:12px"><p class="lbl">Próximas turmas ${sync('#editais (Cursos)')}</p><table class="tbl"><thead><tr><th>Curso</th><th>Quando</th><th>Instrutor</th><th>Vagas</th><th>Status</th><th></th></tr></thead><tbody>
+  ${TURMAS.map(([c,d,i,v,s])=>`<tr>${td('Curso',`<b>${COURSES[c].n}</b>`)}${td('Quando',d)}${td('Instrutor',role()==='vis'?pname(i):who(i))}${td('Vagas',v)}${td('Status',ip(s))}${td('',s==='aberta'?(role()==='vis'?'<span class="muted">Entre para se inscrever</span>':act('Inscrever-me','Inscrição registrada na turma de <b>'+COURSES[c].n+'</b>. O instrutor recebe aviso no Discord.','ghost')):'')}</tr>`).join('')}</tbody></table></div>
+ <div class="g g3">${Object.entries(COURSES).map(([k,c])=>{const n=CERTS.filter(x=>x[2]===k).length*17+3,ins=INSTR.filter(x=>x[1]===k&&x[4]==='ativo').length;return `<div class="tile ccard">
+   <span class="ch">DPP-${c.code}</span><h3>${c.n}</h3><p>${c.d}</p>
+   <div class="facts"><span><b>Carga</b> ${c.h}</span><span><b>Pré-requisito</b> ${c.pre}</span></div>
+   <div class="facts"><span><b>Aprovados</b> ${n}</span><span><b>Instrutores ativos</b> ${ins}</span></div>
+   <div class="ft">${c.mat?`<a class="btn ghost" href="https://${c.mat}" target="_blank" rel="noopener">${ic('ext')}Material na VGD</a>`:''}<a class="btn ghost need-pm" href="#instrutores">Instrutores</a></div></div>`;}).join('')}</div>`;
+
+let insFilter='todos';
+V.instrutores=()=>{
+  const rows=INSTR.filter(x=>insFilter==='todos'||x[1]===insFilter);
+  return header('Instrutores','Registro oficial de quem está licenciado a ministrar cada curso. A licença no HUB dá o cargo de instrutor no Discord, e vice-versa.',cmdAct('Licenciar instrutor','a licença é gravada e o bot dá o cargo <b>Instrutor · curso</b> no Discord.'))
+  +`<div class="chips">${['todos',...Object.keys(COURSES)].map(k=>`<button class="chip ${insFilter===k?'on':''}" data-fi="${k}">${k==='todos'?'Todos os cursos':COURSES[k].n}</button>`).join('')}</div>
+  <div class="tile"><table class="tbl"><thead><tr><th>Instrutor</th><th>Curso</th><th>Unidade</th><th>Licenciado em</th><th>Concedida por</th><th>Status</th></tr></thead><tbody>
+  ${rows.map(([p,c,d,b,s])=>`<tr>${td('Instrutor',who(p))}${td('Curso',COURSES[c].n)}${td('Unidade',tag(PEOPLE[p].u))}${td('Licenciado em',d)}${td('Concedida por',pname(b))}${td('Status',ip(s))}</tr>`).join('')}</tbody></table></div>`;
+};
+document.addEventListener('click',e=>{const f=e.target.closest('[data-fi]');if(f){insFilter=f.dataset.fi;route();}});
+
+V.certificados=()=>header('Certificados','Registro de aprovações por curso. Cada certificado tem um código que qualquer pessoa pode conferir.',cmdAct('Lançar aprovação','o bot posta em <b>#aprovados</b>, menciona o PM e pode dar o cargo do curso.'))
+ +`<div class="g g2" style="margin-bottom:12px;align-items:start">
+   <div class="tile"><p class="lbl">Verificar certificado</p><p class="muted" style="margin:0 0 12px">Digite o código impresso no certificado. Experimente <code class="c">DPP-MOD-0412</code>.</p>
+     <div class="verify"><input id="vcode" placeholder="DPP-XXX-0000" value=""><button class="btn" id="vbtn">${ic('check')}Verificar</button></div><div class="vres" id="vres"></div></div>
+   <div class="tile cert" id="certprev"><div class="k">Departamento de Polícia de Paralela</div><h3>Certificado de conclusão</h3><p>Certificamos que</p><div class="nm">Sd. Caio Ventura</div><p>concluiu o curso de <b>Modulação</b> em 14 nov 2026,<br>ministrado por 3º Sgt. Rafael Brandão.</p><p style="margin-top:12px"><code class="c">DPP-MOD-0412</code></p></div>
+ </div>
+ <div class="tile"><p class="lbl">Aprovações recentes ${sync('#aprovados')}</p><table class="tbl"><thead><tr><th>Código</th><th>PM</th><th>Curso</th><th>Data</th><th>Instrutor</th><th>Nota</th></tr></thead><tbody>
+ ${CERTS.map(([k,p,c,d,i,n])=>`<tr>${td('Código',`<code class="c">${k}</code>`)}${td('PM',who(p))}${td('Curso',COURSES[c].n)}${td('Data',d)}${td('Instrutor',pname(i))}${td('Nota',n)}</tr>`).join('')}</tbody></table></div>`;
+document.addEventListener('click',e=>{if(e.target.closest('#vbtn')){const v=$('#vcode').value.trim().toUpperCase(),c=CERTS.find(x=>x[0]===v),o=$('#vres');
+  o.className='vres show '+(c?'good':'nope');
+  o.innerHTML=c?`<b>Certificado autêntico.</b> ${pname(c[1])} concluiu <b>${COURSES[c[2]].n}</b> em ${c[3]}, com ${pname(c[4])}.`:`<b>Código não encontrado.</b> Confira se foi digitado exatamente como no certificado.`;}});
+
+V.honrarias=()=>{
+  const ids=Object.keys(MEDALS);
+  return header('Honrarias','Condecorações e medalhas do Departamento, em ordem de precedência, e o quadro de quem recebeu cada uma.',cmdAct('Conceder honraria','o bot posta em <b>#condecorações</b> com a imagem da medalha e menciona o PM.'))
+  +`<div class="mgrid" style="margin-bottom:12px">${ids.map((k,i)=>`<div class="tile mcard${i<1?' hon':''}">${medal(k)}<div><span class="ord">${i+1}ª em precedência</span><h3>${MEDALS[k].n}</h3><p>${MEDALS[k].crit}</p><span class="cnt">${AWARDS.filter(a=>a[1]===k).length} agraciado(s)</span></div></div>`).join('')}</div>
+  <div class="tile"><p class="lbl">Quadro de agraciados ${sync('#condecorações')}</p><table class="tbl"><thead><tr><th>PM</th><th>Honraria</th><th>Data</th><th>Motivo</th><th>Concedida por</th></tr></thead><tbody>
+  ${AWARDS.map(([p,m,d,mo,b])=>`<tr>${td('PM',who(p))}${td('Honraria',`<b>${MEDALS[m].n}</b>`)}${td('Data',d)}${td('Motivo',mo)}${td('Concedida por',pname(b))}</tr>`).join('')}</tbody></table></div>`;
+};
+
+V.perfil=(id)=>{
+  id=PEOPLE[id]?id:ME[role()]||'hd'; const p=PEOPLE[id], mine=id===ME[role()];
+  const certs=CERTS.filter(c=>c[1]===id), lic=INSTR.filter(x=>x[0]===id), aw=AWARDS.filter(a=>a[0]===id);
+  const tl=[...certs.map(c=>[c[3],`Aprovado em ${COURSES[c[2]].n}`,c[0]]),...lic.map(l=>[l[2],`Licenciado instrutor de ${COURSES[l[1]].n}`,'por '+pname(l[3])]),...aw.map(a=>[a[2],`Recebeu ${MEDALS[a[1]].n}`,a[3]])]
+    .sort((a,b)=>dkey(b[0])-dkey(a[0]));
+  return header(mine?'Meu perfil':'Perfil do PM','Montado a partir dos módulos do HUB: cursos, licenças e honrarias, sem cadastro duplicado.')
+  +`<div class="tile" style="margin-bottom:12px"><div class="prof"><span class="av" style="background:color-mix(in srgb,${uc(p.u)} 24%,var(--paper));color:var(--ink)">${ini(id)}</span>
+    <div><h2>${p.p} ${p.n}</h2><div class="sub">${UNITS[p.u]?tag(p.u)+UNITS[p.u].full:'<span class="pill neu">Comando-Geral</span>'}<span>${p.dc} no Discord</span><span>No DPP desde ${p.since}</span></div></div>
+    <div class="ft">${mine?act('Editar perfil','<b>No HUB real:</b> só foto e unidade; nome e patente vêm do apelido e dos cargos no Discord.','ghost'):''}${cmdAct('Conceder honraria','o bot posta em <b>#condecorações</b> mencionando '+p.n+'.')}</div></div></div>
+  <div class="stats">${[[certs.length,'cursos concluídos'],[lic.filter(l=>l[4]==='ativo').length,'licenças de instrutor'],[aw.length,'honrarias'],[p.since,'no DPP desde']].map(([n,l])=>`<div class="tile"><div class="num">${n}</div><small>${l}</small></div>`).join('')}</div>
+  <div class="g g2" style="align-items:start">
+    <div class="tile"><p class="lbl">Cursos e certificados</p>${certs.length?`<ul class="list">${certs.map(c=>`<li><div class="t">${COURSES[c[2]].n}</div><div class="m">${c[3]} · nota ${c[5]} · <code class="c">${c[0]}</code></div></li>`).join('')}</ul>`:'<p class="muted" style="margin:0">Nenhum curso concluído ainda.</p>'}</div>
+    <div class="tile"><p class="lbl">Licenças de instrutor</p>${lic.length?`<ul class="list">${lic.map(l=>`<li><div class="t" style="display:flex;justify-content:space-between;gap:8px">${COURSES[l[1]].n}${ip(l[4])}</div><div class="m">desde ${l[2]} · concedida por ${pname(l[3])}</div></li>`).join('')}</ul>`:'<p class="muted" style="margin:0">Não é instrutor.</p>'}</div>
+    <div class="tile hon"><p class="lbl">Honrarias</p>${aw.length?`<div class="medals-row">${aw.map(a=>`<figure>${medal(a[1])}${MEDALS[a[1]].n}<br>${a[2].slice(0,6)}</figure>`).join('')}</div>`:'<p class="muted" style="margin:0">Nenhuma honraria ainda.</p>'}</div>
+    <div class="tile"><p class="lbl">Linha do tempo <span class="soon" style="color:var(--ink2)">promoções na fase 3</span></p>${tl.length?`<ul class="tl">${tl.map(([d,t,s])=>`<li><b>${t}</b><span>${d} · ${s}</span></li>`).join('')}</ul>`:'<p class="muted" style="margin:0">Sem registros.</p>'}</div>
+  </div>`;
+};
+const MES={jan:1,fev:2,mar:3,abr:4,mai:5,jun:6,jul:7,ago:8,set:9,out:10,nov:11,dez:12};
+function dkey(s){const [d,m,y]=s.split(' ');return (+y)*400+MES[m]*31+(+d);}
+
+V.locked=(k)=>header(TITLES[k],'')+`<div class="tile locked"><div class="lkbig">${ic('lock')}</div><h2>Conteúdo do efetivo</h2><p>${TITLES[k]} só aparece para quem entra com uma conta do Discord que tenha cargo de PM no servidor Polícia Paralela. O que você pode editar vem dos cargos que já tem lá.</p>${discordBtn}</div>`;
+
+/* ================= roteador ================= */
+function route(){
+  const [k0,a,b]=(location.hash.slice(1)||'inicio').split('/'); const k=V[k0]&&k0!=='locked'?k0:'inicio';
+  const r=role(), locked=r==='vis'&&PM_ONLY.has(k);
+  renderSide(k==='perfil'&&a&&a!==ME[r]?'':k);
+  $('#crumb').innerHTML=`DPP HUB / <b>${TITLES[k]}</b>`;
+  $('#view').innerHTML=locked?V.locked(k):V[k](a,b);
+  document.body.classList.remove('drawer');
+  document.title=`${TITLES[k]} · DPP HUB`;
+  if(k==='biblioteca'&&b){const el=document.getElementById(b);if(el)setTimeout(()=>el.scrollIntoView({block:'start'}),30);}
+  else if(!route._keep) window.scrollTo(0,0);
+  route._keep=false;
+  const dq=$('#docq'); if(dq) dq.addEventListener('input',()=>{const q=dq.value.trim().toLowerCase();document.querySelectorAll('#doctext .art').forEach(x=>x.style.display=!q||x.dataset.s.includes(q)?'':'none');});
+}
+window.addEventListener('hashchange',route);
+function setRole(r){document.body.dataset.role=r;document.querySelectorAll('#mock [data-role]').forEach(b=>b.classList.toggle('on',b.dataset.role===r));route._keep=true;route();}
+document.querySelectorAll('#mock [data-role]').forEach(b=>b.onclick=()=>setRole(b.dataset.role));
+$('#menuBtn').onclick=()=>document.body.classList.add('drawer');
+$('#scrim').onclick=()=>document.body.classList.remove('drawer');
+
+/* ================= busca (Ctrl K) ================= */
+function index(){
+  const r=role(),out=[];
+  Object.entries(DOCS).forEach(([k,d])=>{if(!d.pub&&r==='vis')return;d.parts.forEach(([,arts])=>arts.forEach(a=>out.push(['Artigo',`Art. ${a[0]} · ${a[1]}`,d.n,`#biblioteca/${k}/art-${a[0]}`])));});
+  Object.values(COURSES).forEach(c=>out.push(['Curso',c.n,`${c.h} · ${c.pre}`,'#cursos']));
+  EDITAIS.forEach(e=>out.push(['Edital',`Edital ${e.num} · ${e.u}`,e.t,'#editais']));
+  Object.entries(UNITS).forEach(([k,u])=>out.push(['Unidade',k,u.full,'#unidades']));
+  if(r!=='vis'){Object.entries(PEOPLE).forEach(([k,p])=>out.push(['Pessoa',`${p.p} ${p.n}`,p.u,`#perfil/${k}`]));Object.values(MEDALS).forEach(m=>out.push(['Honraria',m.n,m.crit,'#honrarias']));CERTS.forEach(c=>out.push(['Certificado',c[0],`${pname(c[1])} · ${COURSES[c[2]].n}`,'#certificados']));}
+  return out;
+}
+const norm=s=>s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+function search(){const q=norm($('#q').value.trim()),all=index();
+  const res=(q?all.filter(x=>norm(x[1]+' '+x[2]).includes(q)):all.filter(x=>x[0]!=='Artigo').slice(0,8)).slice(0,12);
+  $('#sres').innerHTML=res.length?res.map(([k,t,s,h],i)=>`<a href="${h}" class="${i?'':'sel'}"><span class="k">${k}</span><div>${t}<small>${s}</small></div></a>`).join(''):`<div class="empty">Nada encontrado para “${$('#q').value}”.</div>`;}
+function openSearch(){$('#overlay').classList.add('open');$('#q').value='';search();setTimeout(()=>$('#q').focus(),20);}
+function closeSearch(){$('#overlay').classList.remove('open');}
+$('#searchBtn').onclick=openSearch;
+$('#q').addEventListener('input',search);
+$('#q').addEventListener('keydown',e=>{if(e.key==='Enter'){const a=$('#sres a');if(a){location.hash=a.getAttribute('href');closeSearch();}}});
+$('#overlay').addEventListener('click',e=>{if(e.target.id==='overlay'||e.target.closest('#sres a'))closeSearch();});
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openSearch();}if(e.key==='Escape'){closeSearch();document.body.classList.remove('drawer');}});
+
+/* ================= tema ================= */
+(function(){
+  const r=document.documentElement,b=$('#themeBtn');
+  try{const s=localStorage.getItem('dpphub-theme');if(s)r.setAttribute('data-theme',s);}catch(e){}
+  const cur=()=>r.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+  const lbl=()=>{b.textContent=cur()==='dark'?'☀':'☾';b.title=cur()==='dark'?'Modo claro':'Modo escuro';};
+  b.onclick=()=>{const n=cur()==='dark'?'light':'dark';r.setAttribute('data-theme',n);try{localStorage.setItem('dpphub-theme',n);}catch(e){}lbl();};
+  lbl();
+})();
+route();
+</script>
+</body>
+</html>
